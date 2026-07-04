@@ -19,7 +19,7 @@ import { getModelCatalogue, pricingKey } from '../pricing'
 import type { AiProviderModel } from '../drivers/types'
 import type { AiProviderId } from '../runtime/types'
 
-const VALID_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'ollama', 'openrouter', 'openai-compatible']
+const VALID_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'ollama', 'openrouter', 'openai-compatible', 'minimax']
 
 export function tryHandleAiModels(
   req: Request,

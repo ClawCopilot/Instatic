@@ -37,6 +37,7 @@ const ProviderId = Type.Union([
   Type.Literal('ollama'),
   Type.Literal('openrouter'),
   Type.Literal('openai-compatible'),
+  Type.Literal('minimax'),
 ])
 
 const CreateBodySchema = Type.Union([

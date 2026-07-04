@@ -13,6 +13,7 @@ import { openaiDriver } from './openai'
 import { ollamaDriver } from './ollama'
 import { openrouterDriver } from './openrouter'
 import { openaiCompatibleDriver } from './openaiCompatible'
+import { minimaxDriver } from './minimax'
 
 const DRIVERS: Record<AiProviderId, AiProvider> = {
   anthropic: anthropicDriver,
@@ -20,6 +21,7 @@ const DRIVERS: Record<AiProviderId, AiProvider> = {
   ollama: ollamaDriver,
   openrouter: openrouterDriver,
   'openai-compatible': openaiCompatibleDriver,
+  minimax: minimaxDriver,
 }
 
 /** Returns the driver for a provider id, or throws if unknown. */

@@ -27,7 +27,7 @@ import { ApiError } from '@core/http'
 import styles from '../AiPage.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
-type ProviderId = 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'openai-compatible'
+type ProviderId = 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'openai-compatible' | 'minimax'
 type AuthMode = 'apiKey' | 'baseUrl'
 
 // Each provider has exactly one credential shape; the UI derives it instead
@@ -36,6 +36,7 @@ const PROVIDERS: Array<{ id: ProviderId; label: string; authMode: AuthMode }> = 
   { id: 'anthropic', label: 'Anthropic (Claude)', authMode: 'apiKey' },
   { id: 'openai', label: 'OpenAI', authMode: 'apiKey' },
   { id: 'openrouter', label: 'OpenRouter', authMode: 'apiKey' },
+  { id: 'minimax', label: 'MiniMax', authMode: 'apiKey' },
   { id: 'ollama', label: 'Ollama (local)', authMode: 'baseUrl' },
   { id: 'openai-compatible', label: 'Custom Provider', authMode: 'baseUrl' },
 ]
@@ -49,6 +50,7 @@ const PROVIDER_LABEL: Record<ProviderId, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
+  minimax: 'MiniMax',
   ollama: 'Ollama',
   'openai-compatible': 'Custom Provider',
 }
