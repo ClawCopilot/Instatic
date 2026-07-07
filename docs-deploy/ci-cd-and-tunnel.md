@@ -1,8 +1,9 @@
-# Instatic 合体镜像 — 原理与操作手册
+# Instatic + Cloudflare Tunnel — 原理与操作手册
 
 > **最后更新**: 2026-07-07
 > **适用版本**: Instatic v0.0.10+
-> 设计模式参考: link-nvidia 合体镜像架构（sing-box + cloudflared + 应用 → 单容器）
+>
+> 核心价值：一个 `docker run` 命令即可将 Instatic CMS 通过 Cloudflare Tunnel 发布到公网，无需开放服务器端口。
 
 ---
 
@@ -11,11 +12,11 @@
 1. [设计原理](#1-设计原理)
 2. [文件清单](#2-文件清单)
 3. [Docker Compose 叠加模式](#3-docker-compose-叠加模式)
-4. [GitHub Actions CI/CD](#4-github-actions-cicd)
-5. [本地构建与部署](#5-本地构建与部署)
-6. [Cloudflare Tunnel 配置](#6-cloudflare-tunnel-配置)
-7. [sing-box 选配](#7-sing-box-选配)
-8. [start.sh 启动流程](#8-startsh-启动流程)
+4. [快速开始：Cloudflare Tunnel 托管 Instatic](#4-快速开始cloudflare-tunnel-托管-instati)
+5. [GitHub Actions CI/CD](#5-github-actions-cicd)
+6. [本地构建与部署](#6-本地构建与部署)
+7. [start.sh 启动流程](#7-startsh-启动流程)
+8. [sing-box 选配（可选代理层）](#8-sing-box-选配可选代理层)
 9. [安全扫描 (Trivy)](#9-安全扫描-trivy)
 10. [故障排查](#10-故障排查)
 
@@ -23,59 +24,81 @@
 
 ## 1. 设计原理
 
-### 为什么合体？
+### 解决什么问题？
 
-传统微服务部署需要 2~3 个独立容器（Instatic + cloudflared + sing-box），管理多个进程间网络、健康检查和启动顺序。
+你需要把 Instatic CMS 发布到公网，但服务器：
+- 没有公网 IP（NAT/家庭宽带/内网环境）
+- 不能开放端口（安全策略限制）
+- 不想配置繁琐的 Nginx + Let's Encrypt
 
-合体方案将所有二进制编入同一个 Docker 镜像，`start.sh` 统一编排，实现**单容器一体运行**：
+**Cloudflare Tunnel** 完美解决这个问题：cloudflared 主动向 Cloudflare 发起**出站** QUIC 连接，Cloudflare CDN 反向代理到你的服务器。不需要公网 IP，不需要开放端口，流量还自带 Cloudflare DDoS 防护。
+
+### 合体镜像设计
+
+将 cloudflared 二进制直接编入 Instatic 镜像，`start.sh` 在容器内统一编排：
 
 ```
-┌──────────────────────────────────────────────┐
-│              Instatic 合体镜像               │
-│                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ sing-box │  │ Instatic │  │cloudflared│   │
-│  │ (可选)   │  │ CMS 核心  │  │ (可选)    │   │
-│  │ :8080    │  │ :3001    │  │ Tunnel    │   │
-│  └──────────┘  └──────────┘  └──────────┘   │
-│       ▲              ▲              ▲        │
-│       └──────────────┼──────────────┘        │
-│               start.sh 编排                  │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│          Instatic 合体镜像               │
+│                                          │
+│  ┌──────────┐    ┌──────────────────┐    │
+│  │ Instatic │    │   cloudflared    │    │
+│  │ CMS 核心  │   │  Tunnel (可选)    │    │
+│  │ :3001    │    │  管理出站连接      │    │
+│  └──────────┘    └──────────────────┘    │
+│       │                  │               │
+│       └──────┬───────────┘               │
+│         start.sh 编排                    │
+│                                          │
+│  sing-box   (可选代理层，默认不启动)       │
+└──────────────────────────────────────────┘
+```
+
+```
+公网用户
+    │
+    ▼
+Cloudflare CDN (cms.example.com, :443)
+    │
+    │ QUIC 加密隧道（出站连接）
+    ▼
+你的服务器 → Instatic 容器 (start.sh)
+              └─ cloudflared → localhost:3001
 ```
 
 **收益**：
 - 单 `docker run` 启动，零外部依赖
-- 无需健康检查编排、无需 network bridge 通信
-- 运维成本从 3 服务降到 1 服务
+- 无需健康检查编排、无需 network bridge
+- 运维成本从 Nginx + certbot + app → 1 个容器
 - Fly.io / Railway 等 PaaS 平台可直接部署
+- sing-box 作为可选的附加能力，有需要时挂载配置即可
 
 ### Dockerfile 构建流程
 
 ```
 第一阶段:  oven/bun  →  npm build（前端 + 服务端）
 第二阶段:  oven/bun  →  npm install --production（仅生产依赖）
-第三阶段:  alpine    →  下载 sing-box 二进制
-第四阶段:  alpine    →  下载 cloudflared 二进制
+第三阶段:  alpine    →  下载 cloudflared 二进制
+第四阶段:  alpine    →  下载 sing-box 二进制（可选代理层）
 第五阶段:  oven/bun  →  组装 runtime 镜像
              ├─ COPY 第二阶段 node_modules
              ├─ COPY 第一阶段 dist
-             ├─ COPY 第三阶段 sing-box
-             ├─ COPY 第四阶段 cloudflared
-             ├─ COPY start.sh + 配置文件
+             ├─ COPY 第三阶段 cloudflared
+             ├─ COPY 第四阶段 sing-box
+             ├─ COPY start.sh + 配置模板
              └─ CMD ["start.sh"]
 ```
 
-第三、四阶段独立于业务代码，Docker BuildKit 会自动缓存这两个下载层。**改代码不重复下载 sing-box/cloudflared**。
+第三、四阶段独立于业务代码，Docker BuildKit 会自动缓存。**改代码不重复下载 cloudflared/sing-box**。
 
 ### 启动选择逻辑
 
 | 条件 | 行为 |
 |------|------|
-| `/app/sing-box-config.json` 不存在 | sing-box **不启动** |
-| `/app/sing-box-config.json` 存在 | sing-box 后台运行 |
-| `CLOUDFLARE_TUNNEL_TOKEN` 未设置 | cloudflared **不启动**，Instatic 前台运行 |
-| `CLOUDFLARE_TUNNEL_TOKEN` 已设置 | cloudflared 前台运行（接管主进程） |
+| `CLOUDFLARE_TUNNEL_TOKEN` 已设置 | cloudflared 前台运行并自动建立隧道（推荐） |
+| `CLOUDFLARE_TUNNEL_TOKEN` 未设置 | cloudflared 不启动，Instatic 前台运行 |
+| `/app/sing-box-config.json` 存在 | sing-box 后台运行（可选代理） |
+| `/app/sing-box-config.json` 不存在 | sing-box **不启动**（默认） |
 
 ---
 
@@ -83,9 +106,9 @@
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
-| `Dockerfile` | 镜像定义 | 五阶段构建，合体镜像 |
-| `start.sh` | 启动脚本 | 编排 sing-box + Instatic + cloudflared |
-| `sing-box-config.json` | 配置模板 | 默认不启用，挂载时启动 sing-box |
+| `Dockerfile` | 镜像定义 | 五阶段构建，内置 cloudflared + sing-box（可选） |
+| `start.sh` | 启动脚本 | 编排 Instatic + cloudflared（sing-box 可选） |
+| `sing-box-config.json` | 配置模板 | sing-box 可选代理层配置，默认不启用 |
 | `compose.prod.yml` | Compose 基座 | PostgreSQL + app 基础服务 |
 | `compose.sqlite.yml` | Compose 叠加 | 切换到 SQLite，禁用 PostgreSQL |
 | `compose.build.yml` | Compose 叠加 | 本地从 Dockerfile 构建（替代拉取 ghcr.io） |
@@ -111,7 +134,7 @@ compose.prod.yml          ← 基座（必需，定义 app + postgres）
     │
     ├─ compose.build.yml           ← OPT 本地构建
     │
-    ├─ compose.cloudflare-tunnel.yml ← OPT Cloudflare 隧道
+    ├─ compose.cloudflare-tunnel.yml ← 核心推荐：Cloudflare 隧道
     │
     └─ compose.tls.yml             ← OPT Caddy HTTPS
 ```
@@ -125,13 +148,12 @@ docker compose -f compose.prod.yml up -d
 # 组合 2: SQLite + 本地构建（开发/自托管）
 docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml up -d
 
-# 组合 3: SQLite + 本地构建 + Cloudflare Tunnel（零端口暴露）
+# 组合 3: SQLite + 本地构建 + Cloudflare Tunnel（推荐生产方案）
 docker compose -f compose.prod.yml -f compose.sqlite.yml \
   -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
 
-# 组合 4: PostgreSQL + ghcr.io + Caddy HTTPS + Cloudflare Tunnel（生产全栈）
-docker compose -f compose.prod.yml -f compose.tls.yml \
-  -f compose.cloudflare-tunnel.yml up -d
+# 组合 4: PostgreSQL + ghcr.io + Caddy HTTPS（传统公网部署）
+docker compose -f compose.prod.yml -f compose.tls.yml up -d
 
 # 重新构建（代码改动后）
 docker compose ... -f compose.build.yml up -d --build
@@ -148,32 +170,102 @@ docker compose ... -f compose.build.yml up -d --build
 - 禁用 `postgres` 服务（移入 `_disabled` profile）
 - 设置 `DATABASE_URL=sqlite:/app/data/cms.db`
 - 挂载 `data` volume 持久化数据库文件
-- 清除 `depends_on: postgres` 依赖
 
 **`compose.build.yml`** — 本地构建
 - 覆盖 `image` 为 `instatic:local`
 - 添加 `build:` 上下文，从本地 `Dockerfile` 构建
-- 不再依赖 ghcr.io
 
-**`compose.cloudflare-tunnel.yml`** — Cloudflare 隧道
+**`compose.cloudflare-tunnel.yml`** — 核心推荐
 - 设置 `CLOUDFLARE_TUNNEL_TOKEN` 环境变量给 app 容器
 - `ports: !reset []` 清除端口暴露（隧道接管流量）
 - 设置 `PUBLIC_ORIGIN` 和 `TRUSTED_PROXY_CIDRS`
 
 **`compose.tls.yml`** — Caddy HTTPS
-- 添加 `caddy` 服务，监听 80/443
-- 自动申请 Let's Encrypt 证书
-- 代理到 `app:3001`
+- 添加 `caddy` 服务，监听 80/443，自动 Let's Encrypt
 
-### 叠加机制要点
+### 叠加机制
 
-- Docker Compose 按文件顺序**合并**同名字段（环境变量、volumes）
-- `!reset` 是 Compose 的 YAML tag，用于**完全替换**而非合并（如 ports、depends_on）
-- 被 `profiles: ['_disabled']` 标记的服务不会启动
+- Docker Compose 按文件顺序**合并**同名字段
+- `!reset` 完全替换而非合并（如 ports、depends_on）
+- `profiles: ['_disabled']` 标记的服务不会启动
 
 ---
 
-## 4. GitHub Actions CI/CD
+## 4. 快速开始：Cloudflare Tunnel 托管 Instatic
+
+### 工作原理
+
+```
+公网用户
+    │
+    ▼
+Cloudflare CDN (cms.example.com, :443)
+    │
+    │ QUIC 加密隧道（出站连接，不需要开放端口！）
+    ▼
+你的服务器 → Instatic 容器 (start.sh)
+                └─ cloudflared → localhost:3001
+```
+
+**关键**：cloudflared 主动向 Cloudflare 发起**出站**连接，不需要服务器开放任何入站端口。即使服务器在 NAT 后面也能工作。
+
+### 前置配置（只需一次）
+
+1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
+2. 左侧菜单 → **Networks** → **Tunnels**
+3. 点击 **Create a tunnel** → 选 **Cloudflared**
+4. 给 Tunnel 起名（如 `instatic-cms`）→ **Save tunnel**
+5. 复制 **Token**（`eyJhIjoi...` 开头）
+6. 配置 Public Hostname：
+   - Subdomain: `cms`
+   - Domain: `example.com`
+   - Type: `HTTP`
+   - URL: `localhost:3001`
+7. **Save hostname**
+
+### Compose 部署
+
+`.env` 添加 Token：
+
+```bash
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你复制的Token...
+```
+
+```bash
+# SQLite + 本地构建 + Tunnel（推荐）
+docker compose -f compose.prod.yml -f compose.sqlite.yml \
+  -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
+```
+
+### docker run 部署
+
+```bash
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
+  -e DATABASE_URL="sqlite:/app/data/cms.db" \
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/corebunch/instatic:latest
+```
+
+### 验证
+
+```bash
+# 查看 cloudflared 连接状态
+docker logs instatic 2>&1 | grep cloudflared
+
+# 应该看到类似输出：
+# [cloudflared] Starting Cloudflare Tunnel...
+# INF Starting tunnel tunnelID=xxxxx
+# INF Connection ... registered connIndex=0
+```
+
+通过你配置的域名（如 `https://cms.example.com`）访问，即可看到 Instatic 登录页面。
+
+---
+
+## 5. GitHub Actions CI/CD
 
 ### 工作流: `docker-ci.yml`
 
@@ -200,8 +292,8 @@ on:
 
 | 输入参数 | 说明 | 默认值 |
 |----------|------|--------|
-| `sing_box_version` | sing-box 版本号 | `1.10.1` |
 | `cloudflared_version` | cloudflared 版本 | `latest` |
+| `sing_box_version` | sing-box 版本号（可选） | `1.10.1` |
 | `push` | 构建后是否推送 ghcr.io | `true` |
 | `image_tag` | 自定义镜像标签 | 留空=ci-{sha} |
 
@@ -256,23 +348,20 @@ GitHub Actions Runner (ubuntu-latest)
 
 ---
 
-## 5. 本地构建与部署
+## 6. 本地构建与部署
 
 ### 前置条件
 
 - Docker ≥ 24
 - Docker Compose ≥ v2
-- （本地构建）Docker BuildKit 默认已启用
 
 ### 本地构建
 
 ```bash
-# 在项目根目录
-
-# 方式 A: 用 docker compose + compose.build.yml
+# 方式 A: docker compose
 docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml up -d
 
-# 方式 B: 直接 docker build
+# 方式 B: docker build
 docker build -t instatic:local .
 
 docker run -d --name instatic \
@@ -291,32 +380,28 @@ docker run -d --name instatic \
 INSTATIC_SECRET_KEY=<使用 openssl rand -base64 48 生成>
 HOST_PORT=3001
 
-# 可选
+# Cloudflare Tunnel（推荐）
 CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...
-DOMAIN=cms.example.com
 ```
 
 ### 查看日志
 
 ```bash
-# Compose 模式
 docker compose logs -f app
-
-# docker run 模式
+# 或
 docker logs -f instatic
 ```
 
-`start.sh` 启动时会输出每个服务的状态：
+启动日志示例：
 
 ```
 ==========================================
   Instatic CMS
-  (sing-box + cloudflared bundled)
+  + Cloudflare Tunnel (built-in)
 ==========================================
 
 [sing-box] Config not found — skipping
 [Instatic] Starting on port 3001...
-[Instatic] PID: 7
 [Instatic] Ready ✓
 [cloudflared] Starting Cloudflare Tunnel...
 
@@ -328,81 +413,9 @@ docker logs -f instatic
 
 ---
 
-## 6. Cloudflare Tunnel 配置
+## 8. sing-box 选配（可选代理层）
 
-### 工作原理
-
-```
-公网用户
-    │
-    ▼
-Cloudflare CDN (cms.example.com, :443)
-    │
-    │ QUIC 加密隧道（出站连接，不需要开放服务器端口）
-    ▼
-你的服务器 → Instatic 容器 (start.sh)
-                └─ cloudflared → localhost:3001
-```
-
-**关键**：cloudflared 主动向 Cloudflare 发起**出站** QUIC 连接，不需要服务器开放任何入站端口。即使服务器在 NAT 后面、没有公网 IP 也能工作。
-
-### 前置配置（只需一次）
-
-1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
-2. 左侧菜单 → **Networks** → **Tunnels**
-3. 点击 **Create a tunnel** → 选 **Cloudflared**
-4. 给 Tunnel 起名（如 `instatic-cms`）→ **Save tunnel**
-5. 复制 **Token**（`eyJhIjoi...` 开头）
-6. 配置 Public Hostname：
-   - Subdomain: `cms`（或你想要的子域名）
-   - Domain: `example.com`（你的域名）
-   - Type: `HTTP`
-   - URL: `localhost:3001`
-7. **Save hostname**
-
-### Compose 部署
-
-`.env` 添加 Token：
-
-```bash
-CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你复制的Token...
-```
-
-```bash
-# SQLite + 本地构建 + Tunnel
-docker compose -f compose.prod.yml -f compose.sqlite.yml \
-  -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
-```
-
-### docker run 部署
-
-```bash
-docker run -d --name instatic \
-  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
-  -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
-  -e DATABASE_URL="sqlite:/app/data/cms.db" \
-  -v instatic_data:/app/data \
-  -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
-```
-
-### 验证
-
-```bash
-# 查看 cloudflared 连接状态
-docker logs instatic 2>&1 | grep cloudflared
-
-# 应该看到类似输出：
-# [cloudflared] Starting Cloudflare Tunnel...
-# INF Starting tunnel tunnelID=xxxxx
-# INF Connection ... registered connIndex=0
-```
-
-通过你配置的域名（如 `https://cms.example.com`）访问，应该看到 Instatic 登录页面。
-
----
-
-## 7. sing-box 选配
+> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。仅当需要代理功能时才需挂载配置。
 
 ### 启用条件
 
@@ -448,38 +461,36 @@ services:
 
 ---
 
-## 8. start.sh 启动流程
+## 7. start.sh 启动流程
 
 ```
 #!/bin/bash
 set -e
 │
 ├─ 1. 设置默认环境变量
-│     PORT=3001
-│     DATABASE_URL=sqlite:/app/data/cms.db
-│     ...
+│     PORT=3001, DATABASE_URL, ...
 │
-├─ 2. 检测 sing-box 配置
-│     /app/sing-box-config.json 存在？
-│       YES → sing-box run -c ... &（后台）
-│       NO  → 跳过
-│
-├─ 3. 启动 Instatic（后台）
+├─ 2. 启动 Instatic（后台）
 │     bun run server/index.ts &
 │     轮询 healthcheck → 最多等 60 秒
 │       Ready → 继续
 │       Timeout → exit 1
 │
-├─ 4. 检测 Cloudflare Tunnel
+├─ 3. 检测 Cloudflare Tunnel（核心）
 │     CLOUDFLARE_TUNNEL_TOKEN 非空？
 │       YES → exec cloudflared tunnel ...（前台，接管 PID 1）
 │       NO  → wait $INSTATIC_PID（前台等待 Instatic）
 │
+├─ (可选) 检测 sing-box 配置
+│     /app/sing-box-config.json 存在？
+│       YES → sing-box run -c ... &（后台）
+│       NO  → 跳过
+│
 └─ 进程树:
     PID 1: bash (start.sh)
-      ├─ sing-box (if enabled)
       ├─ bun (Instatic, always)
-      └─ cloudflared OR wait (if token set/not)
+      ├─ cloudflared (if token set)
+      └─ sing-box (if config exists)
 ```
 
 ### 环境变量参考
@@ -487,12 +498,12 @@ set -e
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `PORT` | `3001` | Instatic 监听端口 |
+| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **核心** 设置后自动启用 Tunnel |
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
 | `NODE_ENV` | `production` | 运行模式 |
-| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | 设置后自动启用 Tunnel |
-| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | sing-box 配置文件路径 |
+| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （可选）sing-box 配置路径 |
 | `INSTATIC_SECRET_KEY` | 必需 | 应用加密密钥 |
 
 ---
@@ -574,13 +585,13 @@ docker compose build --no-cache app
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 合体镜像定义（五阶段构建） |
-| `start.sh` | 三服务统一启动脚本 |
-| `sing-box-config.json` | sing-box 配置模板 |
+| `Dockerfile` | 五阶段构建，内置 cloudflared + sing-box（可选） |
+| `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel |
+| `sing-box-config.json` | sing-box 可选代理层配置模板 |
 | `compose.prod.yml` | Compose 基座（PostgreSQL） |
 | `compose.sqlite.yml` | SQLite 切换叠加层 |
 | `compose.build.yml` | 本地构建叠加层 |
-| `compose.cloudflare-tunnel.yml` | Cloudflare Tunnel 叠加层 |
+| `compose.cloudflare-tunnel.yml` | Cloudflare Tunnel 叠加层（核心推荐） |
 | `compose.tls.yml` | Caddy HTTPS 叠加层 |
 | `.github/workflows/docker-ci.yml` | GitHub Actions 自动+手动构建 |
 | `.github/workflows/release.yml` | 版本发布工作流 |

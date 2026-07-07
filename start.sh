@@ -1,16 +1,16 @@
 #!/bin/bash
-# Instatic + sing-box + cloudflared 合体启动脚本
-# 参考: link-nvidia 项目统一编排 sing-box + cloudflared 双进程的模式
+# Instatic + Cloudflare Tunnel 启动脚本
+# sing-box 作为可选代理层，默认不启动
 #
 # 架构:
-#   sing-box    → 可选，后台运行（存在配置时启动）
-#   Instatic    → 后台运行（始终启动）
-#   cloudflared → 可选，前台运行（设置了 CLOUDFLARE_TUNNEL_TOKEN 时接管主进程）
+#   Instatic    → 前台/后台运行（始终启动）
+#   cloudflared → 可选前台运行（设置了 CLOUDFLARE_TUNNEL_TOKEN 时接管主进程）
+#   sing-box    → 可选后台运行（存在配置时启动）
 #
 # 环境变量:
-#   CLOUDFLARE_TUNNEL_TOKEN  - Cloudflare Tunnel Token（可选，设置则自动建立隧道）
-#   SING_BOX_CONFIG          - sing-box 配置文件路径（可选，默认 /app/sing-box-config.json）
 #   PORT                     - Instatic 监听端口（默认 3001）
+#   CLOUDFLARE_TUNNEL_TOKEN  - Cloudflare Tunnel Token（设置后自动建隧道）
+#   SING_BOX_CONFIG          - sing-box 配置文件路径（可选，默认值存在才启动）
 #   DATABASE_URL             - 数据库连接（默认 sqlite:/app/data/cms.db）
 #   UPLOADS_DIR              - 上传目录（默认 /app/uploads）
 #   STATIC_DIR               - 静态文件目录（默认 /app/dist）
@@ -19,7 +19,7 @@ set -e
 
 echo "=========================================="
 echo "  Instatic CMS"
-echo "  (sing-box + cloudflared bundled)"
+echo "  + Cloudflare Tunnel (built-in)"
 echo "=========================================="
 echo ""
 

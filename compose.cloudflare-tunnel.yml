@@ -1,8 +1,8 @@
 # compose.cloudflare-tunnel.yml
-# Cloudflare Tunnel 可选集成 — 无需暴露端口即可将 Instatic 发布到公网。
+# Cloudflare Tunnel — 无需暴露端口即可将 Instatic 发布到公网。
 #
-# 合体架构（v2）: sing-box + cloudflared 已直接整合进 Instatic 主镜像，
-# 无需额外容器。此叠加文件仅需传递环境变量即可启用隧道。
+# 镜像内置 cloudflared，只需设置 Token 即可自动建立加密隧道：
+#   公网用户 → Cloudflare CDN → 加密隧道 → Instatic:3001
 #
 # 使用方式:
 #   拉取预构建镜像:
@@ -16,8 +16,8 @@
 #   3. 将 CLOUDFLARE_TUNNEL_TOKEN 填入 .env
 #   4. 在 Tunnel 配置中添加 Public Hostname → 指向 localhost:3001
 #
-# 高级：同时使用 sing-box
-#   将 sing-box-config.json 挂载到 /app/sing-box-config.json 即可自动启动:
+# 可选：启用 sing-box 代理
+#   将配置挂载到 /app/sing-box-config.json 即可自动启动:
 #     docker compose ... -v ./my-sing-box.json:/app/sing-box-config.json:ro
 
 services:

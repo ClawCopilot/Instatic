@@ -16,21 +16,22 @@ COPY package.json bun.lock ./
 COPY vendor ./vendor
 RUN bun install --frozen-lockfile --production
 
-# ---- sing-box download layer (cached separately) ----
-# 参考: link-nvidia 的 sing-box + cloudflared 合体架构
+# ---- cloudflared download layer (cached separately) ----
+# 核心功能: Cloudflare Tunnel 将 Instatic 托管到公网，无需开放服务器端口
+FROM alpine:latest AS cloudflared-layer
+ARG CLOUDFLARED_VERSION=latest
+RUN wget -q -O /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/${CLOUDFLARED_VERSION}/download/cloudflared-linux-amd64 \
+    && chmod +x /tmp/cloudflared
+
+# ---- sing-box download layer (cached, 可选) ----
+# sing-box 作为可选的代理/协议层，默认不启用
 FROM alpine:latest AS sing-box-layer
 ARG SING_BOX_VERSION=1.10.1
 RUN wget -q https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz \
     && tar -zxf sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz \
     && mv sing-box-${SING_BOX_VERSION}-linux-amd64/sing-box /tmp/sing-box
 
-# ---- cloudflared download layer (cached separately) ----
-FROM alpine:latest AS cloudflared-layer
-ARG CLOUDFLARED_VERSION=latest
-RUN wget -q -O /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/${CLOUDFLARED_VERSION}/download/cloudflared-linux-amd64 \
-    && chmod +x /tmp/cloudflared
-
-# ---- runtime (Instatic + sing-box + cloudflared) ----
+# ---- runtime (Instatic + Cloudflare Tunnel) ----
 FROM oven/bun:1.3.11 AS runtime
 WORKDIR /app
 
@@ -39,7 +40,7 @@ ARG INSTATIC_REVISION=unknown
 ARG INSTATIC_CREATED=unknown
 
 LABEL org.opencontainers.image.title="Instatic"
-LABEL org.opencontainers.image.description="Self-hosted CMS with an integrated visual editor — bundled with sing-box + Cloudflare Tunnel."
+LABEL org.opencontainers.image.description="Self-hosted CMS with built-in Cloudflare Tunnel — deploy your site to the public internet without opening any ports."
 LABEL org.opencontainers.image.source="https://github.com/corebunch/instatic"
 LABEL org.opencontainers.image.url="https://github.com/corebunch/instatic"
 LABEL org.opencontainers.image.documentation="https://github.com/corebunch/instatic/tree/main/docs/deployment"
@@ -65,12 +66,12 @@ COPY --chown=bun:bun tsconfig*.json ./
 COPY --chown=bun:bun server ./server
 COPY --chown=bun:bun src ./src
 
-# Copy sing-box and cloudflared binaries
-COPY --from=sing-box-layer /tmp/sing-box /usr/local/bin/sing-box
+# Copy cloudflared (核心) + sing-box (可选)
 COPY --from=cloudflared-layer /tmp/cloudflared /usr/local/bin/cloudflared
-RUN chmod +x /usr/local/bin/sing-box /usr/local/bin/cloudflared
+COPY --from=sing-box-layer /tmp/sing-box /usr/local/bin/sing-box
+RUN chmod +x /usr/local/bin/cloudflared /usr/local/bin/sing-box
 
-# Copy start script and sing-box default config
+# Copy start script
 COPY start.sh /app/start.sh
 COPY sing-box-config.json /app/sing-box-config.json.default
 RUN chmod +x /app/start.sh && chown bun:bun /app/start.sh
