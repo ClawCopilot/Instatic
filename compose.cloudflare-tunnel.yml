@@ -1,0 +1,30 @@
+# compose.cloudflare-tunnel.yml
+# Cloudflare Tunnel 可选集成 — 无需暴露端口即可将 Instatic 发布到公网。
+#
+# 合体架构（v2）: sing-box + cloudflared 已直接整合进 Instatic 主镜像，
+# 无需额外容器。此叠加文件仅需传递环境变量即可启用隧道。
+#
+# 使用方式:
+#   拉取预构建镜像:
+#     docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.cloudflare-tunnel.yml up -d
+#   本地自己构建:
+#     docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
+#
+# 前置条件:
+#   1. 你的域名由 Cloudflare 管理 DNS
+#   2. 在 Cloudflare Zero Trust → Networks → Tunnels 中创建 Tunnel
+#   3. 将 CLOUDFLARE_TUNNEL_TOKEN 填入 .env
+#   4. 在 Tunnel 配置中添加 Public Hostname → 指向 localhost:3001
+#
+# 高级：同时使用 sing-box
+#   将 sing-box-config.json 挂载到 /app/sing-box-config.json 即可自动启动:
+#     docker compose ... -v ./my-sing-box.json:/app/sing-box-config.json:ro
+
+services:
+  app:
+    # Cloudflare Tunnel 接管外部流量，app 端口无需暴露到宿主机
+    ports: !reset []
+    environment:
+      CLOUDFLARE_TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?请在 .env 中设置 CLOUDFLARE_TUNNEL_TOKEN}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://${CLOUDFLARE_TUNNEL_HOSTNAME}}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}

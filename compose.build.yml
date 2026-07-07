@@ -1,6 +1,22 @@
+# compose.build.yml
+# 本地构建叠加 — 从 Dockerfile 构建自己的镜像，替代拉取 ghcr.io 预构建镜像。
+#
+# 使用方式:
+#   docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml up -d
+#
+# 带 Cloudflare Tunnel:
+#   docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
+#
+# 重新构建（代码改动后）:
+#   docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml up -d --build
+
 services:
   app:
+    # 清除 ghcr.io 镜像引用，改用本地 Dockerfile 构建
+    image: instatic:local
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${INSTATIC_IMAGE:-instatic:local}
+      args:
+        INSTATIC_VERSION: local
+        INSTATIC_REVISION: unknown

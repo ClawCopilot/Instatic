@@ -364,3 +364,4 @@ bun run server/index.ts
 | `backup-fly.ps1` | Windows 备份脚本 |
 | `backup-fly.sh` | macOS/Linux 备份脚本 |
 | `docs-deploy/fly-io-deployment-guide.md` | 完整运维指南（详细版） |
+| `docs-deploy/ci-cd-and-tunnel.md` | CI/CD 自动化 + Cloudflare Tunnel 集成 |
