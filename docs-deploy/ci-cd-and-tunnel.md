@@ -13,6 +13,7 @@
 2. [文件清单](#2-文件清单)
 3. [Docker Compose 叠加模式](#3-docker-compose-叠加模式)
 4. [快速开始：Cloudflare Tunnel 托管 Instatic](#4-快速开始cloudflare-tunnel-托管-instati)
+   - [多端口转发（一条隧道承载多个服务）](#多端口转发一条隧道承载多个服务)
 5. [GitHub Actions CI/CD](#5-github-actions-cicd)
 6. [本地构建与部署](#6-本地构建与部署)
 7. [start.sh 启动流程](#7-startsh-启动流程)
@@ -262,6 +263,85 @@ docker logs instatic 2>&1 | grep cloudflared
 ```
 
 通过你配置的域名（如 `https://cms.example.com`）访问，即可看到 Instatic 登录页面。
+
+### 多端口转发（一条隧道承载多个服务）
+
+一个 Cloudflare Tunnel 可以将**不同域名/路径**路由到容器的不同端口，容器内的 `start.sh` 和 `cloudflared` **不需要任何改动**——路由规则全部在 Cloudflare 控制台配置。
+
+#### 场景 A：不同域名 → 不同端口
+
+如果你的服务器同时需要对外暴露 Instatic CMS 和 sing-box 代理：
+
+| 公网地址 | 转发到 | 服务 |
+|----------|--------|------|
+| `cms.example.com` | `localhost:3001` | Instatic CMS |
+| `proxy.example.com` | `localhost:8080` | sing-box 代理 |
+
+配置步骤（在已有的 Tunnel 上追加）：
+
+1. 进入 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**
+2. 点击已有 Tunnel → **Public Hostname** → **Add a public hostname**
+3. Subdomain: `proxy`，Domain: `example.com`
+4. Type: `HTTP`，URL: `localhost:8080`
+5. **Save hostname**
+
+> 一个 `cloudflared tunnel run` 进程天生支持多条路由，无需额外容器或进程。
+
+#### 场景 B：同一域名不同路径 → 不同端口
+
+| 公网地址 | 转发到 | 服务 |
+|----------|--------|------|
+| `example.com` | `localhost:3001` | Instatic CMS |
+| `example.com/vless` | `localhost:8080` | sing-box WebSocket |
+
+配置时 Type 和 URL 同上，注意在 Path 字段填写 `/vless`。
+
+#### 完整示例：一条 Tunnel 同时托管 Instatic + sing-box
+
+```bash
+# 1. 准备 sing-box 配置（监听 :8080）
+cat > my-sing-box.json << 'EOF'
+{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "::",
+      "listen_port": 8080,
+      "users": [{ "uuid": "你的UUID", "flow": "" }],
+      "transport": { "type": "ws", "path": "/vless" }
+    }
+  ],
+  "outbounds": [{ "type": "direct", "tag": "direct" }]
+}
+EOF
+
+# 2. 启动容器（挂载 sing-box 配置 + 设置 Tunnel Token）
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
+  -e DATABASE_URL="sqlite:/app/data/cms.db" \
+  -v $(pwd)/my-sing-box.json:/app/sing-box-config.json:ro \
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/corebunch/instatic:latest
+
+# 3. 去 Cloudflare 控制台配置两条 Public Hostname：
+#    cms.example.com  → localhost:3001  (Instatic)
+#    proxy.example.com → localhost:8080  (sing-box)
+```
+
+容器内进程视图：
+
+```
+PID 1: bash (start.sh)
+  ├─ bun (Instatic, :3001)
+  ├─ sing-box (:8080, 可选代理)
+  └─ cloudflared (Tunnel)
+       ├─ cms.example.com → :3001
+       └─ proxy.example.com → :8080
+```
 
 ---
 
