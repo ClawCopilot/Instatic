@@ -1,8 +1,8 @@
 name: Docker CI
 
-# 每次推送到 main 分支时自动构建 Docker 镜像并推送到 ghcr.io
+# 每次推送到 main 分支时自动构建 Docker 镜像并推送到 ghcr.io。
 # 也支持手动触发，可指定 sing-box/cloudflared 版本。
-# 参考: link-nvidia 的 CI/CD 模式 — 持续交付，保证 latest 镜像始终可用
+# 参考: link-nvidia 的 CI/CD 模式 — 持续交付，保证 latest 镜像始终可用。
 on:
   push:
     branches: ["main"]
