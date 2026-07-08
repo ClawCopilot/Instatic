@@ -123,7 +123,7 @@ export const minimaxDriver: AiProvider = {
     const adapter: typeof base = {
       ...base,
       buildRequestBody(messages, innerReq) {
-        const body = base.buildRequestBody(messages, innerReq)
+        const body = base.buildRequestBody(messages, innerReq) as Record<string, unknown>
         // MiniMax-specific tweaks:
         // 1. Disable M3 thinking so the output is plain text (otherwise
         //    `<think>…</think>` tags leak into the text stream).
