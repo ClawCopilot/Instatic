@@ -16,6 +16,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-black?labelColor=black&color=blue)](LICENSE)
 [![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-black?labelColor=black&color=f9f1e1)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-everywhere-black?labelColor=black&color=3178c6)](https://www.typescriptlang.org/)
+[![Docker Image](https://img.shields.io/badge/Docker%20镜像-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic)
 
 [一键部署](#一键部署) · [快速开始](#快速开始) · [Docker 部署](#docker-部署) · [Cloudflare Tunnel](#cloudflare-tunnel) · [文档](docs/README.md) · [插件](docs/features/plugin-system.md)
 
@@ -172,10 +173,12 @@ bun run dev
 
 ## Docker 部署
 
+> **镜像地址：** [`ghcr.io/clawcopilot/instatic`](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) — 每次 push main 自动构建，点击直达 GitHub Packages 页面。
+
 ### 拉取镜像
 
 ```sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 镜像内置了 **Cloudflare Tunnel**（cloudflared）和 **sing-box**（可选代理层），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。
@@ -273,7 +276,7 @@ docker run -d --name instatic \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 ```
 
 ### 验证
@@ -311,7 +314,7 @@ docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e INSTATIC_SECRET_KEY=... \
   -v ./my-sing-box.json:/app/sing-box-config.json:ro \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 ```
 
 完整文档见 [Instatic + Cloudflare Tunnel 原理与操作手册](docs-deploy/ci-cd-and-tunnel.md)。

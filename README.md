@@ -16,6 +16,7 @@ A self-hosted CMS where the visual editor, content engine, and publisher all liv
 [![License: MIT](https://img.shields.io/badge/license-MIT-black?labelColor=black&color=blue)](LICENSE)
 [![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-black?labelColor=black&color=f9f1e1)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-everywhere-black?labelColor=black&color=3178c6)](https://www.typescriptlang.org/)
+[![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic)
 
 [One-Click Deploy](#deploy-in-one-click) · [Quick Start](#quick-start) · [Docs](docs/README.md) · [Plugins](docs/features/plugin-system.md) · [Roadmap](#early-on-purpose)
 
