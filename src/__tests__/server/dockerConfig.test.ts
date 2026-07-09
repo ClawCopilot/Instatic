@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 
 describe('self-host docker config', () => {

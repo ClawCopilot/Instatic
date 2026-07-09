@@ -1,4 +1,4 @@
-﻿import { Button } from '@ui/components/Button'
+import { Button } from '@ui/components/Button'
 import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginCard } from './components/PluginCard/PluginCard'

@@ -1,4 +1,4 @@
-﻿# Security Policy
+# Security Policy
 
 Instatic is pre-1.0 and not yet recommended for hostile multi-user environments without careful operator review. Security reports are still taken seriously.
 

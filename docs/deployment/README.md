@@ -1,4 +1,4 @@
-﻿# Deployment
+# Deployment
 
 This index maps supported deployment targets to the files, variables, and persistence rules they need.
 

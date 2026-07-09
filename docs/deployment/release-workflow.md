@@ -1,4 +1,4 @@
-﻿# Release Workflow
+# Release Workflow
 
 This maintainer guide covers publishing Instatic Docker images.
 

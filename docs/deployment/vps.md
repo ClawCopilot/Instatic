@@ -1,4 +1,4 @@
-﻿# VPS Deployment
+# VPS Deployment
 
 This guide covers Docker Compose installs on a single VPS.
 

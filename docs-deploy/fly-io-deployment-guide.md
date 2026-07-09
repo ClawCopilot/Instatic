@@ -1,4 +1,4 @@
-﻿# Instatic Fly.io 部署及运维指南
+# Instatic Fly.io 部署及运维指南
 
 > **编写日期**: 2026-07-04
 > **适用版本**: Instatic v0.0.10+

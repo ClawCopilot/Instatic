@@ -1,4 +1,4 @@
-﻿# Instatic + Cloudflare Tunnel — 原理与操作手册
+# Instatic + Cloudflare Tunnel — 原理与操作手册
 
 > **最后更新**: 2026-07-07
 > **适用版本**: Instatic v0.0.10+

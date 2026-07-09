@@ -1,4 +1,4 @@
-﻿# Generic Docker Image
+# Generic Docker Image
 
 This guide covers the production Docker image outside the bundled VPS Compose files.
 

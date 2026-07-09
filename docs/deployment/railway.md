@@ -1,4 +1,4 @@
-﻿# Railway Deployment
+# Railway Deployment
 
 This guide defines the Railway image-source configuration for Instatic.
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Help commands — §4.15 of the Command Spotlight master plan.
  *
  * - Show keyboard shortcuts

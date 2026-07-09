@@ -1,4 +1,4 @@
-﻿# Render Deployment
+# Render Deployment
 
 This guide defines the Render Blueprint configuration for Instatic.
 
