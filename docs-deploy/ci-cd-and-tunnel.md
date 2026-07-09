@@ -13,6 +13,7 @@
 2. [文件清单](#2-文件清单)
 3. [Docker Compose 叠加模式](#3-docker-compose-叠加模式)
 4. [快速开始：Cloudflare Tunnel 托管 Instatic](#4-快速开始cloudflare-tunnel-托管-instati)
+   - [多节点部署（高可用 / 故障转移）](#多节点部署高可用--故障转移)
    - [多端口转发（一条隧道承载多个服务）](#多端口转发一条隧道承载多个服务)
 5. [GitHub Actions CI/CD](#5-github-actions-cicd)
    - [在 GitHub 上查看/拉取镜像](#在-github-上查看拉取镜像)
@@ -266,6 +267,93 @@ docker logs instatic 2>&1 | grep cloudflared
 ```
 
 通过你配置的域名（如 `https://cms.example.com`）访问，即可看到 Instatic 登录页面。
+
+### 多节点部署（高可用 / 故障转移）
+
+Cloudflare Tunnel 原生支持**同一 Tunnel 运行多个 cloudflared 副本**（connectors）。只要用同一个 Token，多个节点上的 cloudflared 都会注册到同一条 Tunnel，Cloudflare 自动做健康检查和故障转移——某节点宕机，流量自动切到其他节点。
+
+#### 架构示意
+
+```
+                Cloudflare CDN
+             (cms.example.com :443)
+                      │
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+  cloudflared     cloudflared     cloudflared
+  (Tokyo)         (Singapore)     (Frankfurt)
+        │             │              │
+  localhost:3001  localhost:3001  localhost:3001
+    Instatic-A     Instatic-B     Instatic-C
+        │             │              │
+    SQLite         SQLite         SQLite
+   (独立数据)      (独立数据)      (独立数据)
+```
+
+#### 前提条件
+
+所有节点使用**同一个** `CLOUDFLARE_TUNNEL_TOKEN`，Cloudflare 控制台也只需配置一次 Public Hostname。
+
+#### ⚠️ SQLite 多节点的关键限制
+
+Instatic 默认使用 SQLite（单文件数据库），多个节点各自维护独立的 `cms.db`。**这不是分布式数据库**——如果你在节点 A 发布一篇文章，节点 B 看不到。
+
+因此多节点部署当前适合以下场景：
+
+| 场景 | 适用性 | 说明 |
+|------|--------|------|
+| **主备高可用** | ✅ 推荐 | 一台主节点运行，其他节点待命。主节点宕机后手动切换（配合 HF 恢复） |
+| **读多写少的静态站点** | ✅ 可用 | 已发布的静态站点各节点独立，Cloudflare 分发只读流量 |
+| **多节点同时读写** | ❌ 不支持 | SQLite 无法跨节点同步写入，会导致数据分裂 |
+
+#### 方案一：主备模式（推荐）
+
+一台作为**主节点**（可读写），其他作为**备用节点**。主节点定期通过 HF Dataset 备份，备用节点设置 `HF_RESTORE_ON_START=true` 启动时自动拉取最新备份。
+
+```
+主节点 (Active)                    备用节点 (Standby)
+    │                                   │
+    ├─ Instatic 正常运行                ├─ HF_RESTORE_ON_START=true
+    ├─ HF 定时备份                      ├─ 启动时从 HF 恢复数据
+    └─ 宕机时 → 流量自动切到备用         └─ 手动或脚本切换为主
+```
+
+主备切换后，新主节点继续备份；旧主恢复后变为备用。
+
+#### 方案二：未来扩展 — 远程数据库
+
+如果未来需要多节点同时读写，可以改造 Instatic 支持 PostgreSQL（已有 `compose.prod.yml` 基座）或 Turso/LibSQL 远程模式。多个节点连接同一个数据库，Cloudflare Tunnel 自动分发流量即可。
+
+#### 部署命令（所有节点相同）
+
+```bash
+# 每个节点执行相同的 docker run
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \    # ← 同一个 Token
+  -e INSTATIC_SECRET_KEY=xxxxx \
+  -e DATABASE_URL="sqlite:/app/data/cms.db" \
+  -e HF_TOKEN=hf_xxx \
+  -e HF_BACKUP_DATASET=user/instatic-backup \
+  -e HF_RESTORE_ON_START=true \               # ← 备用节点设为 true
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/corebunch/instatic:latest
+```
+
+#### 验证多节点
+
+```bash
+# 查看各节点的 cloudflared 连接
+docker logs instatic 2>&1 | grep "connIndex"
+
+# 输出示例（4 个节点各有一条连接）：
+# INF Connection ... registered connIndex=0
+# INF Connection ... registered connIndex=1
+# INF Connection ... registered connIndex=2
+# INF Connection ... registered connIndex=3
+```
+
+Cloudflare 控制台 **Tunnels → 点击你的 Tunnel** 也能看到所有活跃连接。
 
 ### 多端口转发（一条隧道承载多个服务）
 
