@@ -15,6 +15,7 @@
 4. [快速开始：Cloudflare Tunnel 托管 Instatic](#4-快速开始cloudflare-tunnel-托管-instati)
    - [多端口转发（一条隧道承载多个服务）](#多端口转发一条隧道承载多个服务)
 5. [GitHub Actions CI/CD](#5-github-actions-cicd)
+   - [在 GitHub 上查看/拉取镜像](#在-github-上查看拉取镜像)
 6. [本地构建与部署](#6-本地构建与部署)
 7. [start.sh 启动流程](#7-startsh-启动流程)
 8. [sing-box 选配（可选代理层）](#8-sing-box-选配可选代理层)
@@ -406,6 +407,35 @@ GitHub Actions Runner (ubuntu-latest)
 | `ci-abc12345` | push main | 精确回溯到某次提交 |
 | `0.0.10` | tag v0.0.10 (release.yml) | 生产版本 |
 | `自定义` | 手动触发 + 填写 `image_tag` | 临时/特殊构建 |
+
+#### 在 GitHub 上查看/拉取镜像
+
+构建完成后，镜像存储在 **GitHub Packages (ghcr.io)**：
+
+| 途径 | 操作 |
+|------|------|
+| **仓库首页 → Badge** | 点击顶部 `Docker 镜像` badge，直达包页面 |
+| **仓库首页 → 侧边栏** | 右侧边栏 → **Packages** → 点 `instatic` |
+| **直接 URL** | `https://github.com/ClawCopilot/Instatic/pkgs/container/instatic` |
+
+进入包页面后，可以看到：
+
+- **所有已构建的版本标签**：`latest`、`ci-xxxxxxx` 等
+- 点击任一标签 → 页面顶部直接显示 `docker pull` 命令
+- **OS/Arch** 列显示支持的平台（`linux/amd64`）
+- **Recent tagged image versions** 显示压缩大小和推送时间
+
+拉取命令：
+
+```bash
+# 最新 CI 构建
+docker pull ghcr.io/clawcopilot/instatic:latest
+
+# 精确到某次提交
+docker pull ghcr.io/clawcopilot/instatic:ci-abc12345
+```
+
+> **注意**：默认情况下 GitHub Packages 为私有。如需公开访问，需在包页面 → **Package settings** → **Danger Zone** → **Change visibility** → 设为 `Public`。
 
 #### 缓存策略
 

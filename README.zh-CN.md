@@ -173,11 +173,26 @@ bun run dev
 
 ## Docker 部署
 
-> **镜像地址：** [`ghcr.io/clawcopilot/instatic`](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) — 每次 push main 自动构建，点击直达 GitHub Packages 页面。
+> **镜像地址：** [`ghcr.io/clawcopilot/instatic`](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) — 每次 push main 自动构建。
+
+### 在 GitHub 上找到镜像
+
+每次 CI 构建完成后，镜像会推送至 **GitHub Packages**。三种方式找到它：
+
+| 途径 | 操作 |
+|------|------|
+| **README Badge** | 点击本文档顶部的 `Docker 镜像` 徽章 → 直达包页面 |
+| **仓库侧边栏** | 仓库首页 → 右侧 **Packages** → 点 `instatic` |
+| **直接链接** | [github.com/ClawCopilot/Instatic/pkgs/container/instatic](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) |
+
+进入包页面后，点击版本标签（如 `latest`），页面上方会直接显示 `docker pull` 命令。
 
 ### 拉取镜像
 
 ```sh
+docker pull ghcr.io/clawcopilot/instatic:latest
+
+# Compose 方式启动
 INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
