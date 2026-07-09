@@ -762,6 +762,7 @@ HF_BACKUP_KEEP_COUNT=7      # 保留最近 N 个备份
 | `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic |
 | `HF_BACKUP_INTERVAL` | `21600` | 备份间隔（秒），默认 6 小时 |
 | `HF_BACKUP_KEEP_COUNT` | `7` | 保留最近 N 个备份，旧的自动删除 |
+| `HF_BACKUP_SOURCE_DIRS` | `/app/data /app/uploads` | 要备份的目录，空格分隔（恢复时自动还原到相同路径） |
 
 ### 手动操作
 

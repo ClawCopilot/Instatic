@@ -237,6 +237,7 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 | `HF_TOKEN` | （空） | Hugging Face Token（可选，设置后启用 HF Dataset 备份/恢复） |
 | `HF_BACKUP_DATASET` | （空） | HF Dataset 仓库名（可选，格式 `user/dataset`） |
 | `HF_RESTORE_ON_START` | `false` | 启动时自动从 HF 恢复数据（可选） |
+| `HF_BACKUP_SOURCE_DIRS` | `/app/data /app/uploads` | 要备份的目录，空格分隔（可选） |
 
 <br>
 

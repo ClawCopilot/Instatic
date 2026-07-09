@@ -14,6 +14,7 @@ set -e
 
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
+HF_BACKUP_SOURCE_DIRS="${HF_BACKUP_SOURCE_DIRS:-/app/data /app/uploads}"
 
 if [ -z "${HF_TOKEN}" ] || [ -z "${HF_BACKUP_DATASET}" ]; then
     echo "[hf-restore] HF_TOKEN or HF_BACKUP_DATASET not configured — skipping"
@@ -45,23 +46,20 @@ huggingface-cli download "${HF_BACKUP_DATASET}" \
 echo "[hf-restore] Extracting archive..."
 tar -xzf "${RESTORE_DIR}/${LATEST}" -C "${RESTORE_DIR}"
 
-# 恢复 data 目录
-if [ -d "${RESTORE_DIR}/data" ]; then
-    echo "[hf-restore] Restoring /app/data..."
-    # 先备份现有数据（防止覆盖）
-    if [ -d /app/data ] && [ "$(ls -A /app/data 2>/dev/null)" ]; then
-        cp -r /app/data /app/data.bak.$(date +%s) 2>/dev/null || true
+# 根据 HF_BACKUP_SOURCE_DIRS 逐个恢复
+for d in ${HF_BACKUP_SOURCE_DIRS}; do
+    dir_rel="${d#/app/}"           # /app/data → data
+    dir_name="$(basename "$d")"    # /foo/bar → bar
+    if [ -d "${RESTORE_DIR}/${dir_rel}" ]; then
+        echo "[hf-restore] Restoring ${d}..."
+        # 先备份现有数据（防止覆盖）
+        if [ -d "${d}" ] && [ "$(ls -A "${d}" 2>/dev/null)" ]; then
+            cp -r "${d}" "${d}.bak.$(date +%s)" 2>/dev/null || true
+        fi
+        mkdir -p "${d}"
+        cp -r "${RESTORE_DIR}/${dir_rel}"/* "${d}"/ 2>/dev/null || true
     fi
-    mkdir -p /app/data
-    cp -r "${RESTORE_DIR}"/data/* /app/data/ 2>/dev/null || true
-fi
-
-# 恢复 uploads 目录
-if [ -d "${RESTORE_DIR}/uploads" ]; then
-    echo "[hf-restore] Restoring /app/uploads..."
-    mkdir -p /app/uploads
-    cp -r "${RESTORE_DIR}"/uploads/* /app/uploads/ 2>/dev/null || true
-fi
+done
 
 # 清理
 rm -rf "${RESTORE_DIR}"
