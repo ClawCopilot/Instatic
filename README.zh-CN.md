@@ -296,7 +296,7 @@ CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com
 docker compose -f compose.prod.yml -f compose.sqlite.yml \
   -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
 
-# docker run 方式（Hostname 仅用于启动日志显示，CSRF 需单独设置 PUBLIC_ORIGIN）
+# docker run 方式（将 :0.0.11 替换为最新具体版本号）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
@@ -304,7 +304,7 @@ docker run -d --name instatic \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 > **注意**：`CLOUDFLARE_TUNNEL_HOSTNAME` 的值必须与 Cloudflare Zero Trust 面板中为该 Tunnel 配置的 Public Hostname **完全一致**，否则启动日志中显示的是错误地址。
@@ -347,7 +347,7 @@ docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
   -e INSTATIC_SECRET_KEY=... \
   -e SING_BOX_UUID=$(uuidgen) \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 
 # 查看连接信息：
 docker logs instatic
@@ -363,7 +363,7 @@ docker run -d --name instatic \
   -e SING_BOX_UUID=... \
   -e SING_BOX_PORT=8443 \
   -e SING_BOX_PATH=/my-proxy \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 **高级方式：挂载自定义配置**
@@ -374,7 +374,7 @@ docker run -d --name instatic \
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -v ./my-sing-box.json:/app/sing-box-config.json:ro \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 完整文档见 [Instatic + Cloudflare Tunnel 原理与操作手册](docs-deploy/ci-cd-and-tunnel.md)。

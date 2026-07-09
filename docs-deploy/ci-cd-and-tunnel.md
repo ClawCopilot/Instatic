@@ -192,8 +192,9 @@ docker compose ... -f compose.build.yml up -d --build
 
 **`compose.prod.yml`** — 基座
 - `postgres` 服务（PostgreSQL 16）
-- `app` 服务，默认拉取 `ghcr.io/clawcopilot/instatic:latest`
+- `app` 服务，镜像由 `INSTATIC_IMAGE` 环境变量控制（默认 `ghcr.io/clawcopilot/instatic:latest`）
 - 暴露 `${HOST_PORT:-3001}:3001`
+- > ⚠️ 生产环境请将 `INSTATIC_IMAGE` 设为具体版本号，不要用 `:latest`
 
 **`compose.sqlite.yml`** — SQLite 切换
 - 禁用 `postgres` 服务（移入 `_disabled` profile）
@@ -269,13 +270,14 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 ### docker run 部署
 
 ```bash
+# 生产环境请将 :0.0.11 替换为最新的具体版本号，不要用 :latest
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 ### 验证
@@ -420,7 +422,7 @@ docker compose restart app
 **docker run 部署方式**：
 
 ```bash
-# 活动节点
+# 活动节点（将 :0.0.11 替换为实际部署版本）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e INSTATIC_ROLE=active \
@@ -430,9 +432,9 @@ docker run -d --name instatic \
   -e HF_BACKUP_DATASET=user/instatic-backup \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 
-# 备用节点（另一个服务器）
+# 备用节点（另一个服务器，使用相同版本号）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \      # ← 同一个 Token
   -e INSTATIC_ROLE=standby \
@@ -442,7 +444,7 @@ docker run -d --name instatic \
   -e HF_BACKUP_DATASET=user/instatic-backup \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 **ha-switch 命令参考**：
@@ -597,6 +599,7 @@ Cloudflare 控制台 **Zero Trust → Networks → Tunnels → 点击你的 Tunn
 ```bash
 # 1. 启动容器。Token 是唯一必需参数；Hostname 用于显示连接地址，
 #    其值必须与 Cloudflare 控制台中配置的 Hostname 完全一致。
+#    将 :0.0.11 替换为最新的具体版本号，生产环境不要用 :latest。
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
@@ -605,7 +608,7 @@ docker run -d --name instatic \
   -e SING_BOX_UUID=$(uuidgen) \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 
 # 2. 查看启动日志（Hostname 使 start.sh 能自动拼装 VLESS 链接）：
 docker logs instatic
@@ -714,11 +717,14 @@ GitHub Actions Runner (ubuntu-latest)
 拉取命令：
 
 ```bash
-# 最新 CI 构建
-docker pull ghcr.io/clawcopilot/instatic:latest
+# 生产环境：使用具体 release 版本（推荐）
+docker pull ghcr.io/clawcopilot/instatic:0.0.11
 
-# 精确到某次提交
+# 精确到某次 CI 提交（调试用）
 docker pull ghcr.io/clawcopilot/instatic:ci-abc12345
+
+# :latest = 每日构建，仅限本地测试
+docker pull ghcr.io/clawcopilot/instatic:latest
 ```
 
 > **注意**：默认情况下 GitHub Packages 为私有。如需公开访问，需在包页面 → **Package settings** → **Danger Zone** → **Change visibility** → 设为 `Public`。
@@ -905,12 +911,12 @@ set -e
 只需设置 `SING_BOX_UUID`，`start.sh` 自动生成标准 VLESS + WebSocket 配置：
 
 ```bash
-# docker run — 一行就够了
+# docker run — 一行就够了（将 :0.0.11 替换为实际版本）
 docker run -d --name instatic \
   -p 8080:8080 \
   -e INSTATIC_SECRET_KEY=... \
   -e SING_BOX_UUID=$(uuidgen) \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 
 # Compose
 services:
@@ -947,12 +953,12 @@ services:
 需要多入站、链式出站、TLS 等复杂场景时，可挂载完整的 JSON 配置：
 
 ```bash
-# docker run 模式
+# docker run 模式（将 :0.0.11 替换为实际版本）
 docker run -d --name instatic \
   -p 3001:3001 -p 8080:8080 \
   -e INSTATIC_SECRET_KEY=... \
   -v ./my-sing-box.json:/app/sing-box-config.json:ro \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 
 # Compose 模式
 services:
@@ -1096,7 +1102,7 @@ HF Dataset 备份能让你：
 只需在启动容器时添加两个环境变量即可启用：
 
 ```bash
-# docker run 方式
+# docker run 方式（将 :0.0.11 替换为实际部署版本）
 docker run -d --name instatic \
   -e HF_TOKEN=hf_YOUR_TOKEN_HERE \
   -e HF_BACKUP_DATASET=yourname/instatic-backup \
@@ -1104,7 +1110,7 @@ docker run -d --name instatic \
   -e INSTATIC_SECRET_KEY=... \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/clawcopilot/instatic:latest
+  ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
 ```yaml
