@@ -1,0 +1,22 @@
+# compose.ha-standby.yml
+# HA 备用节点叠加配置 — 使一个节点以 standby 模式运行。
+#
+# 架构：
+#   活动节点 (active):  读写 + 定时备份 + cloudflared
+#   备用节点 (standby):  启动时恢复 + 只读 + cloudflared (同 Tunnel Token)
+#
+# 使用方式：
+#   docker compose -f compose.prod.yml -f compose.sqlite.yml \
+#     -f compose.cloudflare-tunnel.yml -f compose.ha-standby.yml up -d
+#
+# 前置条件：
+#   1. 已按文档配置 HF Token + Backup Dataset
+#   2. 活动节点和备用节点使用同一个 CLOUDFLARE_TUNNEL_TOKEN
+#   3. 备用节点是独立服务器或独立 compose 项目
+
+services:
+  app:
+    environment:
+      INSTATIC_ROLE: standby
+      # 备用节点从 HF 恢复数据，不主动备份
+      HF_RESTORE_ON_START: "true"

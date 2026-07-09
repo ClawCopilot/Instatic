@@ -78,9 +78,10 @@ RUN chmod +x /usr/local/bin/cloudflared /usr/local/bin/sing-box
 COPY start.sh /app/start.sh
 COPY scripts/hf-backup.sh /usr/local/bin/hf-backup
 COPY scripts/hf-restore.sh /usr/local/bin/hf-restore
+COPY scripts/ha-switch.sh /usr/local/bin/ha-switch
 COPY sing-box-config.json /app/sing-box-config.json.default
-RUN chmod +x /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore \
-    && chown bun:bun /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore
+RUN chmod +x /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore /usr/local/bin/ha-switch \
+    && chown bun:bun /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore /usr/local/bin/ha-switch
 
 RUN mkdir -p /app/uploads /app/data && chown -R bun:bun /app
 

@@ -112,13 +112,18 @@ Cloudflare CDN (cms.example.com, :443)
 | 文件 | 类型 | 说明 |
 |------|------|------|
 | `Dockerfile` | 镜像定义 | 五阶段构建，内置 cloudflared + sing-box（可选） |
-| `start.sh` | 启动脚本 | 编排 Instatic + cloudflared（sing-box 可选） |
+| `start.sh` | 启动脚本 | 编排 Instatic + cloudflared + HA 主备（sing-box 可选） |
 | `sing-box-config.json` | 配置模板 | sing-box 可选代理层配置，默认不启用 |
 | `compose.prod.yml` | Compose 基座 | PostgreSQL + app 基础服务 |
 | `compose.sqlite.yml` | Compose 叠加 | 切换到 SQLite，禁用 PostgreSQL |
 | `compose.build.yml` | Compose 叠加 | 本地从 Dockerfile 构建（替代拉取 ghcr.io） |
 | `compose.cloudflare-tunnel.yml` | Compose 叠加 | 启用 Cloudflare Tunnel + 关闭端口暴露 |
 | `compose.tls.yml` | Compose 叠加 | 启用 Caddy 自动 HTTPS（Let's Encrypt） |
+| `compose.ha-standby.yml` | Compose 叠加 | HA 备用节点（standby 角色 + 启动恢复） |
+| `compose.pg-remote.yml` | Compose 叠加 | 禁用本地 PG，连接远程/托管 PostgreSQL |
+| `scripts/ha-switch.sh` | HA 脚本 | 主备切换命令（promote/demote/status） |
+| `scripts/hf-backup.sh` | 备份脚本 | HF Dataset 定时备份 |
+| `scripts/hf-restore.sh` | 恢复脚本 | HF Dataset 启动恢复 |
 | `.github/workflows/docker-ci.yml` | GitHub Actions | push main 自动构建 + 手动触发 |
 | `.github/workflows/release.yml` | GitHub Actions | 版本 tag 触发发布 |
 | `.trivyignore` | 安全配置 | Trivy CVE 豁免规则 |
@@ -135,13 +140,17 @@ Cloudflare CDN (cms.example.com, :443)
 ```
 compose.prod.yml          ← 基座（必需，定义 app + postgres）
     │
-    ├─ compose.sqlite.yml          ← OR 切换 SQLite
+    ├─ compose.sqlite.yml              ← OR 切换 SQLite
     │
-    ├─ compose.build.yml           ← OPT 本地构建
+    ├─ compose.build.yml               ← OPT 本地构建
     │
-    ├─ compose.cloudflare-tunnel.yml ← 核心推荐：Cloudflare 隧道
+    ├─ compose.cloudflare-tunnel.yml   ← 核心推荐：Cloudflare 隧道
     │
-    └─ compose.tls.yml             ← OPT Caddy HTTPS
+    ├─ compose.ha-standby.yml          ← OPT HA 备用节点
+    │
+    ├─ compose.pg-remote.yml           ← OPT 远程 PostgreSQL（多节点集群）
+    │
+    └─ compose.tls.yml                 ← OPT Caddy HTTPS
 ```
 
 ### 常用组合
@@ -159,6 +168,14 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 
 # 组合 4: PostgreSQL + ghcr.io + Caddy HTTPS（传统公网部署）
 docker compose -f compose.prod.yml -f compose.tls.yml up -d
+
+# 组合 5: SQLite + 备用节点 + Cloudflare Tunnel（HA 主备）
+docker compose -f compose.prod.yml -f compose.sqlite.yml \
+  -f compose.cloudflare-tunnel.yml -f compose.ha-standby.yml up -d
+
+# 组合 6: 远程 PG + Cloudflare Tunnel（多节点集群，全读写）
+docker compose -f compose.prod.yml -f compose.pg-remote.yml \
+  -f compose.cloudflare-tunnel.yml up -d
 
 # 重新构建（代码改动后）
 docker compose ... -f compose.build.yml up -d --build
@@ -272,6 +289,10 @@ docker logs instatic 2>&1 | grep cloudflared
 
 Cloudflare Tunnel 原生支持**同一 Tunnel 运行多个 cloudflared 副本**（connectors）。只要用同一个 Token，多个节点上的 cloudflared 都会注册到同一条 Tunnel，Cloudflare 自动做健康检查和故障转移——某节点宕机，流量自动切到其他节点。
 
+Instatic 内置 **HA 主备模式**，通过 `INSTATIC_ROLE` 环境变量 + 角色持久化文件 + `ha-switch` 命令实现。
+
+---
+
 #### 架构示意
 
 ```
@@ -284,15 +305,13 @@ Cloudflare Tunnel 原生支持**同一 Tunnel 运行多个 cloudflared 副本**�
   (Tokyo)         (Singapore)     (Frankfurt)
         │             │              │
   localhost:3001  localhost:3001  localhost:3001
-    Instatic-A     Instatic-B     Instatic-C
+    Instatic        Instatic        Instatic
+  role: active    role: standby   role: standby
         │             │              │
-    SQLite         SQLite         SQLite
-   (独立数据)      (独立数据)      (独立数据)
+   HF 定时备份    HF 启动恢复     HF 启动恢复
 ```
 
-#### 前提条件
-
-所有节点使用**同一个** `CLOUDFLARE_TUNNEL_TOKEN`，Cloudflare 控制台也只需配置一次 Public Hostname。
+---
 
 #### ⚠️ SQLite 多节点的关键限制
 
@@ -302,58 +321,232 @@ Instatic 默认使用 SQLite（单文件数据库），多个节点各自维护�
 
 | 场景 | 适用性 | 说明 |
 |------|--------|------|
-| **主备高可用** | ✅ 推荐 | 一台主节点运行，其他节点待命。主节点宕机后手动切换（配合 HF 恢复） |
-| **读多写少的静态站点** | ✅ 可用 | 已发布的静态站点各节点独立，Cloudflare 分发只读流量 |
-| **多节点同时读写** | ❌ 不支持 | SQLite 无法跨节点同步写入，会导致数据分裂 |
+| **主备高可用（方案一）** | ✅ 推荐 | 一台 active 运行，其他 standby 待命。内置切换脚本 |
+| **远程 PG 集群（方案二）** | ✅ 已支持 | PostgreSQL 模式，多节点连接同一 PG，支持同时读写 |
 
-#### 方案一：主备模式（推荐）
+---
 
-一台作为**主节点**（可读写），其他作为**备用节点**。主节点定期通过 HF Dataset 备份，备用节点设置 `HF_RESTORE_ON_START=true` 启动时自动拉取最新备份。
+#### 方案一：主备模式（SQLite + HF 备份 + 内置切换）
 
-```
-主节点 (Active)                    备用节点 (Standby)
-    │                                   │
-    ├─ Instatic 正常运行                ├─ HF_RESTORE_ON_START=true
-    ├─ HF 定时备份                      ├─ 启动时从 HF 恢复数据
-    └─ 宕机时 → 流量自动切到备用         └─ 手动或脚本切换为主
-```
+一台作为**活动节点**（active，可读写 + 定时备份），其他作为**备用节点**（standby，启动时恢复数据）。`ha-switch` 命令一键完成切换。
 
-主备切换后，新主节点继续备份；旧主恢复后变为备用。
+**节点行为差异**：
 
-#### 方案二：未来扩展 — 远程数据库
+| 行为 | active | standby |
+|------|--------|---------|
+| Instatic 运行 | ✅ | ✅ |
+| cloudflared 隧道 | ✅ | ✅ |
+| HF 定时备份 | ✅ | ❌ (disable) |
+| 启动时 HF 恢复 | ❌ | ✅ (auto) |
+| 数据一致性 | 最新 | 上一次备份 |
 
-如果未来需要多节点同时读写，可以改造 Instatic 支持 PostgreSQL（已有 `compose.prod.yml` 基座）或 Turso/LibSQL 远程模式。多个节点连接同一个数据库，Cloudflare Tunnel 自动分发流量即可。
+**部署步骤**：
 
-#### 部署命令（所有节点相同）
+**步骤 1 — 配置 HF Backup（两台机器都需要）**
+
+`.env` 中添加 HF 配置：
 
 ```bash
-# 每个节点执行相同的 docker run
+HF_TOKEN=hf_your_token
+HF_BACKUP_DATASET=your-username/instatic-backup
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...    # ← 两台机器用同一个 Token
+INSTATIC_SECRET_KEY=xxxxx
+```
+
+**步骤 2 — 启动活动节点（机器 A）**
+
+```bash
+# active 模式启动（默认，无需额外设置）
+docker compose -f compose.prod.yml -f compose.sqlite.yml \
+  -f compose.cloudflare-tunnel.yml up -d
+```
+
+启动后验证角色：
+
+```bash
+docker compose exec app ha-switch status
+# HA Node Status:
+#   Role:         active
+#   Instatic:     online ✓
+```
+
+**步骤 3 — 启动备用节点（机器 B）**
+
+```bash
+# 叠加 ha-standby 配置
+docker compose -f compose.prod.yml -f compose.sqlite.yml \
+  -f compose.cloudflare-tunnel.yml -f compose.ha-standby.yml up -d
+```
+
+备用节点启动时自动从 HF Dataset 恢复最新备份数据。
+
+```bash
+docker compose exec app ha-switch status
+# HA Node Status:
+#   Role:         standby
+#   Instatic:     online ✓
+```
+
+**步骤 4 — 故障切换（主节点宕机后）**
+
+在主节点机器 B 上执行：
+
+```bash
+# 将 standby 提升为 active（自动从 HF 拉取最新备份）
+docker compose exec app ha-switch promote
+
+# 如果不需要从 HF 拉取（数据已是最新），用 --force 跳过
+docker compose exec app ha-switch promote --force
+
+# 重启容器使角色生效
+docker compose restart app
+```
+
+**步骤 5 — 旧主恢复后降级为备用**
+
+```bash
+# 在旧主节点上（如果还能访问）
+docker compose exec app ha-switch demote
+docker compose restart app
+```
+
+**docker run 部署方式**：
+
+```bash
+# 活动节点
 docker run -d --name instatic \
-  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \    # ← 同一个 Token
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e INSTATIC_ROLE=active \
   -e INSTATIC_SECRET_KEY=xxxxx \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -e HF_TOKEN=hf_xxx \
   -e HF_BACKUP_DATASET=user/instatic-backup \
-  -e HF_RESTORE_ON_START=true \               # ← 备用节点设为 true
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/corebunch/instatic:latest
+
+# 备用节点（另一个服务器）
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \      # ← 同一个 Token
+  -e INSTATIC_ROLE=standby \
+  -e INSTATIC_SECRET_KEY=xxxxx \
+  -e DATABASE_URL="sqlite:/app/data/cms.db" \
+  -e HF_TOKEN=hf_xxx \
+  -e HF_BACKUP_DATASET=user/instatic-backup \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
   ghcr.io/corebunch/instatic:latest
 ```
 
-#### 验证多节点
+**ha-switch 命令参考**：
+
+| 命令 | 用途 |
+|------|------|
+| `ha-switch promote` | 备用 → 活动（先拉取最新 HF 备份） |
+| `ha-switch promote --force` | 备用 → 活动（跳过远程备份，保留本地数据） |
+| `ha-switch demote` | 活动 → 备用（先做最后一次备份到 HF） |
+| `ha-switch status` | 查看当前角色和健康状态 |
+
+---
+
+#### 方案二：远程数据库集群（PostgreSQL + 多节点同时读写）
+
+如果使用 PostgreSQL，多个 Instatic 节点可以连接**同一个数据库**，所有节点都能同时读写。Instatic 已内置 PostgreSQL 支持（`Bun.SQL` + 连接池）。
+
+**架构示意**：
+
+```
+                Cloudflare CDN
+                      │
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+  cloudflared     cloudflared     cloudflared
+        │             │              │
+   Instatic-A     Instatic-B     Instatic-C
+        │             │              │
+        └─────────────┼──────────────┘
+                      │
+               PostgreSQL (同一数据库)
+```
+
+**数据库选项**：
+
+| 方案 | 成本 | 延迟 | 适合场景 |
+|------|------|------|----------|
+| **自建 PG**（一台服务器专跑 PG） | 低 | 低 | 节点在同一机房/VPC |
+| **Neon / Supabase**（Serverless PG） | 中 | 中 | 节点分布全球，按量付费 |
+| **Docker Compose 单机 PG** | 免费 | 极低 | 单机多副本（仅进程级冗余） |
+
+**部署：自建 PG + 多 Instatic 节点**
+
+**步骤 1 — PG 服务器上**
+
+```bash
+# PG 服务器（独立机器或同一 VPC）
+docker run -d --name postgres \
+  --restart unless-stopped \
+  -e POSTGRES_DB=instatic \
+  -e POSTGRES_USER=instatic \
+  -e POSTGRES_PASSWORD=<strong-password> \
+  -p 5432:5432 \
+  -v pg_data:/var/lib/postgresql/data \
+  postgres:16
+```
+
+**步骤 2 — 所有 Instatic 节点（相同配置）**
+
+`.env` 配置：
+
+```bash
+# 所有节点使用相同的 PG 连接
+DATABASE_URL=postgres://instatic:<password>@<pg-host>:5432/instatic
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...    # ← 同一个 Token
+INSTATIC_SECRET_KEY=xxxxx
+```
+
+```bash
+# 所有节点执行相同命令
+docker compose -f compose.prod.yml -f compose.build.yml \
+  -f compose.cloudflare-tunnel.yml up -d
+```
+
+> **注意**：PG 模式下 `compose.prod.yml` 内置了 postgres 服务。如果 PG 在远程，需要移除本地的 postgres 服务。可使用 `compose.pg-remote.yml` 叠加：
+>
+> ```bash
+> docker compose -f compose.prod.yml -f compose.pg-remote.yml \
+>   -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
+> ```
+
+**步骤 3 — 验证多节点**
+
+```bash
+# 各节点查看连接
+docker compose exec app bun run server/healthcheck.ts
+
+# Cloudflare 控制台查看活跃连接数
+# Networks → Tunnels → 你的 Tunnel → Connectors
+```
+
+**连接池配置（可选）**：
+
+Instatic 使用 `Bun.SQL` 内置连接池。如需自定义，可在代码中调整。当前默认值已满足大多数场景。
+
+---
+
+#### 验证多节点运行
 
 ```bash
 # 查看各节点的 cloudflared 连接
 docker logs instatic 2>&1 | grep "connIndex"
 
-# 输出示例（4 个节点各有一条连接）：
+# 示例输出（4 个节点各有一条连接）：
 # INF Connection ... registered connIndex=0
 # INF Connection ... registered connIndex=1
 # INF Connection ... registered connIndex=2
 # INF Connection ... registered connIndex=3
 ```
 
-Cloudflare 控制台 **Tunnels → 点击你的 Tunnel** 也能看到所有活跃连接。
+Cloudflare 控制台 **Zero Trust → Networks → Tunnels → 点击你的 Tunnel** 也能看到所有活跃连接数。
 
 ### 多端口转发（一条隧道承载多个服务）
 
@@ -865,10 +1058,11 @@ HF_BACKUP_SOURCE_PATHS=/app/data,/app/uploads  # 逗号分隔，也可加文件�
 |------|--------|------|
 | `HF_TOKEN` | （空） | Hugging Face Access Token，Write 权限 |
 | `HF_BACKUP_DATASET` | （空） | HF Dataset 仓库名，格式 `user/dataset` |
-| `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic |
+| `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic。standby 模式自动启用 |
 | `HF_BACKUP_INTERVAL` | `21600` | 备份间隔（秒），默认 6 小时 |
 | `HF_BACKUP_KEEP_COUNT` | `7` | 保留最近 N 个备份，旧的自动删除 |
 | `HF_BACKUP_SOURCE_PATHS` | `/app/data,/app/uploads` | 要备份的路径，逗号分隔，支持文件和目录。路径含逗号时用 `\,` 转义 |
+| `INSTATIC_ROLE` | `active` | HA 角色：`active`（读写+定时备份）/ `standby`（启动恢复+不备份） |
 
 ### 手动操作
 
@@ -895,7 +1089,7 @@ docker exec instatic hf-restore
 PID 1: bash (start.sh)
   ├─ bun (Instatic, :3001)
   ├─ sing-box (:8080, 可选)
-  ├─ hf-backup loop (后台定时备份)
+  ├─ hf-backup loop (后台定时备份, 仅 active)
   └─ cloudflared (Tunnel)
 ```
 
@@ -906,16 +1100,18 @@ PID 1: bash (start.sh)
 | 文件 | 说明 |
 |------|------|
 | `Dockerfile` | 五阶段构建，内置 cloudflared + sing-box（可选）+ HF 备份（可选） |
-| `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel + HF 备份 |
+| `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel + HF 备份 + HA 主备 |
 | `sing-box-config.json` | sing-box 可选代理层配置模板 |
 | `scripts/hf-backup.sh` | HF Dataset 备份脚本 |
 | `scripts/hf-restore.sh` | HF Dataset 恢复脚本 |
-| `sing-box-config.json` | sing-box 可选代理层配置模板 |
+| `scripts/ha-switch.sh` | HA 主备切换脚本（promote/demote/status） |
 | `compose.prod.yml` | Compose 基座（PostgreSQL） |
 | `compose.sqlite.yml` | SQLite 切换叠加层 |
 | `compose.build.yml` | 本地构建叠加层 |
 | `compose.cloudflare-tunnel.yml` | Cloudflare Tunnel 叠加层（核心推荐） |
 | `compose.tls.yml` | Caddy HTTPS 叠加层 |
+| `compose.ha-standby.yml` | HA 备用节点叠加层 |
+| `compose.pg-remote.yml` | 远程 PostgreSQL 连接叠加层（多节点集群） |
 | `.github/workflows/docker-ci.yml` | GitHub Actions 自动+手动构建 |
 | `.github/workflows/release.yml` | 版本发布工作流 |
 | `.trivyignore` | Trivy CVE 豁免规则 |

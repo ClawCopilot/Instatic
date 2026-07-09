@@ -1,0 +1,35 @@
+# compose.pg-remote.yml
+# Override: 禁用本地 Postgres，连接远程/托管 PostgreSQL。
+#
+# 适用场景：
+#   1. 使用 Neon / Supabase / 自建 PG 等远程数据库
+#   2. 多节点 PG 集群 — 多个 Instatic 实例连接同一个 PG
+#   3. 不想在本地运行 Postgres 容器
+#
+# 使用方式（SQLite → PG 迁移 + Cloudflare Tunnel 多节点）:
+#   docker compose -f compose.prod.yml -f compose.pg-remote.yml \
+#     -f compose.cloudflare-tunnel.yml up -d
+#
+# 前置条件:
+#   1. 在 .env 中设置 DATABASE_URL 指向远程 PG：
+#      DATABASE_URL=postgres://user:password@host:5432/dbname
+#   2. 确保远程 PG 允许来自本机的连接（防火墙/安全组 + pg_hba.conf）
+#   3. 可选：挂载 schema_migrations 导出用于新库初始化
+
+services:
+  # 禁用本地 postgres 服务
+  postgres:
+    profiles: ['_disabled']
+
+  app:
+    environment:
+      # DATABASE_URL 必须在 .env 中设置，指向远程 PG
+      DATABASE_URL: ${DATABASE_URL:?请在 .env 中设置 DATABASE_URL 指向远程 PostgreSQL}
+      # 远程 PG 模式下，uploads 目录需要在所有节点间共享
+      # 如果不共享，各节点的上传文件相互独立
+      # 推荐方案：使用 S3 兼容存储或 NFS 共享卷
+    depends_on: !reset {}
+
+volumes:
+  # 远程 PG 不需要本地 postgres_data 卷
+  postgres_data:
