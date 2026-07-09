@@ -754,6 +754,8 @@ HF_RESTORE_ON_START=true   # 首次部署设为 true，后续可删掉
 HF_BACKUP_INTERVAL=21600    # 备份间隔（秒），默认 6 小时
 HF_BACKUP_KEEP_COUNT=7      # 保留最近 N 个备份
 HF_BACKUP_SOURCE_PATHS=/app/data,/app/uploads  # 逗号分隔，也可加文件如 /app/config/settings.json
+# 含空格的路径直接写，无需转义
+# 含逗号的路径用 \, 转义：/app/a\,b 表示路径 /app/a,b
 ```
 
 ### 环境变量参考
@@ -765,7 +767,7 @@ HF_BACKUP_SOURCE_PATHS=/app/data,/app/uploads  # 逗号分隔，也可加文件�
 | `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic |
 | `HF_BACKUP_INTERVAL` | `21600` | 备份间隔（秒），默认 6 小时 |
 | `HF_BACKUP_KEEP_COUNT` | `7` | 保留最近 N 个备份，旧的自动删除 |
-| `HF_BACKUP_SOURCE_PATHS` | `/app/data,/app/uploads` | 要备份的路径，逗号分隔，支持文件和目录 |
+| `HF_BACKUP_SOURCE_PATHS` | `/app/data,/app/uploads` | 要备份的路径，逗号分隔，支持文件和目录。路径含逗号时用 `\,` 转义 |
 
 ### 手动操作
 

@@ -7,13 +7,33 @@
 #   HF_BACKUP_DATASET      - HF Dataset 仓库名，格式 user/dataset-name（必填）
 #   HF_BACKUP_KEEP_COUNT   - 保留备份数量（默认 7）
 #   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔（默认 /app/data,/app/uploads）
-#                            支持目录和文件，例如：
-#                              /app/data,/app/uploads,/app/config/custom.json
+#                            支持目录和文件，含空格路径无需额外处理。
+#                            路径名含逗号时用 \, 转义，反斜杠用 \\ 表示。
+#                            例如: /app/data,/app/my\ files,/path\,with\,comma
 #
 # 用法:
 #   hf-backup.sh           - 手动执行一次备份
 
 set -e
+
+# ---- 解析逗号分隔的路径列表，支持 \, 转义逗号 ----
+# 输出每行一个路径（标准输出），由调用方 while read 读取
+parse_path_list() {
+    local input="$1"
+    # 1. 临时用不可打印字符 \x1E 替代 \,
+    local escaped
+    escaped=$(echo "$input" | sed 's/\\,/\x1E/g')
+    # 2. 按逗号切分
+    local IFS=','
+    local parts=()
+    read -ra parts <<< "$escaped"
+    # 3. 逐个还原 \x1E → , 并 trim
+    for part in "${parts[@]}"; do
+        part=$(echo "$part" | sed 's/\x1E/,/g')
+        part=$(echo "$part" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [ -n "$part" ] && echo "$part"
+    done
+}
 
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
@@ -36,16 +56,12 @@ mkdir -p "${BACKUP_DIR}"
 
 echo "[hf-backup] $(date -u '+%Y-%m-%d %H:%M:%S UTC') Starting backup..."
 
-# 解析逗号分隔的路径列表，收集有效路径
+# 收集有效路径
 SOURCE_ARGS=(-C /app)
 VALID_PATHS=()
-IFS=',' read -ra RAW_PATHS <<< "${HF_BACKUP_SOURCE_PATHS}"
-for p in "${RAW_PATHS[@]}"; do
-    # 去首尾空白
-    p=$(echo "$p" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+while IFS= read -r p; do
     [ -z "$p" ] && continue
     if [ -e "$p" ]; then
-        # 转为相对 /app 的路径
         rel="${p#/app/}"
         SOURCE_ARGS+=("$rel")
         VALID_PATHS+=("$p")
@@ -53,7 +69,7 @@ for p in "${RAW_PATHS[@]}"; do
     else
         echo "[hf-backup]   ! ${p} (not found — skipped)"
     fi
-done
+done < <(parse_path_list "${HF_BACKUP_SOURCE_PATHS}")
 
 if [ ${#VALID_PATHS[@]} -eq 0 ]; then
     echo "[hf-backup] No valid source paths found — skipping"

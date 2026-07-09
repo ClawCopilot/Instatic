@@ -6,12 +6,28 @@
 #   HF_TOKEN               - Hugging Face 访问令牌（必填）
 #   HF_BACKUP_DATASET      - HF Dataset 仓库名，格式 user/dataset-name（必填）
 #   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔（默认 /app/data,/app/uploads）
+#                            支持 \, 转义逗号，含空格路径无需额外处理
 #   HF_RESTORE_ON_START    - 设为 "true" 时启动时自动恢复（默认 false）
 #
 # 用法:
 #   hf-restore.sh          - 手动执行恢复
 
 set -e
+
+# ---- 解析逗号分隔的路径列表，支持 \, 转义逗号 ----
+parse_path_list() {
+    local input="$1"
+    local escaped
+    escaped=$(echo "$input" | sed 's/\\,/\x1E/g')
+    local IFS=','
+    local parts=()
+    read -ra parts <<< "$escaped"
+    for part in "${parts[@]}"; do
+        part=$(echo "$part" | sed 's/\x1E/,/g')
+        part=$(echo "$part" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [ -n "$part" ] && echo "$part"
+    done
+}
 
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
@@ -48,9 +64,7 @@ echo "[hf-restore] Extracting archive..."
 tar -xzf "${RESTORE_DIR}/${LATEST}" -C "${RESTORE_DIR}"
 
 # 根据 HF_BACKUP_SOURCE_PATHS 逐个恢复（文件或目录）
-IFS=',' read -ra RAW_PATHS <<< "${HF_BACKUP_SOURCE_PATHS}"
-for p in "${RAW_PATHS[@]}"; do
-    p=$(echo "$p" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+while IFS= read -r p; do
     [ -z "$p" ] && continue
 
     rel="${p#/app/}"   # /app/data/foo → data/foo
@@ -58,7 +72,6 @@ for p in "${RAW_PATHS[@]}"; do
 
     if [ -f "$src" ]; then
         echo "[hf-restore] Restoring file: ${p}"
-        # 备份现有文件
         if [ -f "$p" ]; then
             cp "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
         fi
@@ -66,7 +79,6 @@ for p in "${RAW_PATHS[@]}"; do
         cp "$src" "$p"
     elif [ -d "$src" ]; then
         echo "[hf-restore] Restoring dir : ${p}"
-        # 备份现有目录
         if [ -d "$p" ] && [ "$(ls -A "$p" 2>/dev/null)" ]; then
             cp -r "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
         fi
@@ -75,7 +87,7 @@ for p in "${RAW_PATHS[@]}"; do
     else
         echo "[hf-restore]   ! ${p} (not in backup — skipped)"
     fi
-done
+done < <(parse_path_list "${HF_BACKUP_SOURCE_PATHS}")
 
 # 清理
 rm -rf "${RESTORE_DIR}"
