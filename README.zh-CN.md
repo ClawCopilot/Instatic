@@ -196,7 +196,7 @@ docker pull ghcr.io/clawcopilot/instatic:latest
 INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
-镜像内置了 **Cloudflare Tunnel**（cloudflared）和 **sing-box**（可选代理层），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。
+镜像内置了 **Cloudflare Tunnel**（cloudflared）、**sing-box**（可选代理层）以及 **Hugging Face Dataset 备份/恢复**（可选），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。
 
 ### Docker Compose 叠加模式
 
@@ -234,6 +234,9 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 | `INSTATIC_SECRET_KEY` | **必需** | 应用加密密钥 |
 | `CLOUDFLARE_TUNNEL_TOKEN` | （空） | 设置后自动启用 Cloudflare Tunnel |
 | `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （可选）sing-box 配置路径 |
+| `HF_TOKEN` | （空） | Hugging Face Token（可选，设置后启用 HF Dataset 备份/恢复） |
+| `HF_BACKUP_DATASET` | （空） | HF Dataset 仓库名（可选，格式 `user/dataset`） |
+| `HF_RESTORE_ON_START` | `false` | 启动时自动从 HF 恢复数据（可选） |
 
 <br>
 

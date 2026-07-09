@@ -54,10 +54,13 @@ ENV PORT=3001
 ENV STATIC_DIR=/app/dist
 ENV UPLOADS_DIR=/app/uploads
 
-# Install bash (start.sh dependency) and ca-certificates
+# Install bash (start.sh dependency), ca-certificates, python3, and cron (可选备份调度)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates \
+    && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip cron \
     && rm -rf /var/lib/apt/lists/*
+
+# Install huggingface_hub CLI（可选 HF Dataset 备份/恢复）
+RUN pip3 install --break-system-packages --no-cache-dir huggingface_hub[cli]>=0.31.1
 
 COPY --from=production-deps --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=build --chown=bun:bun /app/dist ./dist
@@ -73,8 +76,11 @@ RUN chmod +x /usr/local/bin/cloudflared /usr/local/bin/sing-box
 
 # Copy start script
 COPY start.sh /app/start.sh
+COPY scripts/hf-backup.sh /usr/local/bin/hf-backup
+COPY scripts/hf-restore.sh /usr/local/bin/hf-restore
 COPY sing-box-config.json /app/sing-box-config.json.default
-RUN chmod +x /app/start.sh && chown bun:bun /app/start.sh
+RUN chmod +x /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore \
+    && chown bun:bun /app/start.sh /usr/local/bin/hf-backup /usr/local/bin/hf-restore
 
 RUN mkdir -p /app/uploads /app/data && chown -R bun:bun /app
 

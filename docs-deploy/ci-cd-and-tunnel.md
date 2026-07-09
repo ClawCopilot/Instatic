@@ -21,6 +21,8 @@
 8. [sing-box 选配（可选代理层）](#8-sing-box-选配可选代理层)
 9. [安全扫描 (Trivy)](#9-安全扫描-trivy)
 10. [故障排查](#10-故障排查)
+11. [Hugging Face Dataset 备份与恢复](#11-hugging-face-dataset-备份与恢复)
+12. [相关文件索引](#12-相关文件索引)
 
 ---
 
@@ -691,12 +693,116 @@ docker compose build --no-cache app
 
 ---
 
-## 相关文件索引
+## 11. Hugging Face Dataset 备份与恢复
+
+> **可选功能**，仅当 `HF_TOKEN` 和 `HF_BACKUP_DATASET` 同时设置时启用。
+
+### 为什么需要 HF Dataset 备份？
+
+Instatic 的所有数据（SQLite 数据库 + 上传文件）都在容器内的 `/app/data` 和 `/app/uploads` 目录。HF Dataset 备份能让你：
+
+- **零成本异地备份** — HF Dataset 存储免费，无需额外配置 S3/对象存储
+- **一键恢复** — 更换服务器或重建容器时，设置 `HF_RESTORE_ON_START=true` 即可自动恢复
+- **定时自动执行** — 默认每 6 小时自动备份一次，无需人工干预
+
+### 工作原理
+
+```
+容器内
+    │
+    ├─ /app/data ──────┐
+    ├─ /app/uploads ───┤
+    │                   ▼
+    └─ hf-backup.sh → tar.gz → huggingface_hub CLI → HF Dataset
+                                                      └─ backups/
+                                                          ├─ instatic-backup-20260709-120000.tar.gz
+                                                          ├─ instatic-backup-20260709-060000.tar.gz
+                                                          └─ latest-backup.tar.gz
+```
+
+恢复方向相反：HF Dataset → 下载 → 解压 → `/app/data` + `/app/uploads`
+
+### 前置配置（只需一次）
+
+1. 在 Hugging Face 创建 Access Token（[hf.co/settings/tokens](https://huggingface.co/settings/tokens)）→ 选 **Write** 权限
+2. 创建一个 Dataset 仓库（[huggingface.co/new-dataset](https://huggingface.co/new-dataset)）→ 建议设为 **Private**
+3. 记住仓库名，格式：`你的用户名/dataset-name`
+
+### 部署
+
+只需在启动容器时添加两个环境变量即可启用：
+
+```bash
+# docker run 方式
+docker run -d --name instatic \
+  -e HF_TOKEN=hf_YOUR_TOKEN_HERE \
+  -e HF_BACKUP_DATASET=yourname/instatic-backup \
+  -e HF_RESTORE_ON_START=true \
+  -e INSTATIC_SECRET_KEY=... \
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/clawcopilot/instatic:latest
+```
+
+```yaml
+# Compose .env 方式
+HF_TOKEN=hf_YOUR_TOKEN_HERE
+HF_BACKUP_DATASET=yourname/instatic-backup
+HF_RESTORE_ON_START=true   # 首次部署设为 true，后续可删掉
+HF_BACKUP_INTERVAL=21600    # 备份间隔（秒），默认 6 小时
+HF_BACKUP_KEEP_COUNT=7      # 保留最近 N 个备份
+```
+
+### 环境变量参考
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `HF_TOKEN` | （空） | Hugging Face Access Token，Write 权限 |
+| `HF_BACKUP_DATASET` | （空） | HF Dataset 仓库名，格式 `user/dataset` |
+| `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic |
+| `HF_BACKUP_INTERVAL` | `21600` | 备份间隔（秒），默认 6 小时 |
+| `HF_BACKUP_KEEP_COUNT` | `7` | 保留最近 N 个备份，旧的自动删除 |
+
+### 手动操作
+
+```bash
+# 手动执行一次备份（不依赖定时循环）
+docker exec instatic hf-backup
+
+# 手动从 HF Dataset 恢复数据（会覆盖当前数据！）
+docker exec instatic hf-restore
+```
+
+### 典型场景
+
+| 场景 | 操作 |
+|------|------|
+| **新部署** | 设置 `HF_RESTORE_ON_START=true`，从旧服务器迁移数据 |
+| **日常运行** | 只需 `HF_TOKEN` + `HF_BACKUP_DATASET`，自动定时备份 |
+| **迁移服务器** | 新机器设 `HF_RESTORE_ON_START=true`，启动即自动恢复 |
+| **手动备份** | `docker exec instatic hf-backup` |
+
+### 容器进程视图（启用 HF 备份后）
+
+```
+PID 1: bash (start.sh)
+  ├─ bun (Instatic, :3001)
+  ├─ sing-box (:8080, 可选)
+  ├─ hf-backup loop (后台定时备份)
+  └─ cloudflared (Tunnel)
+```
+
+---
+
+## 12. 相关文件索引
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 五阶段构建，内置 cloudflared + sing-box（可选） |
-| `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel |
+| `Dockerfile` | 五阶段构建，内置 cloudflared + sing-box（可选）+ HF 备份（可选） |
+| `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel + HF 备份 |
+| `sing-box-config.json` | sing-box 可选代理层配置模板 |
+| `scripts/hf-backup.sh` | HF Dataset 备份脚本 |
+| `scripts/hf-restore.sh` | HF Dataset 恢复脚本 |
 | `sing-box-config.json` | sing-box 可选代理层配置模板 |
 | `compose.prod.yml` | Compose 基座（PostgreSQL） |
 | `compose.sqlite.yml` | SQLite 切换叠加层 |
