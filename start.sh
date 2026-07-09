@@ -13,7 +13,11 @@
 # 环境变量:
 #   PORT                     - Instatic 监听端口（默认 3001）
 #   CLOUDFLARE_TUNNEL_TOKEN  - Cloudflare Tunnel Token（设置后自动建隧道）
-#   SING_BOX_CONFIG          - sing-box 配置文件路径（可选，默认值存在才启动）
+#   SING_BOX_UUID            - VLESS UUID（设置后自动生成配置并启动，零文件方式）
+#   SING_BOX_PORT            - sing-box 监听端口（默认 8080）
+#   SING_BOX_PATH            - WebSocket 路径（默认 /vless）
+#   SING_BOX_LOG_LEVEL       - sing-box 日志级别（默认 info）
+#   SING_BOX_CONFIG          - 自定义配置文件路径（高级用法，挂载完整 JSON 配置）
 #   DATABASE_URL             - 数据库连接（默认 sqlite:/app/data/cms.db）
 #   UPLOADS_DIR              - 上传目录（默认 /app/uploads）
 #   STATIC_DIR               - 静态文件目录（默认 /app/dist）
@@ -111,7 +115,37 @@ elif [ "${INSTATIC_ROLE}" = "standby" ]; then
 fi
 
 # ---- 1. 启动 sing-box（可选） ----
+# 启用方式（优先级从高到低）：
+#   A) 设置 SING_BOX_UUID 环境变量 → 自动生成 VLESS+WS 配置（最简单）
+#   B) 挂载自定义配置文件到 /app/sing-box-config.json
+#   C) 不设置 → 跳过 sing-box（默认）
 SING_BOX_CONFIG="${SING_BOX_CONFIG:-/app/sing-box-config.json}"
+
+# A: 环境变量方式（零文件，开箱即用）
+if [ -n "${SING_BOX_UUID}" ]; then
+    SING_BOX_PORT="${SING_BOX_PORT:-8080}"
+    SING_BOX_PATH="${SING_BOX_PATH:-/vless}"
+    SING_BOX_LOG_LEVEL="${SING_BOX_LOG_LEVEL:-info}"
+    SING_BOX_CONFIG="/tmp/sing-box-config.json"
+    cat > "${SING_BOX_CONFIG}" << SINGBOXEOF
+{
+  "log": { "level": "${SING_BOX_LOG_LEVEL}" },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "::",
+      "listen_port": ${SING_BOX_PORT},
+      "users": [{ "uuid": "${SING_BOX_UUID}" }],
+      "transport": { "type": "ws", "path": "${SING_BOX_PATH}" }
+    }
+  ],
+  "outbounds": [{ "type": "direct", "tag": "direct" }]
+}
+SINGBOXEOF
+    echo "[sing-box] Config generated from SING_BOX_UUID (port=${SING_BOX_PORT} path=${SING_BOX_PATH})"
+fi
+
 if [ -f "${SING_BOX_CONFIG}" ]; then
     echo "[sing-box] Starting with config: ${SING_BOX_CONFIG}"
     sing-box run -c "${SING_BOX_CONFIG}" &

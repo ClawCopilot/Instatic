@@ -102,8 +102,9 @@ Cloudflare CDN (cms.example.com, :443)
 |------|------|
 | `CLOUDFLARE_TUNNEL_TOKEN` 已设置 | cloudflared 前台运行并自动建立隧道（推荐） |
 | `CLOUDFLARE_TUNNEL_TOKEN` 未设置 | cloudflared 不启动，Instatic 前台运行 |
-| `/app/sing-box-config.json` 存在 | sing-box 后台运行（可选代理） |
-| `/app/sing-box-config.json` 不存在 | sing-box **不启动**（默认） |
+| `SING_BOX_UUID` 已设置 | 自动生成 VLESS+WS 配置，sing-box 后台运行（推荐） |
+| `/app/sing-box-config.json` 存在 | sing-box 后台运行（高级：挂载自定义配置） |
+| 以上皆未设置 | sing-box **不启动**（默认） |
 
 ---
 
@@ -583,35 +584,17 @@ Cloudflare 控制台 **Zero Trust → Networks → Tunnels → 点击你的 Tunn
 #### 完整示例：一条 Tunnel 同时托管 Instatic + sing-box
 
 ```bash
-# 1. 准备 sing-box 配置（监听 :8080）
-cat > my-sing-box.json << 'EOF'
-{
-  "log": { "level": "info" },
-  "inbounds": [
-    {
-      "type": "vless",
-      "tag": "vless-in",
-      "listen": "::",
-      "listen_port": 8080,
-      "users": [{ "uuid": "你的UUID", "flow": "" }],
-      "transport": { "type": "ws", "path": "/vless" }
-    }
-  ],
-  "outbounds": [{ "type": "direct", "tag": "direct" }]
-}
-EOF
-
-# 2. 启动容器（挂载 sing-box 配置 + 设置 Tunnel Token）
+# 1. 启动容器（SING_BOX_UUID 自动生成配置，零文件方式）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
-  -v $(pwd)/my-sing-box.json:/app/sing-box-config.json:ro \
+  -e SING_BOX_UUID=$(uuidgen) \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
   ghcr.io/clawcopilot/instatic:latest
 
-# 3. 去 Cloudflare 控制台配置两条 Public Hostname：
+# 2. 去 Cloudflare 控制台配置两条 Public Hostname：
 #    cms.example.com  → localhost:3001  (Instatic)
 #    proxy.example.com → localhost:8080  (sing-box)
 ```
@@ -827,9 +810,11 @@ set -e
 │       NO  → wait $INSTATIC_PID（前台等待 Instatic）
 │
 ├─ (可选) 检测 sing-box 配置
-│     /app/sing-box-config.json 存在？
-│       YES → sing-box run -c ... &（后台）
-│       NO  → 跳过
+│     SING_BOX_UUID 非空？
+│       YES → 自动生成配置 → sing-box run -c ... &（后台）
+│       NO  → /app/sing-box-config.json 存在？
+│         YES → sing-box run -c ... &（后台，高级用法）
+│         NO  → 跳过
 │
 └─ 进程树:
     PID 1: bash (start.sh)
@@ -848,22 +833,53 @@ set -e
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
 | `NODE_ENV` | `production` | 运行模式 |
-| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （可选）sing-box 配置路径 |
+| `SING_BOX_UUID` | （空） | **推荐** 设置后自动生成配置并启动 sing-box |
+| `SING_BOX_PORT` | `8080` | sing-box 监听端口 |
+| `SING_BOX_PATH` | `/vless` | sing-box WebSocket 路径 |
+| `SING_BOX_LOG_LEVEL` | `info` | sing-box 日志级别 |
+| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （高级）自定义 sing-box 配置文件路径 |
 | `INSTATIC_SECRET_KEY` | 必需 | 应用加密密钥 |
 
 ---
 
 ## 8. sing-box 选配（可选代理层）
 
-> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。仅当需要代理功能时才需挂载配置。
+> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。
 
 ### 启用条件
 
-`start.sh` 启动时检测 `/app/sing-box-config.json` 是否存在。**默认不存在（不启动）**。
+三种启用方式（优先级从高到低）：
 
-镜像内含 `sing-box-config.json` 作为模板（复制到 `/app/sing-box-config.json.default`），可参考修改。
+| 优先级 | 方式 | 说明 |
+|--------|------|------|
+| **A** | 设置 `SING_BOX_UUID` | **推荐**，自动生成 VLESS+WS 配置，零文件 |
+| **B** | 挂载 `/app/sing-box-config.json` | 高级用法，需要多入站/自定义出站时使用 |
+| **C** | 都不设置 | **默认**，不启动 sing-box |
 
-### 配置示例
+### 方式 A：环境变量（推荐，开箱即用）
+
+只需设置 `SING_BOX_UUID`，`start.sh` 自动生成标准 VLESS + WebSocket 配置：
+
+```bash
+# docker run — 一行就够了
+docker run -d --name instatic \
+  -p 8080:8080 \
+  -e INSTATIC_SECRET_KEY=... \
+  -e SING_BOX_UUID=$(uuidgen) \
+  ghcr.io/clawcopilot/instatic:latest
+
+# Compose
+services:
+  app:
+    environment:
+      SING_BOX_UUID: "550e8400-e29b-41d4-a716-446655440000"
+      # 可选覆盖：
+      # SING_BOX_PORT: 8443
+      # SING_BOX_PATH: /my-vless
+      # SING_BOX_LOG_LEVEL: debug
+```
+
+自动生成的配置等效于：
 
 ```json
 {
@@ -882,7 +898,9 @@ set -e
 }
 ```
 
-### 挂载启用
+### 方式 B：挂载自定义配置（高级）
+
+需要多入站、链式出站、TLS 等复杂场景时，可挂载完整的 JSON 配置：
 
 ```bash
 # docker run 模式
@@ -892,7 +910,7 @@ docker run -d --name instatic \
   -v ./my-sing-box.json:/app/sing-box-config.json:ro \
   ghcr.io/clawcopilot/instatic:latest
 
-# Compose 模式（在 compose.cloudflare-tunnel.yml 或自定义 overlay 中添加）
+# Compose 模式
 services:
   app:
     volumes:
@@ -953,11 +971,16 @@ docker logs instatic 2>&1 | grep -i "error\|fail"
 
 ### 问题：sing-box 不启动
 
-确认配置文件存在：
+检查是否设置了环境变量或挂载了配置：
 
 ```bash
+# 方式 A：检查 SING_BOX_UUID 是否设置
+docker exec instatic printenv SING_BOX_UUID
+# 如果为空，添加 -e SING_BOX_UUID=$(uuidgen)
+
+# 方式 B：检查配置文件是否挂载
 docker exec instatic ls -la /app/sing-box-config.json
-# 如果不存在:
+# 如果不存在：
 # docker run 需加 -v ./config.json:/app/sing-box-config.json:ro
 ```
 

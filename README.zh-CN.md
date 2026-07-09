@@ -233,7 +233,10 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `INSTATIC_SECRET_KEY` | **必需** | 应用加密密钥 |
 | `CLOUDFLARE_TUNNEL_TOKEN` | （空） | 设置后自动启用 Cloudflare Tunnel |
-| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （可选）sing-box 配置路径 |
+| `SING_BOX_UUID` | （空） | 设置后自动启动 sing-box VLESS+WS 代理（零文件，推荐） |
+| `SING_BOX_PORT` | `8080` | sing-box 监听端口 |
+| `SING_BOX_PATH` | `/vless` | sing-box WebSocket 路径 |
+| `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （高级）挂载自定义 sing-box 完整配置文件 |
 | `HF_TOKEN` | （空） | Hugging Face Token（可选，设置后启用 HF Dataset 备份/恢复） |
 | `HF_BACKUP_DATASET` | （空） | HF Dataset 仓库名（可选，格式 `user/dataset`） |
 | `HF_RESTORE_ON_START` | `false` | 启动时自动从 HF 恢复数据（可选） |
@@ -324,14 +327,37 @@ docker logs instatic 2>&1 | grep cloudflared
 
 ### sing-box（可选代理层）
 
-> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。仅当需要代理功能时才需挂载配置。
+> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。
 
-挂载配置文件即可启用：
+**推荐方式：环境变量（零文件）**
+
+只需设置 `SING_BOX_UUID`，`start.sh` 自动生成 VLESS + WebSocket 配置并启动：
 
 ```bash
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e INSTATIC_SECRET_KEY=... \
+  -e SING_BOX_UUID=$(uuidgen) \
+  ghcr.io/clawcopilot/instatic:latest
+```
+
+可选覆盖端口和路径：
+
+```bash
+docker run -d --name instatic \
+  -e SING_BOX_UUID=... \
+  -e SING_BOX_PORT=8443 \
+  -e SING_BOX_PATH=/my-proxy \
+  ghcr.io/clawcopilot/instatic:latest
+```
+
+**高级方式：挂载自定义配置**
+
+需要多入站、自定义出站等复杂场景时，仍可挂载完整 JSON 配置：
+
+```bash
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -v ./my-sing-box.json:/app/sing-box-config.json:ro \
   ghcr.io/clawcopilot/instatic:latest
 ```

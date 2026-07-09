@@ -17,7 +17,9 @@
 #   4. 在 Tunnel 配置中添加 Public Hostname → 指向 localhost:3001
 #
 # 可选：启用 sing-box 代理
-#   将配置挂载到 /app/sing-box-config.json 即可自动启动:
+#   推荐方式：设置 SING_BOX_UUID 环境变量，自动生成 VLESS+WS 配置:
+#     docker compose ... -e SING_BOX_UUID=$(uuidgen)
+#   高级方式：挂载自定义配置:
 #     docker compose ... -v ./my-sing-box.json:/app/sing-box-config.json:ro
 
 services:
