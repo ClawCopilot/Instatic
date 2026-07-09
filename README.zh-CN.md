@@ -196,7 +196,7 @@ docker pull ghcr.io/clawcopilot/instatic:latest
 INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
-镜像内置了 **Cloudflare Tunnel**（cloudflared）、**sing-box**（可选代理层）以及 **Hugging Face Dataset 备份/恢复**（可选），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。
+镜像内置了 **Cloudflare Tunnel**（cloudflared）、**sing-box**（可选代理层）以及 **Hugging Face Dataset 备份/恢复**（可选，默认备份 `/app/data` + `/app/uploads` 即 SQLite 数据库、媒体文件、插件和发布的站点），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。
 
 ### Docker Compose 叠加模式
 

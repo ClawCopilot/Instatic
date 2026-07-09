@@ -6,10 +6,13 @@
 #   HF_TOKEN               - Hugging Face 访问令牌（必填）
 #   HF_BACKUP_DATASET      - HF Dataset 仓库名，格式 user/dataset-name（必填）
 #   HF_BACKUP_KEEP_COUNT   - 保留备份数量（默认 7）
-#   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔（默认 /app/data,/app/uploads）
+#   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔
+#                            默认: /app/data,/app/uploads
+#                              /app/data    = SQLite 数据库 (cms.db + WAL)
+#                              /app/uploads = 媒体文件 + 插件 + 发布的站点
 #                            支持目录和文件，含空格路径无需额外处理。
-#                            路径名含逗号时用 \, 转义，反斜杠用 \\ 表示。
-#                            例如: /app/data,/app/my\ files,/path\,with\,comma
+#                            路径名含逗号时用 \, 转义。
+#                            例如: /app/data,/app/uploads,/app/my\ config
 #
 # 用法:
 #   hf-backup.sh           - 手动执行一次备份

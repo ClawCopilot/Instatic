@@ -699,12 +699,25 @@ docker compose build --no-cache app
 
 ### 为什么需要 HF Dataset 备份？
 
-Instatic 的所有数据（SQLite 数据库 + 上传文件）都在容器内的 `/app/data` 和 `/app/uploads` 目录。HF Dataset 备份能让你：
+Instatic 的运行时数据分布在两个默认目录中。HF Dataset 备份默认覆盖全部：
+
+| 默认路径 | 内容 |
+|----------|------|
+| `HF_BACKUP_SOURCE_PATHS=/app/data,/app/uploads` | 以下全部 |
+
+| 目录 | 包含 | 说明 |
+|------|------|------|
+| `/app/data/` | `cms.db`, `cms.db-shm`, `cms.db-wal` | SQLite 数据库 — 所有内容、用户、设置 |
+| `/app/uploads/published/` | 静态站点 HTML/JS/CSS | 发布的网站（通过 `current` symlink 切换） |
+| `/app/uploads/plugins/` | `<plugin-id>/<version>/...` | 已安装的插件包文件 |
+| `/app/uploads/<media>/` | 用户上传的图片、文件等 | 媒体库中的文件 |
+
+HF Dataset 备份能让你：
 
 - **零成本异地备份** — HF Dataset 存储免费，无需额外配置 S3/对象存储
 - **一键恢复** — 更换服务器或重建容器时，设置 `HF_RESTORE_ON_START=true` 即可自动恢复
 - **定时自动执行** — 默认每 6 小时自动备份一次，无需人工干预
-- **灵活指定路径** — 通过 `HF_BACKUP_SOURCE_PATHS` 按逗号分隔，可备份目录和文件
+- **灵活扩展** — 可通过 `HF_BACKUP_SOURCE_PATHS` 追加自定义路径
 
 ### 工作原理
 
