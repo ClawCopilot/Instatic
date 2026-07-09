@@ -1206,7 +1206,41 @@ INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.10
 
 ---
 
-### 升级操作流程
+### 一键自动升级（推荐）
+
+使用项目内置的 `scripts/upgrade.sh`，自动完成备份→拉取→切换→验证→回滚全流程：
+
+```bash
+# compose 模式 — 升级到指定版本
+bash scripts/upgrade.sh --target 0.0.12 --env-file /opt/instatic/.env
+
+# compose 模式 — 自动升级到 GitHub 最新 release
+bash scripts/upgrade.sh --env-file /opt/instatic/.env
+
+# docker run 模式
+bash scripts/upgrade.sh --container instatic --target 0.0.12
+
+# 预览操作（不执行）
+bash scripts/upgrade.sh --target 0.0.12 --dry-run
+```
+
+脚本执行流程：
+
+```
+1. 检测部署模式 (compose / docker run)
+2. 获取当前版本号
+3. 确定目标版本 (--target 或 GitHub API 查最新 release)
+4. 升级前备份 (自动触发 hf-backup)
+5. 拉取新镜像 → 更新 .env / 滚动重启
+6. 轮询 /health 端点验证 (30 次 × 2s = 最长 60s)
+7. 健康检查失败 → 自动回滚到旧版本
+```
+
+> `/health` 端点已增强，返回 `version`、`revision`、`db` 状态、`uptime`、HA `role`，升级脚本据此判断新版本是否完全就绪。
+
+---
+
+### 升级操作流程（手动）
 
 #### 步骤 1：升级前备份（必须！）
 
@@ -1301,8 +1335,18 @@ docker logs -f instatic
 #### 步骤 5：验证升级结果
 
 ```bash
-# 检查健康状态
-curl -s http://localhost:3001/api/health
+# 检查健康状态（返回版本、数据库状态、运行时长等）
+curl -s http://localhost:3001/health | python3 -m json.tool
+# 输出示例:
+# {
+#   "status": "ok",
+#   "ts": 1720526460000,
+#   "version": "0.0.12",
+#   "revision": "abc1234",
+#   "db": "ok",
+#   "role": "active",
+#   "uptime": 45321
+# }
 
 # 登录 CMS 后台，确认：
 # - 页面能正常加载和编辑
@@ -1376,6 +1420,7 @@ Watchtower、Diun 这类自动拉取最新镜像的工具对 Instatic 来说是�
 | `Dockerfile` | 五阶段构建，内置 cloudflared + sing-box（可选）+ HF 备份（可选） |
 | `start.sh` | 启动脚本，核心编排 Instatic + Cloudflare Tunnel + HF 备份 + HA 主备 |
 | `sing-box-config.json` | sing-box 可选代理层配置模板 |
+| `scripts/upgrade.sh` | 一键稳定升级脚本（备份→拉取→切换→健康检查→自动回滚） |
 | `scripts/hf-backup.sh` | HF Dataset 备份脚本 |
 | `scripts/hf-restore.sh` | HF Dataset 恢复脚本 |
 | `scripts/ha-switch.sh` | HA 主备切换脚本（promote/demote/status） |

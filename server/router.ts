@@ -112,9 +112,32 @@ export async function handleServerRequest(
 // Order matters — see `routes` above.
 // ---------------------------------------------------------------------------
 
-function tryServeHealth(_req: Request, _runtime: ServerRuntime, _url: URL, pathname: string): Response | null {
+// Server start timestamp — used for uptime reporting in /health.
+const START_TS = Date.now()
+
+function tryServeHealth(_req: Request, runtime: ServerRuntime, _url: URL, pathname: string): Response | null {
   if (pathname !== '/health') return null
-  return jsonResponse({ status: 'ok', ts: Date.now() })
+  // Lightweight DB probe — a failed connect or corrupt DB returns 503,
+  // not a half-true "ok". Uses db.unsafe so we don't couple the health
+  // check shape to any particular table name.
+  const dbPromise = runtime.db.unsafe('SELECT 1')
+    .then(() => 'ok' as const)
+    .catch(() => 'error' as const)
+  const bodyPromise = dbPromise.then((dbStatus) => ({
+    status: dbStatus === 'ok' ? 'ok' : 'degraded',
+    ts: Date.now(),
+    // Version info baked into the image via Dockerfile ENV — absent during
+    // `bun run dev`, where we fall back to 'dev'.
+    version: process.env.INSTATIC_VERSION || 'dev',
+    revision: process.env.INSTATIC_REVISION || 'unknown',
+    db: dbStatus,
+    role: process.env.INSTATIC_ROLE || 'active',
+    uptime: Date.now() - START_TS,
+  }))
+  const statusCode = dbPromise.then((dbStatus) => (dbStatus === 'ok' ? 200 : 503))
+  return Promise.all([bodyPromise, statusCode]).then(([body, status]) =>
+    jsonResponse(body, { status }),
+  )
 }
 
 /**

@@ -54,6 +54,11 @@ ENV PORT=3001
 ENV STATIC_DIR=/app/dist
 ENV UPLOADS_DIR=/app/uploads
 
+# Runtime-visible version info — exposed via the /health endpoint so operators
+# can confirm which release is running without inspecting image labels.
+ENV INSTATIC_VERSION=${INSTATIC_VERSION}
+ENV INSTATIC_REVISION=${INSTATIC_REVISION}
+
 # Install bash (start.sh dependency), ca-certificates, python3
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip \
