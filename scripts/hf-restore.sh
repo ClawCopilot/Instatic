@@ -1,10 +1,11 @@
 #!/bin/bash
 # Instatic Hugging Face Dataset 恢复脚本
-# 从 Hugging Face Dataset 下载最新备份并恢复到 /app/data 和 /app/uploads
+# 从 Hugging Face Dataset 下载最新备份并恢复指定路径（文件或目录）
 #
 # 环境变量:
 #   HF_TOKEN               - Hugging Face 访问令牌（必填）
 #   HF_BACKUP_DATASET      - HF Dataset 仓库名，格式 user/dataset-name（必填）
+#   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔（默认 /app/data,/app/uploads）
 #   HF_RESTORE_ON_START    - 设为 "true" 时启动时自动恢复（默认 false）
 #
 # 用法:
@@ -14,7 +15,7 @@ set -e
 
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
-HF_BACKUP_SOURCE_DIRS="${HF_BACKUP_SOURCE_DIRS:-/app/data /app/uploads}"
+HF_BACKUP_SOURCE_PATHS="${HF_BACKUP_SOURCE_PATHS:-/app/data,/app/uploads}"
 
 if [ -z "${HF_TOKEN}" ] || [ -z "${HF_BACKUP_DATASET}" ]; then
     echo "[hf-restore] HF_TOKEN or HF_BACKUP_DATASET not configured — skipping"
@@ -42,22 +43,37 @@ huggingface-cli download "${HF_BACKUP_DATASET}" \
     "backups/${LATEST}" \
     --local-dir "${RESTORE_DIR}" --quiet
 
-# 解压并恢复到对应目录
+# 解压到临时目录（归档内路径是 data、uploads 等 /app 相对路径）
 echo "[hf-restore] Extracting archive..."
 tar -xzf "${RESTORE_DIR}/${LATEST}" -C "${RESTORE_DIR}"
 
-# 根据 HF_BACKUP_SOURCE_DIRS 逐个恢复
-for d in ${HF_BACKUP_SOURCE_DIRS}; do
-    dir_rel="${d#/app/}"           # /app/data → data
-    dir_name="$(basename "$d")"    # /foo/bar → bar
-    if [ -d "${RESTORE_DIR}/${dir_rel}" ]; then
-        echo "[hf-restore] Restoring ${d}..."
-        # 先备份现有数据（防止覆盖）
-        if [ -d "${d}" ] && [ "$(ls -A "${d}" 2>/dev/null)" ]; then
-            cp -r "${d}" "${d}.bak.$(date +%s)" 2>/dev/null || true
+# 根据 HF_BACKUP_SOURCE_PATHS 逐个恢复（文件或目录）
+IFS=',' read -ra RAW_PATHS <<< "${HF_BACKUP_SOURCE_PATHS}"
+for p in "${RAW_PATHS[@]}"; do
+    p=$(echo "$p" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    [ -z "$p" ] && continue
+
+    rel="${p#/app/}"   # /app/data/foo → data/foo
+    src="${RESTORE_DIR}/${rel}"
+
+    if [ -f "$src" ]; then
+        echo "[hf-restore] Restoring file: ${p}"
+        # 备份现有文件
+        if [ -f "$p" ]; then
+            cp "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
         fi
-        mkdir -p "${d}"
-        cp -r "${RESTORE_DIR}/${dir_rel}"/* "${d}"/ 2>/dev/null || true
+        mkdir -p "$(dirname "$p")"
+        cp "$src" "$p"
+    elif [ -d "$src" ]; then
+        echo "[hf-restore] Restoring dir : ${p}"
+        # 备份现有目录
+        if [ -d "$p" ] && [ "$(ls -A "$p" 2>/dev/null)" ]; then
+            cp -r "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
+        fi
+        mkdir -p "$p"
+        cp -r "${src}"/* "$p"/ 2>/dev/null || true
+    else
+        echo "[hf-restore]   ! ${p} (not in backup — skipped)"
     fi
 done
 

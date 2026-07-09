@@ -704,15 +704,17 @@ Instatic 的所有数据（SQLite 数据库 + 上传文件）都在容器内的 
 - **零成本异地备份** — HF Dataset 存储免费，无需额外配置 S3/对象存储
 - **一键恢复** — 更换服务器或重建容器时，设置 `HF_RESTORE_ON_START=true` 即可自动恢复
 - **定时自动执行** — 默认每 6 小时自动备份一次，无需人工干预
+- **灵活指定路径** — 通过 `HF_BACKUP_SOURCE_PATHS` 按逗号分隔，可备份目录和文件
 
 ### 工作原理
 
 ```
 容器内
     │
-    ├─ /app/data ──────┐
-    ├─ /app/uploads ───┤
-    │                   ▼
+    ├─ /app/data ──────────┐
+    ├─ /app/uploads ───────┤
+    ├─ /app/config/xxx ────┤  ← 支持文件和目录
+    │                       ▼
     └─ hf-backup.sh → tar.gz → huggingface_hub CLI → HF Dataset
                                                       └─ backups/
                                                           ├─ instatic-backup-20260709-120000.tar.gz
@@ -720,7 +722,7 @@ Instatic 的所有数据（SQLite 数据库 + 上传文件）都在容器内的 
                                                           └─ latest-backup.tar.gz
 ```
 
-恢复方向相反：HF Dataset → 下载 → 解压 → `/app/data` + `/app/uploads`
+恢复方向相反：HF Dataset → 下载 → 解压 → 原路径还原
 
 ### 前置配置（只需一次）
 
@@ -751,6 +753,7 @@ HF_BACKUP_DATASET=yourname/instatic-backup
 HF_RESTORE_ON_START=true   # 首次部署设为 true，后续可删掉
 HF_BACKUP_INTERVAL=21600    # 备份间隔（秒），默认 6 小时
 HF_BACKUP_KEEP_COUNT=7      # 保留最近 N 个备份
+HF_BACKUP_SOURCE_PATHS=/app/data,/app/uploads  # 逗号分隔，也可加文件如 /app/config/settings.json
 ```
 
 ### 环境变量参考
@@ -762,7 +765,7 @@ HF_BACKUP_KEEP_COUNT=7      # 保留最近 N 个备份
 | `HF_RESTORE_ON_START` | `false` | 设为 `true` 时，启动后先从 HF 恢复数据再启动 Instatic |
 | `HF_BACKUP_INTERVAL` | `21600` | 备份间隔（秒），默认 6 小时 |
 | `HF_BACKUP_KEEP_COUNT` | `7` | 保留最近 N 个备份，旧的自动删除 |
-| `HF_BACKUP_SOURCE_DIRS` | `/app/data /app/uploads` | 要备份的目录，空格分隔（恢复时自动还原到相同路径） |
+| `HF_BACKUP_SOURCE_PATHS` | `/app/data,/app/uploads` | 要备份的路径，逗号分隔，支持文件和目录 |
 
 ### 手动操作
 

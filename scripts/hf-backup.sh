@@ -1,12 +1,14 @@
 #!/bin/bash
 # Instatic Hugging Face Dataset 备份脚本
-# 将 /app/data 和 /app/uploads 打包上传到 Hugging Face Dataset
+# 将指定路径（文件或目录）打包上传到 Hugging Face Dataset
 #
 # 环境变量:
 #   HF_TOKEN               - Hugging Face 访问令牌（必填）
 #   HF_BACKUP_DATASET      - HF Dataset 仓库名，格式 user/dataset-name（必填）
 #   HF_BACKUP_KEEP_COUNT   - 保留备份数量（默认 7）
-#   HF_BACKUP_SOURCE_DIRS  - 备份源目录（默认 /app/data /app/uploads）
+#   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔（默认 /app/data,/app/uploads）
+#                            支持目录和文件，例如：
+#                              /app/data,/app/uploads,/app/config/custom.json
 #
 # 用法:
 #   hf-backup.sh           - 手动执行一次备份
@@ -16,7 +18,7 @@ set -e
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
 HF_BACKUP_KEEP_COUNT="${HF_BACKUP_KEEP_COUNT:-7}"
-HF_BACKUP_SOURCE_DIRS="${HF_BACKUP_SOURCE_DIRS:-/app/data /app/uploads}"
+HF_BACKUP_SOURCE_PATHS="${HF_BACKUP_SOURCE_PATHS:-/app/data,/app/uploads}"
 
 # 未配置则静默跳过
 if [ -z "${HF_TOKEN}" ] || [ -z "${HF_BACKUP_DATASET}" ]; then
@@ -34,22 +36,31 @@ mkdir -p "${BACKUP_DIR}"
 
 echo "[hf-backup] $(date -u '+%Y-%m-%d %H:%M:%S UTC') Starting backup..."
 
-# 打包备份源目录（忽略不存在的目录）
-SOURCE_ARGS=()
-for d in ${HF_BACKUP_SOURCE_DIRS}; do
-    if [ -d "$d" ]; then
-        # 转换为相对 /app 的路径
-        rel="${d#/app/}"
-        SOURCE_ARGS+=(-C /app "$rel")
+# 解析逗号分隔的路径列表，收集有效路径
+SOURCE_ARGS=(-C /app)
+VALID_PATHS=()
+IFS=',' read -ra RAW_PATHS <<< "${HF_BACKUP_SOURCE_PATHS}"
+for p in "${RAW_PATHS[@]}"; do
+    # 去首尾空白
+    p=$(echo "$p" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    [ -z "$p" ] && continue
+    if [ -e "$p" ]; then
+        # 转为相对 /app 的路径
+        rel="${p#/app/}"
+        SOURCE_ARGS+=("$rel")
+        VALID_PATHS+=("$p")
+        echo "[hf-backup]   + ${p}"
+    else
+        echo "[hf-backup]   ! ${p} (not found — skipped)"
     fi
 done
 
-if [ ${#SOURCE_ARGS[@]} -eq 0 ]; then
-    echo "[hf-backup] No source directories found — skipping"
+if [ ${#VALID_PATHS[@]} -eq 0 ]; then
+    echo "[hf-backup] No valid source paths found — skipping"
     exit 0
 fi
 
-echo "[hf-backup] Archiving: ${HF_BACKUP_SOURCE_DIRS}"
+echo "[hf-backup] Archiving ${#VALID_PATHS[@]} path(s)..."
 tar -czf "${BACKUP_DIR}/${ARCHIVE}" "${SOURCE_ARGS[@]}"
 
 ARCHIVE_SIZE=$(du -h "${BACKUP_DIR}/${ARCHIVE}" | cut -f1)

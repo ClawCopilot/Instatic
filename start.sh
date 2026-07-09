@@ -20,7 +20,7 @@
 #   HF_BACKUP_DATASET        - HF Dataset 仓库名（可选，格式 user/dataset）
 #   HF_RESTORE_ON_START      - 启动时从 HF 恢复数据（可选，默认 false）
 #   HF_BACKUP_INTERVAL       - 备份间隔秒数（可选，默认 21600 = 6小时）
-#   HF_BACKUP_SOURCE_DIRS    - 备份源目录，空格分隔（默认 /app/data /app/uploads）
+#   HF_BACKUP_SOURCE_PATHS - 备份源路径，逗号分隔，支持文件和目录（默认 /app/data,/app/uploads）
 
 set -e
 
