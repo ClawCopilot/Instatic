@@ -102,6 +102,8 @@ Cloudflare CDN (cms.example.com, :443)
 |------|------|
 | `CLOUDFLARE_TUNNEL_TOKEN` 已设置 | cloudflared 前台运行并自动建立隧道（推荐） |
 | `CLOUDFLARE_TUNNEL_TOKEN` 未设置 | cloudflared 不启动，Instatic 前台运行 |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` 已设置 | 启动日志显示公网 CMS 地址 + VLESS 连接串（依赖 Token 生效） |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` 未设置 | 日志提示去 Cloudflare 面板绑定域名 |
 | `SING_BOX_UUID` 已设置 | 自动生成 VLESS+WS 配置，sing-box 后台运行（推荐） |
 | `/app/sing-box-config.json` 存在 | sing-box 后台运行（高级：挂载自定义配置） |
 | 以上皆未设置 | sing-box **不启动**（默认） |
@@ -583,8 +585,14 @@ Cloudflare 控制台 **Zero Trust → Networks → Tunnels → 点击你的 Tunn
 
 #### 完整示例：一条 Tunnel 同时托管 Instatic + sing-box
 
+> **前提**：已在 Cloudflare Zero Trust 控制台完成以下配置：
+> - 创建 Tunnel，获取 `CLOUDFLARE_TUNNEL_TOKEN`
+> - 添加 `cms.example.com → localhost:3001` 的 Public Hostname
+> - 添加 `proxy.example.com → localhost:8080` 的 Public Hostname（sing-box WS 路径）
+
 ```bash
-# 1. 启动容器（设置 HOSTNAME 后，启动日志自动显示所有连接地址）
+# 1. 启动容器。Token 是唯一必需参数；Hostname 用于显示连接地址，
+#    其值必须与 Cloudflare 控制台中配置的 Hostname 完全一致。
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
@@ -595,7 +603,7 @@ docker run -d --name instatic \
   -v instatic_uploads:/app/uploads \
   ghcr.io/clawcopilot/instatic:latest
 
-# 2. 查看启动日志：
+# 2. 查看启动日志（Hostname 使 start.sh 能自动拼装 VLESS 链接）：
 docker logs instatic
 # ==========================================
 #   连接信息
@@ -606,10 +614,6 @@ docker logs instatic
 #   VLESS 代理 :
 #     vless://550e8400-...@cms.example.com:443?...&type=ws&path=/vless#Instatic
 # ==========================================
-
-# 3. 去 Cloudflare 控制台配置两条 Public Hostname：
-#    cms.example.com  → localhost:3001  (Instatic)
-#    proxy.example.com → localhost:8080  (sing-box)
 ```
 
 容器内进程视图：
@@ -822,6 +826,11 @@ set -e
 │       YES → exec cloudflared tunnel ...（前台，接管 PID 1）
 │       NO  → wait $INSTATIC_PID（前台等待 Instatic）
 │
+├─ 4. 打印连接信息摘要（Token 已设置时）
+│     CLOUDFLARE_TUNNEL_HOSTNAME 非空？
+│       YES → 显示 https://<HOSTNAME>/admin/ + VLESS 链接
+│       NO  → 提示去 Cloudflare 面板绑定域名
+│
 ├─ (可选) 检测 sing-box 配置
 │     SING_BOX_UUID 非空？
 │       YES → 自动生成配置 → sing-box run -c ... &（后台）
@@ -841,8 +850,8 @@ set -e
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `PORT` | `3001` | Instatic 监听端口 |
-| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **核心** 设置后自动启用 Tunnel |
-| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | 公网域名（如 `cms.example.com`），启动时显示连接地址 |
+| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **必需**。Cloudflare Tunnel 凭证，是建立隧道的**唯一前提** |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | **依赖 Token**。Cloudflare 控制台中配置的 Public Hostname。必须与面板中设置的值**完全一致**。Compose overlay 中自动推导为 `PUBLIC_ORIGIN`（CSRF 功能）；`docker run` 中仅用于启动日志显示地址 |
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
@@ -853,6 +862,19 @@ set -e
 | `SING_BOX_LOG_LEVEL` | `info` | sing-box 日志级别 |
 | `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （高级）自定义 sing-box 配置文件路径 |
 | `INSTATIC_SECRET_KEY` | 必需 | 应用加密密钥 |
+
+### Token 与 Hostname 的关系
+
+| 维度 | `CLOUDFLARE_TUNNEL_TOKEN` | `CLOUDFLARE_TUNNEL_HOSTNAME` |
+|------|--------------------------|------------------------------|
+| 是否必需 | **是**（建立隧道的唯一前提） | 否（缺省时隧道仍正常工作） |
+| 对隧道的影响 | 直接控制隧道建立 | **无**。隧道工作不依赖此变量 |
+| 对启动日志的影响 | 无（仅触发 cloudflared 启动） | 有。设置后日志显示 `https://<HOSTNAME>/admin/` 和 VLESS 链接 |
+| Compose overlay 中 | 传入 `cloudflared` 进程 | 自动推导为 `PUBLIC_ORIGIN: https://<HOSTNAME>`，**影响 CSRF 校验** |
+| docker run 中 | 同上 | 仅用于启动日志展示，**不影响 CSRF** |
+| 值的约束 | Cloudflare 下发的 Token | **必须**与 Cloudflare Zero Trust 面板中为该 Tunnel 配置的 Public Hostname **完全一致** → 不一致会导致日志显示错误地址 |
+
+> **一句话总结**：Token 是"钥匙"（有它隧道才通），Hostname 是"门牌号标签"（有它日志才显示具体地址）。Hostname 在 Compose overlay 中还有额外 CSRF 功能。
 
 ---
 

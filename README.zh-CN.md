@@ -232,8 +232,8 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 | `PORT` | `3001` | Instatic 监听端口 |
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `INSTATIC_SECRET_KEY` | **必需** | 应用加密密钥 |
-| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | 设置后自动启用 Cloudflare Tunnel |
-| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | Cloudflare Tunnel 公网域名（可选，如 `cms.example.com`） |
+| `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **必需**。Cloudflare Tunnel 凭证，设置后自动建立加密隧道 |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | **依赖 Token**。Cloudflare 控制台中配置的公网域名（如 `cms.example.com`）。必须与 Cloudflare Zero Trust 面板中配置的 Public Hostname **完全一致**。Compose overlay 会自动将其推导为 `PUBLIC_ORIGIN`（CSRF 校验）；`docker run` 时仅用于启动日志显示连接地址 |
 | `SING_BOX_UUID` | （空） | 设置后自动启动 sing-box VLESS+WS 代理（零文件，推荐） |
 | `SING_BOX_PORT` | `8080` | sing-box 监听端口 |
 | `SING_BOX_PATH` | `/vless` | sing-box WebSocket 路径 |
@@ -285,15 +285,15 @@ Cloudflare CDN (cms.example.com, :443)
 ### 部署
 
 ```bash
-# .env 中添加
+# .env 中添加（Token 是建立隧道的唯一前提，Hostname 起辅助作用）
 CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你的Token...
-CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com  # 可选，启动时显示公网地址
+CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com
 
-# Compose 方式（推荐）
+# Compose 方式（推荐 —— Hostname 自动推导 PUBLIC_ORIGIN，保障 CSRF 正常）
 docker compose -f compose.prod.yml -f compose.sqlite.yml \
   -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
 
-# docker run 方式
+# docker run 方式（Hostname 仅用于启动日志显示，CSRF 需单独设置 PUBLIC_ORIGIN）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
   -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
@@ -303,6 +303,8 @@ docker run -d --name instatic \
   -v instatic_uploads:/app/uploads \
   ghcr.io/clawcopilot/instatic:latest
 ```
+
+> **注意**：`CLOUDFLARE_TUNNEL_HOSTNAME` 的值必须与 Cloudflare Zero Trust 面板中为该 Tunnel 配置的 Public Hostname **完全一致**，否则启动日志中显示的是错误地址。
 
 ### 验证
 
