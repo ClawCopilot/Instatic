@@ -1,4 +1,4 @@
-# Render Deployment
+﻿# Render Deployment
 
 This guide defines the Render Blueprint configuration for Instatic.
 
@@ -16,7 +16,7 @@ Render can run Instatic from the published Docker image, provide a public web se
 Both templates use:
 
 ```txt
-Image=ghcr.io/corebunch/instatic:latest
+Image=ghcr.io/clawcopilot/instatic:latest
 PORT=10000
 UPLOADS_DIR=/app/storage/uploads
 STATIC_DIR=/app/dist
@@ -34,13 +34,13 @@ Render's one-click flow reads a Blueprint from a Git repository. For public inst
 
 | Template repo | Source file |
 |---|---|
-| `corebunch/instatic-render-sqlite` | `docs/deployment/render/sqlite/render.yaml` |
-| `corebunch/instatic-render-postgres` | `docs/deployment/render/postgres/render.yaml` |
+| `clawcopilot/instatic-render-sqlite` | `docs/deployment/render/sqlite/render.yaml` |
+| `clawcopilot/instatic-render-postgres` | `docs/deployment/render/postgres/render.yaml` |
 
 Each template repo README can expose a button:
 
 ```md
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/corebunch/instatic-render-sqlite)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/clawcopilot/instatic-render-sqlite)
 ```
 
 Use `runtime: image` in the Blueprint so Render pulls the published image instead of building from the public source repository during every user install. The checked-in template uses `latest` so new Deploy to Render installs start from the current stable image. Release bundles rewrite the copied Blueprint files to the bundle's semver tag.
@@ -51,7 +51,7 @@ Use `runtime: image` in the Blueprint so Render pulls the published image instea
 
 ```txt
 Service: instatic
-Image: ghcr.io/corebunch/instatic:latest
+Image: ghcr.io/clawcopilot/instatic:latest
 Disk: /app/storage
 DATABASE_URL=sqlite:/app/storage/data/cms.db
 UPLOADS_DIR=/app/storage/uploads
@@ -67,7 +67,7 @@ Render persistent disks are paid-service features and are attached to one servic
 
 ```txt
 Service: instatic
-Image: ghcr.io/corebunch/instatic:latest
+Image: ghcr.io/clawcopilot/instatic:latest
 Disk: /app/storage
 Database: instatic-db
 DATABASE_URL=<Render internal Postgres connection string>

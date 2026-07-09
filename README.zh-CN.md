@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # Instatic
 
@@ -8,15 +8,15 @@
 
 <p>
   <a href="https://trendshift.io/repositories/66792?utm_source=repository-badge&utm_medium=badge&utm_campaign=badge-repository-66792" target="_blank" rel="noopener noreferrer">
-    <img src="https://trendshift.io/api/badge/repositories/66792" alt="CoreBunch/Instatic | Trendshift" width="250" height="55">
+    <img src="https://trendshift.io/api/badge/repositories/66792" alt="clawcopilot/Instatic | Trendshift" width="250" height="55">
   </a>
 </p>
 
-[![Release](https://img.shields.io/github/v/release/corebunch/instatic?color=black&labelColor=black)](https://github.com/corebunch/instatic/releases)
+[![Release](https://img.shields.io/github/v/release/clawcopilot/instatic?color=black&labelColor=black)](https://github.com/clawcopilot/instatic/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black?labelColor=black&color=blue)](LICENSE)
 [![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-black?labelColor=black&color=f9f1e1)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-everywhere-black?labelColor=black&color=3178c6)](https://www.typescriptlang.org/)
-[![Docker Image](https://img.shields.io/badge/Docker%20镜像-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic)
+[![Docker Image](https://img.shields.io/badge/Docker%20镜像-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/clawcopilot/Instatic/pkgs/container/instatic)
 
 [一键部署](#一键部署) · [快速开始](#快速开始) · [Docker 部署](#docker-部署) · [Cloudflare Tunnel](#cloudflare-tunnel) · [文档](docs/README.md) · [插件](docs/features/plugin-system.md)
 
@@ -157,7 +157,7 @@
 你只需要 [Bun](https://bun.sh)。默认开发环境跑 SQLite，不需要额外服务。
 
 ```sh
-git clone https://github.com/corebunch/instatic.git
+git clone https://github.com/clawcopilot/instatic.git
 cd instatic
 bun install
 bun run dev
@@ -173,7 +173,7 @@ bun run dev
 
 ## Docker 部署
 
-> **镜像地址：** [`ghcr.io/clawcopilot/instatic`](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) — 每次 push main 自动构建。
+> **镜像地址：** [`ghcr.io/clawcopilot/instatic`](https://github.com/clawcopilot/Instatic/pkgs/container/instatic) — 每次 push main 自动构建。
 
 ### 在 GitHub 上找到镜像
 
@@ -183,7 +183,7 @@ bun run dev
 |------|------|
 | **README Badge** | 点击本文档顶部的 `Docker 镜像` 徽章 → 直达包页面 |
 | **仓库侧边栏** | 仓库首页 → 右侧 **Packages** → 点 `instatic` |
-| **直接链接** | [github.com/ClawCopilot/Instatic/pkgs/container/instatic](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic) |
+| **直接链接** | [github.com/clawcopilot/Instatic/pkgs/container/instatic](https://github.com/clawcopilot/Instatic/pkgs/container/instatic) |
 
 进入包页面后，点击版本标签（如 `latest`），页面上方会直接显示 `docker pull` 命令。
 

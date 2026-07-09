@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "instatic",
   "private": true,
   "version": "0.0.10",
@@ -11,10 +11,10 @@
   "homepage": "https://instatic.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/corebunch/instatic.git"
+    "url": "https://github.com/clawcopilot/instatic.git"
   },
   "bugs": {
-    "url": "https://github.com/corebunch/instatic/issues"
+    "url": "https://github.com/clawcopilot/instatic/issues"
   },
   "type": "module",
   "scripts": {

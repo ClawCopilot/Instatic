@@ -39,6 +39,7 @@ get_role() {
 }
 
 set_role() {
+    mkdir -p "$(dirname "${ROLE_FILE}")"
     echo "$1" > "${ROLE_FILE}"
     log "Role set to: $1"
 }
@@ -49,6 +50,10 @@ check_instatic_health() {
 
 do_backup() {
     if [ -n "${HF_TOKEN}" ] && [ -n "${HF_BACKUP_DATASET}" ]; then
+        if ! command -v hf-backup >/dev/null 2>&1; then
+            log "ERROR: hf-backup not found. Is the container built correctly?"
+            return 1
+        fi
         log "Running final backup to HF Dataset..."
         hf-backup 2>&1 | while IFS= read -r line; do
             log "[backup] ${line}"
@@ -68,6 +73,10 @@ do_backup() {
 
 do_restore() {
     if [ -n "${HF_TOKEN}" ] && [ -n "${HF_BACKUP_DATASET}" ]; then
+        if ! command -v hf-restore >/dev/null 2>&1; then
+            log "ERROR: hf-restore not found. Is the container built correctly?"
+            return 1
+        fi
         log "Restoring data from HF Dataset..."
         hf-restore 2>&1 | while IFS= read -r line; do
             log "[restore] ${line}"

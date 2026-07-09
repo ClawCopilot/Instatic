@@ -1,4 +1,4 @@
-# VPS Deployment
+﻿# VPS Deployment
 
 This guide covers Docker Compose installs on a single VPS.
 
@@ -29,7 +29,7 @@ Before adding AI provider credentials, saving plugin secret settings, or enablin
 SQLite:
 
 ```sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:<version> docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:<version> docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 Postgres:
@@ -37,7 +37,7 @@ Postgres:
 ```sh
 cp .env.production.example .env
 # Set POSTGRES_PASSWORD and INSTATIC_SECRET_KEY in .env.
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:<version> docker compose -f compose.prod.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:<version> docker compose -f compose.prod.yml up -d
 ```
 
 ## Prerequisites
@@ -49,7 +49,7 @@ Install Docker Engine and Docker Compose on the VPS. If using TLS, point a domai
 Use a source checkout:
 
 ```sh
-git clone https://github.com/CoreBunch/Instatic.git
+git clone https://github.com/clawcopilot/Instatic.git
 cd instatic
 ```
 

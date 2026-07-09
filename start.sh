@@ -116,7 +116,14 @@ if [ -f "${SING_BOX_CONFIG}" ]; then
     echo "[sing-box] Starting with config: ${SING_BOX_CONFIG}"
     sing-box run -c "${SING_BOX_CONFIG}" &
     SING_BOX_PID=$!
-    echo "[sing-box] PID: ${SING_BOX_PID}"
+    # Allow sing-box startup failure without aborting the whole script
+    sleep 1
+    if ! kill -0 "${SING_BOX_PID}" 2>/dev/null; then
+        echo "[sing-box] WARNING: sing-box exited immediately — check config"
+        unset SING_BOX_PID
+    else
+        echo "[sing-box] PID: ${SING_BOX_PID}"
+    fi
 else
     echo "[sing-box] Config not found at ${SING_BOX_CONFIG} — skipping"
 fi
@@ -154,6 +161,9 @@ if [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
     echo "=========================================="
     # cloudflared 前台运行，接管容器主进程
     exec cloudflared tunnel --no-autoupdate run --token "${CLOUDFLARE_TUNNEL_TOKEN}"
+    # exec failed - should not reach here
+    echo "[cloudflared] FATAL: exec cloudflared failed"
+    exit 1
 else
     echo "[cloudflared] Token not set — skipping"
     echo "=========================================="

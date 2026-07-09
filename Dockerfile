@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+﻿# syntax=docker/dockerfile:1
 
 FROM oven/bun:1.3.11 AS build
 WORKDIR /app
@@ -20,14 +20,14 @@ RUN bun install --frozen-lockfile --production
 # 核心功能: Cloudflare Tunnel 将 Instatic 托管到公网，无需开放服务器端口
 FROM alpine:latest AS cloudflared-layer
 ARG CLOUDFLARED_VERSION=latest
-RUN wget -q -O /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/${CLOUDFLARED_VERSION}/download/cloudflared-linux-amd64 \
+RUN wget -nv -O /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/${CLOUDFLARED_VERSION}/download/cloudflared-linux-amd64 \
     && chmod +x /tmp/cloudflared
 
 # ---- sing-box download layer (cached, 可选) ----
 # sing-box 作为可选的代理/协议层，默认不启用
 FROM alpine:latest AS sing-box-layer
 ARG SING_BOX_VERSION=1.10.1
-RUN wget -q https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz \
+RUN wget -nv https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz \
     && tar -zxf sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz \
     && mv sing-box-${SING_BOX_VERSION}-linux-amd64/sing-box /tmp/sing-box
 
@@ -41,9 +41,9 @@ ARG INSTATIC_CREATED=unknown
 
 LABEL org.opencontainers.image.title="Instatic"
 LABEL org.opencontainers.image.description="Self-hosted CMS with built-in Cloudflare Tunnel — deploy your site to the public internet without opening any ports."
-LABEL org.opencontainers.image.source="https://github.com/corebunch/instatic"
-LABEL org.opencontainers.image.url="https://github.com/corebunch/instatic"
-LABEL org.opencontainers.image.documentation="https://github.com/corebunch/instatic/tree/main/docs/deployment"
+LABEL org.opencontainers.image.source="https://github.com/clawcopilot/instatic"
+LABEL org.opencontainers.image.url="https://github.com/clawcopilot/instatic"
+LABEL org.opencontainers.image.documentation="https://github.com/clawcopilot/instatic/tree/main/docs/deployment"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${INSTATIC_VERSION}"
 LABEL org.opencontainers.image.revision="${INSTATIC_REVISION}"
@@ -54,9 +54,9 @@ ENV PORT=3001
 ENV STATIC_DIR=/app/dist
 ENV UPLOADS_DIR=/app/uploads
 
-# Install bash (start.sh dependency), ca-certificates, python3, and cron (可选备份调度)
+# Install bash (start.sh dependency), ca-certificates, python3
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip cron \
+    && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install huggingface_hub CLI（可选 HF Dataset 备份/恢复）

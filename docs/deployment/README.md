@@ -1,4 +1,4 @@
-# Deployment
+﻿# Deployment
 
 This index maps supported deployment targets to the files, variables, and persistence rules they need.
 
@@ -51,13 +51,13 @@ Managed platforms often override `PORT`. That is fine; the server uses `process.
 Release bundles plus the published GHCR image are the default portable install path:
 
 ```sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 Pin a semver tag for predictable upgrades:
 
 ```sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:0.0.10 docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.10 docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 Source builds remain supported for contributors and release-candidate testing:
@@ -66,7 +66,7 @@ Source builds remain supported for contributors and release-candidate testing:
 docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.build.yml up -d --build
 ```
 
-The maintainer release target is `ghcr.io/corebunch/instatic`, documented in [release-workflow.md](release-workflow.md).
+The maintainer release target is `ghcr.io/clawcopilot/instatic`, documented in [release-workflow.md](release-workflow.md).
 
 ## Database Choice
 

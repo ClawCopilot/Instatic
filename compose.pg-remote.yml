@@ -24,12 +24,8 @@ services:
   app:
     environment:
       # DATABASE_URL 必须在 .env 中设置，指向远程 PG
-      DATABASE_URL: ${DATABASE_URL:?请在 .env 中设置 DATABASE_URL 指向远程 PostgreSQL}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to point to remote PostgreSQL}
       # 远程 PG 模式下，uploads 目录需要在所有节点间共享
       # 如果不共享，各节点的上传文件相互独立
       # 推荐方案：使用 S3 兼容存储或 NFS 共享卷
     depends_on: !reset {}
-
-volumes:
-  # 远程 PG 不需要本地 postgres_data 卷
-  postgres_data:

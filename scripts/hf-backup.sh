@@ -40,7 +40,11 @@ parse_path_list() {
 
 HF_TOKEN="${HF_TOKEN:-}"
 HF_BACKUP_DATASET="${HF_BACKUP_DATASET:-}"
-HF_BACKUP_KEEP_COUNT="${HF_BACKUP_KEEP_COUNT:-7}"
+HF_KEEP_COUNT="${HF_BACKUP_KEEP_COUNT:-7}"
+# 校验 HF_BACKUP_KEEP_COUNT 为正整数，防止 $((...)) 出错
+case "${HF_KEEP_COUNT}" in
+    ''|*[!0-9]*) HF_KEEP_COUNT=7 ;;
+esac
 HF_BACKUP_SOURCE_PATHS="${HF_BACKUP_SOURCE_PATHS:-/app/data,/app/uploads}"
 
 # 未配置则静默跳过
@@ -98,11 +102,11 @@ huggingface-cli upload "${HF_BACKUP_DATASET}" \
     "backups/${LATEST}" --quiet 2>&1 | tail -1
 
 # 清理旧备份：保留最近 N 个
-echo "[hf-backup] Pruning old backups (keep=${HF_BACKUP_KEEP_COUNT})..."
+echo "[hf-backup] Pruning old backups (keep=${HF_KEEP_COUNT})..."
 OLD_BACKUPS=$(huggingface-cli repo-files "${HF_BACKUP_DATASET}" 2>/dev/null \
     | grep "^backups/instatic-backup-" \
     | sort -r \
-    | tail -n +$((HF_BACKUP_KEEP_COUNT + 1)))
+    | tail -n +$((HF_KEEP_COUNT + 1)))
 
 if [ -n "${OLD_BACKUPS}" ]; then
     echo "${OLD_BACKUPS}" | while read -r f; do

@@ -73,14 +73,20 @@ while IFS= read -r p; do
     if [ -f "$src" ]; then
         echo "[hf-restore] Restoring file: ${p}"
         if [ -f "$p" ]; then
-            cp "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
+            cp "$p" "${p}.bak.$(date +%s)" 2>/dev/null || {
+                echo "[hf-restore] WARNING: Failed to backup ${p} — aborting restore for this file"
+                continue
+            }
         fi
         mkdir -p "$(dirname "$p")"
         cp "$src" "$p"
     elif [ -d "$src" ]; then
         echo "[hf-restore] Restoring dir : ${p}"
         if [ -d "$p" ] && [ "$(ls -A "$p" 2>/dev/null)" ]; then
-            cp -r "$p" "${p}.bak.$(date +%s)" 2>/dev/null || true
+            cp -r "$p" "${p}.bak.$(date +%s)" 2>/dev/null || {
+                echo "[hf-restore] WARNING: Failed to backup ${p} — aborting restore for this directory"
+                continue
+            }
         fi
         mkdir -p "$p"
         cp -r "${src}"/* "$p"/ 2>/dev/null || true

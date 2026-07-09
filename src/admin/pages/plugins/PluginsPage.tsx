@@ -1,4 +1,4 @@
-import { Button } from '@ui/components/Button'
+﻿import { Button } from '@ui/components/Button'
 import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginCard } from './components/PluginCard/PluginCard'
@@ -79,7 +79,7 @@ export function PluginsPage() {
               <p className={styles.errorHint}>
                 This looks like a plugin sandbox issue. See the{' '}
                 <a
-                  href="https://github.com/corebunch/instatic/blob/main/docs/features/plugin-system.md"
+                  href="https://github.com/clawcopilot/instatic/blob/main/docs/features/plugin-system.md"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

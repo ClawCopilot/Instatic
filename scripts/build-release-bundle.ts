@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+﻿import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -49,8 +49,8 @@ async function copyIntoBundle(path: string): Promise<void> {
 async function pinRenderBlueprintImage(path: string): Promise<void> {
   const destination = join(stagingDir, path)
   const contents = await readFile(destination, 'utf-8')
-  const image = `ghcr.io/corebunch/instatic:${version}`
-  const updated = contents.replace(/ghcr\.io\/corebunch\/instatic:[^\s]+/g, image)
+  const image = `ghcr.io/clawcopilot/instatic:${version}`
+  const updated = contents.replace(/ghcr\.io\/clawcopilot\/instatic:[^\s]+/g, image)
   if (updated === contents) {
     throw new Error(`Render Blueprint image tag was not found: ${path}`)
   }
@@ -78,7 +78,7 @@ This bundle contains the production Compose files and deployment docs for Instat
 ## SQLite, single-container install
 
 \`\`\`sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:${version} docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:${version} docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 \`\`\`
 
 ## Postgres install
@@ -86,12 +86,12 @@ INSTATIC_IMAGE=ghcr.io/corebunch/instatic:${version} docker compose -f compose.p
 \`\`\`sh
 cp .env.production.example .env
 # Edit .env and set POSTGRES_PASSWORD and INSTATIC_SECRET_KEY.
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:${version} docker compose -f compose.prod.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:${version} docker compose -f compose.prod.yml up -d
 \`\`\`
 
 ## Railway image-source install
 
-Use \`ghcr.io/corebunch/instatic:${version}\` as the Railway service source. Attach a volume at \`/app/storage\` and set:
+Use \`ghcr.io/clawcopilot/instatic:${version}\` as the Railway service source. Attach a volume at \`/app/storage\` and set:
 
 \`\`\`txt
 DATABASE_URL=sqlite:/app/storage/data/cms.db
@@ -109,7 +109,7 @@ Copy one of these files to a template repository as its root \`render.yaml\`:
 - \`docs/deployment/render/sqlite/render.yaml\`
 - \`docs/deployment/render/postgres/render.yaml\`
 
-These release-bundle copies are already pinned to \`ghcr.io/corebunch/instatic:${version}\`.
+These release-bundle copies are already pinned to \`ghcr.io/clawcopilot/instatic:${version}\`.
 Read \`docs/deployment/render.md\` before publishing a Deploy to Render button.
 `,
   'utf-8',

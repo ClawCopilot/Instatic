@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -67,7 +67,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/corebunch/instatic
+          images: ghcr.io/clawcopilot/instatic
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

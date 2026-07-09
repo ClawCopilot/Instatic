@@ -1,4 +1,4 @@
-# Instatic + Cloudflare Tunnel — 原理与操作手册
+﻿# Instatic + Cloudflare Tunnel — 原理与操作手册
 
 > **最后更新**: 2026-07-07
 > **适用版本**: Instatic v0.0.10+
@@ -185,7 +185,7 @@ docker compose ... -f compose.build.yml up -d --build
 
 **`compose.prod.yml`** — 基座
 - `postgres` 服务（PostgreSQL 16）
-- `app` 服务，默认拉取 `ghcr.io/corebunch/instatic:latest`
+- `app` 服务，默认拉取 `ghcr.io/clawcopilot/instatic:latest`
 - 暴露 `${HOST_PORT:-3001}:3001`
 
 **`compose.sqlite.yml`** — SQLite 切换
@@ -268,7 +268,7 @@ docker run -d --name instatic \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 ```
 
 ### 验证
@@ -423,7 +423,7 @@ docker run -d --name instatic \
   -e HF_BACKUP_DATASET=user/instatic-backup \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 
 # 备用节点（另一个服务器）
 docker run -d --name instatic \
@@ -435,7 +435,7 @@ docker run -d --name instatic \
   -e HF_BACKUP_DATASET=user/instatic-backup \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 ```
 
 **ha-switch 命令参考**：
@@ -609,7 +609,7 @@ docker run -d --name instatic \
   -v $(pwd)/my-sing-box.json:/app/sing-box-config.json:ro \
   -v instatic_data:/app/data \
   -v instatic_uploads:/app/uploads \
-  ghcr.io/corebunch/instatic:latest
+  ghcr.io/clawcopilot/instatic:latest
 
 # 3. 去 Cloudflare 控制台配置两条 Public Hostname：
 #    cms.example.com  → localhost:3001  (Instatic)
@@ -699,7 +699,7 @@ GitHub Actions Runner (ubuntu-latest)
 |------|------|
 | **仓库首页 → Badge** | 点击顶部 `Docker 镜像` badge，直达包页面 |
 | **仓库首页 → 侧边栏** | 右侧边栏 → **Packages** → 点 `instatic` |
-| **直接 URL** | `https://github.com/ClawCopilot/Instatic/pkgs/container/instatic` |
+| **直接 URL** | `https://github.com/clawcopilot/Instatic/pkgs/container/instatic` |
 
 进入包页面后，可以看到：
 
@@ -806,54 +806,6 @@ docker logs -f instatic
 
 ---
 
-## 8. sing-box 选配（可选代理层）
-
-> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。仅当需要代理功能时才需挂载配置。
-
-### 启用条件
-
-`start.sh` 启动时检测 `/app/sing-box-config.json` 是否存在。**默认不存在（不启动）**。
-
-镜像内含 `sing-box-config.json` 作为模板（复制到 `/app/sing-box-config.json.default`），可参考修改。
-
-### 配置示例
-
-```json
-{
-  "log": { "level": "info" },
-  "inbounds": [
-    {
-      "type": "vless",
-      "tag": "vless-in",
-      "listen": "::",
-      "listen_port": 8080,
-      "users": [{ "uuid": "你的UUID" }],
-      "transport": { "type": "ws", "path": "/vless" }
-    }
-  ],
-  "outbounds": [{ "type": "direct", "tag": "direct" }]
-}
-```
-
-### 挂载启用
-
-```bash
-# docker run 模式
-docker run -d --name instatic \
-  -p 3001:3001 -p 8080:8080 \
-  -e INSTATIC_SECRET_KEY=... \
-  -v ./my-sing-box.json:/app/sing-box-config.json:ro \
-  ghcr.io/corebunch/instatic:latest
-
-# Compose 模式（在 compose.cloudflare-tunnel.yml 或自定义 overlay 中添加）
-services:
-  app:
-    volumes:
-      - ./my-sing-box.json:/app/sing-box-config.json:ro
-```
-
----
-
 ## 7. start.sh 启动流程
 
 ```
@@ -898,6 +850,54 @@ set -e
 | `NODE_ENV` | `production` | 运行模式 |
 | `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （可选）sing-box 配置路径 |
 | `INSTATIC_SECRET_KEY` | 必需 | 应用加密密钥 |
+
+---
+
+## 8. sing-box 选配（可选代理层）
+
+> sing-box 是内置在镜像中的**可选代理/协议层**，默认不启动。仅当需要代理功能时才需挂载配置。
+
+### 启用条件
+
+`start.sh` 启动时检测 `/app/sing-box-config.json` 是否存在。**默认不存在（不启动）**。
+
+镜像内含 `sing-box-config.json` 作为模板（复制到 `/app/sing-box-config.json.default`），可参考修改。
+
+### 配置示例
+
+```json
+{
+  "log": { "level": "info" },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "::",
+      "listen_port": 8080,
+      "users": [{ "uuid": "你的UUID" }],
+      "transport": { "type": "ws", "path": "/vless" }
+    }
+  ],
+  "outbounds": [{ "type": "direct", "tag": "direct" }]
+}
+```
+
+### 挂载启用
+
+```bash
+# docker run 模式
+docker run -d --name instatic \
+  -p 3001:3001 -p 8080:8080 \
+  -e INSTATIC_SECRET_KEY=... \
+  -v ./my-sing-box.json:/app/sing-box-config.json:ro \
+  ghcr.io/clawcopilot/instatic:latest
+
+# Compose 模式（在 compose.cloudflare-tunnel.yml 或自定义 overlay 中添加）
+services:
+  app:
+    volumes:
+      - ./my-sing-box.json:/app/sing-box-config.json:ro
+```
 
 ---
 

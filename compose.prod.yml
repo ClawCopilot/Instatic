@@ -1,4 +1,4 @@
-name: instatic-prod
+﻿name: instatic-prod
 
 services:
   postgres:
@@ -20,7 +20,7 @@ services:
       retries: 10
 
   app:
-    image: ${INSTATIC_IMAGE:-ghcr.io/corebunch/instatic:latest}
+    image: ${INSTATIC_IMAGE:-ghcr.io/clawcopilot/instatic:latest}
     restart: unless-stopped
     ports:
       - "${HOST_PORT:-3001}:3001"

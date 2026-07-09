@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # Instatic
 
@@ -8,15 +8,15 @@ A self-hosted CMS where the visual editor, content engine, and publisher all liv
 
 <p>
   <a href="https://trendshift.io/repositories/66792?utm_source=repository-badge&utm_medium=badge&utm_campaign=badge-repository-66792" target="_blank" rel="noopener noreferrer">
-    <img src="https://trendshift.io/api/badge/repositories/66792" alt="CoreBunch/Instatic | Trendshift" width="250" height="55">
+    <img src="https://trendshift.io/api/badge/repositories/66792" alt="clawcopilot/Instatic | Trendshift" width="250" height="55">
   </a>
 </p>
 
-[![Release](https://img.shields.io/github/v/release/corebunch/instatic?color=black&labelColor=black)](https://github.com/corebunch/instatic/releases)
+[![Release](https://img.shields.io/github/v/release/clawcopilot/instatic?color=black&labelColor=black)](https://github.com/clawcopilot/instatic/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black?labelColor=black&color=blue)](LICENSE)
 [![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-black?labelColor=black&color=f9f1e1)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-everywhere-black?labelColor=black&color=3178c6)](https://www.typescriptlang.org/)
-[![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/ClawCopilot/Instatic/pkgs/container/instatic)
+[![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io-blue?logo=docker&labelColor=black)](https://github.com/clawcopilot/Instatic/pkgs/container/instatic)
 
 [One-Click Deploy](#deploy-in-one-click) · [Quick Start](#quick-start) · [Docs](docs/README.md) · [Plugins](docs/features/plugin-system.md) · [Roadmap](#early-on-purpose)
 
@@ -71,7 +71,7 @@ When a new Instatic version is available, update by redeploying the latest image
 Prefer your own hardware? Instatic is a single Docker image:
 
 ```sh
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 Full guides for VPS, Postgres, HTTPS with Caddy, Render, and backups are in [docs/deployment](docs/deployment/README.md).
@@ -177,7 +177,7 @@ What comes out the other end is plain HTML and compact CSS, all the way down. No
 You need [Bun](https://bun.sh). Nothing else. The default dev setup runs on SQLite, so there are no extra services to stand up.
 
 ```sh
-git clone https://github.com/corebunch/instatic.git
+git clone https://github.com/clawcopilot/instatic.git
 cd instatic
 bun install
 bun run dev

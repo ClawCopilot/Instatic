@@ -1,4 +1,4 @@
-# Instatic Fly.io 部署及运维指南
+﻿# Instatic Fly.io 部署及运维指南
 
 > **编写日期**: 2026-07-04
 > **适用版本**: Instatic v0.0.10+
@@ -557,7 +557,7 @@ git pull origin main
 
 # 方式二：使用官方 Docker 镜像
 # 修改 fly.toml 或直接指定镜像
-fly deploy --image ghcr.io/corebunch/instatic:latest
+fly deploy --image ghcr.io/clawcopilot/instatic:latest
 ```
 
 ### 10.2 滚动升级

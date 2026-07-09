@@ -1,4 +1,4 @@
-# Instatic Hetzner VPS 部署及运维指南
+﻿# Instatic Hetzner VPS 部署及运维指南
 
 > **编写日期**: 2026-07-04
 > **适用版本**: Instatic v0.0.10+
@@ -234,7 +234,7 @@ sudo apt install -y caddy
 ```bash
 # 进入工作目录
 cd /opt
-git clone https://github.com/corebunch/instatic.git
+git clone https://github.com/clawcopilot/instatic.git
 cd instatic
 ```
 
@@ -252,7 +252,7 @@ vim .env
 
 ```bash
 # ─── Image ────────────────────────────────────────────────
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest
 
 # ─── AI 加密密钥 ──────────────────────────────────────────
 # 本地生成: bun run scripts/generate-secret-key.ts
@@ -435,7 +435,7 @@ curl -vI https://cms.example.com 2>&1 | grep -A5 "SSL"
 # 最后更新: 2026-07-04
 
 # ─── 镜像 ────────────────────────────────────────────────
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest
 
 # ─── AI 加密密钥 ──────────────────────────────────────────
 INSTATIC_SECRET_KEY=sk_v2_your_generated_secret_key_here
@@ -817,7 +817,7 @@ sudo fail2ban-client status
 
 ```bash
 # 定期扫描镜像漏洞
-docker scan ghcr.io/corebunch/instatic:latest
+docker scan ghcr.io/clawcopilot/instatic:latest
 
 # 限制容器资源（可选）
 # 在 compose.prod.yml 的 app 服务中添加:
@@ -840,7 +840,7 @@ cd /opt/instatic
 docker compose -f compose.prod.yml -f compose.tls.yml pull app
 
 # 或拉取特定版本
-# 修改 .env: INSTATIC_IMAGE=ghcr.io/corebunch/instatic:v0.0.11
+# 修改 .env: INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:v0.0.11
 docker compose -f compose.prod.yml -f compose.tls.yml pull app
 ```
 
@@ -875,7 +875,7 @@ curl -I https://cms.example.com/admin/
 
 ```bash
 # 修改 .env 中的镜像版本
-# INSTATIC_IMAGE=ghcr.io/corebunch/instatic:v0.0.10
+# INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:v0.0.10
 vim /opt/instatic/.env
 
 # 重新部署
@@ -1046,7 +1046,7 @@ systemctl enable docker
 # ─── 克隆项目 ───
 echo "=== 4. 克隆 Instatic ==="
 cd /opt
-git clone https://github.com/corebunch/instatic.git
+git clone https://github.com/clawcopilot/instatic.git
 cd instatic
 
 # ─── 配置 .env ───
@@ -1054,7 +1054,7 @@ echo "=== 5. 配置环境变量 ==="
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 
 cat > .env << EOF
-INSTATIC_IMAGE=ghcr.io/corebunch/instatic:latest
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest
 INSTATIC_SECRET_KEY=${INSTATIC_SECRET_KEY:-REPLACE_WITH_GENERATED_KEY}
 HOST_PORT=3001
 TRUSTED_PROXY_CIDRS=172.16.0.0/12

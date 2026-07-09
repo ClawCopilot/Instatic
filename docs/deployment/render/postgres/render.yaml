@@ -1,9 +1,9 @@
-services:
+﻿services:
   - type: web
     name: instatic
     runtime: image
     image:
-      url: ghcr.io/corebunch/instatic:latest
+      url: ghcr.io/clawcopilot/instatic:latest
     plan: starter
     numInstances: 1
     healthCheckPath: /health

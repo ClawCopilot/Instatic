@@ -1,4 +1,4 @@
-# Generic Docker Image
+﻿# Generic Docker Image
 
 This guide covers the production Docker image outside the bundled VPS Compose files.
 
@@ -35,8 +35,8 @@ docker build -t instatic:local .
 GHCR is the canonical image registry:
 
 ```sh
-docker pull ghcr.io/corebunch/instatic:latest
-docker pull ghcr.io/corebunch/instatic:0.0.10
+docker pull ghcr.io/clawcopilot/instatic:latest
+docker pull ghcr.io/clawcopilot/instatic:0.0.10
 ```
 
 The v0.0.10 published image is built for `linux/amd64`. Use it on Railway and x86_64 VPS/container hosts. ARM64 hosts should build from source for now, or wait for the native arm64 release job before pulling GHCR images directly.
@@ -85,14 +85,14 @@ docker run -d \
 
 The app volume is still required in Postgres mode because uploads, fonts, plugin packs, and published disk artefacts live under `UPLOADS_DIR`.
 
-Replace `instatic:local` with `ghcr.io/corebunch/instatic:<tag>` when deploying from a published image.
+Replace `instatic:local` with `ghcr.io/clawcopilot/instatic:<tag>` when deploying from a published image.
 
 ## Run On Railway From The Image
 
 Create an app service from Docker image source:
 
 ```txt
-ghcr.io/corebunch/instatic:0.0.10
+ghcr.io/clawcopilot/instatic:0.0.10
 ```
 
 Attach a Railway volume at `/app/storage`, set the health check path to `/health`, and set app variables:

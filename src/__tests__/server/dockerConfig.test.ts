@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+﻿import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 
 describe('self-host docker config', () => {
@@ -57,7 +57,7 @@ describe('self-host docker config', () => {
     const compose = readFileSync('compose.prod.yml', 'utf8')
     const buildOverride = readFileSync('compose.build.yml', 'utf8')
 
-    expect(compose).toContain('ghcr.io/corebunch/instatic:latest')
+    expect(compose).toContain('ghcr.io/clawcopilot/instatic:latest')
     expect(compose).not.toContain('build:')
     expect(compose).toContain('restart: unless-stopped')
     expect(compose).toContain('condition: service_healthy')
