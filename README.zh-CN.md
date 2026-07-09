@@ -233,6 +233,7 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `INSTATIC_SECRET_KEY` | **必需** | 应用加密密钥 |
 | `CLOUDFLARE_TUNNEL_TOKEN` | （空） | 设置后自动启用 Cloudflare Tunnel |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | Cloudflare Tunnel 公网域名（可选，如 `cms.example.com`） |
 | `SING_BOX_UUID` | （空） | 设置后自动启动 sing-box VLESS+WS 代理（零文件，推荐） |
 | `SING_BOX_PORT` | `8080` | sing-box 监听端口 |
 | `SING_BOX_PATH` | `/vless` | sing-box WebSocket 路径 |
@@ -286,6 +287,7 @@ Cloudflare CDN (cms.example.com, :443)
 ```bash
 # .env 中添加
 CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你的Token...
+CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com  # 可选，启动时显示公网地址
 
 # Compose 方式（推荐）
 docker compose -f compose.prod.yml -f compose.sqlite.yml \
@@ -294,6 +296,7 @@ docker compose -f compose.prod.yml -f compose.sqlite.yml \
 # docker run 方式
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
   -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
@@ -336,9 +339,16 @@ docker logs instatic 2>&1 | grep cloudflared
 ```bash
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
   -e INSTATIC_SECRET_KEY=... \
   -e SING_BOX_UUID=$(uuidgen) \
   ghcr.io/clawcopilot/instatic:latest
+
+# 查看连接信息：
+docker logs instatic
+#   CMS 管理后台 : https://cms.example.com/admin/
+#   VLESS 代理 :
+#     vless://550e8400-...@cms.example.com:443?...&type=ws&path=/vless#Instatic
 ```
 
 可选覆盖端口和路径：

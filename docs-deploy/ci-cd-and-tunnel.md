@@ -584,9 +584,10 @@ Cloudflare 控制台 **Zero Trust → Networks → Tunnels → 点击你的 Tunn
 #### 完整示例：一条 Tunnel 同时托管 Instatic + sing-box
 
 ```bash
-# 1. 启动容器（SING_BOX_UUID 自动生成配置，零文件方式）
+# 1. 启动容器（设置 HOSTNAME 后，启动日志自动显示所有连接地址）
 docker run -d --name instatic \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
   -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -e SING_BOX_UUID=$(uuidgen) \
@@ -594,7 +595,19 @@ docker run -d --name instatic \
   -v instatic_uploads:/app/uploads \
   ghcr.io/clawcopilot/instatic:latest
 
-# 2. 去 Cloudflare 控制台配置两条 Public Hostname：
+# 2. 查看启动日志：
+docker logs instatic
+# ==========================================
+#   连接信息
+# ==========================================
+#   CMS 管理后台 : https://cms.example.com/admin/
+#   公开站点     : https://cms.example.com/
+#
+#   VLESS 代理 :
+#     vless://550e8400-...@cms.example.com:443?...&type=ws&path=/vless#Instatic
+# ==========================================
+
+# 3. 去 Cloudflare 控制台配置两条 Public Hostname：
 #    cms.example.com  → localhost:3001  (Instatic)
 #    proxy.example.com → localhost:8080  (sing-box)
 ```
@@ -829,6 +842,7 @@ set -e
 |------|--------|------|
 | `PORT` | `3001` | Instatic 监听端口 |
 | `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **核心** 设置后自动启用 Tunnel |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | 公网域名（如 `cms.example.com`），启动时显示连接地址 |
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
