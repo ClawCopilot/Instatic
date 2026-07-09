@@ -66,7 +66,9 @@
 
 ### 更新只需重新部署
 
-新版本发布后，重新部署最新镜像即可。数据库和上传文件存在挂载的存储卷里，替换容器不需要重建整个站点。
+新版本发布后，**将 `INSTATIC_IMAGE` 指向具体版本号**（如 `:0.0.11`），重新部署即可。数据库和上传文件存在挂载的存储卷里，替换容器不需要重建整个站点。
+
+> **重要**：生产环境不要使用 `:latest` 标签——任意一次 push main 都会覆盖它，等同于每日构建。请始终 pin 到明确版本号，升级前查看 [CHANGELOG](CHANGELOG.md) 并备份数据。详见[稳定升级指南](docs-deploy/ci-cd-and-tunnel.md#12-稳定升级策略)。
 
 <br>
 
@@ -190,10 +192,11 @@ bun run dev
 ### 拉取镜像
 
 ```sh
-docker pull ghcr.io/clawcopilot/instatic:latest
+# 生产环境：使用具体版本号（推荐）
+docker pull ghcr.io/clawcopilot/instatic:0.0.11
 
-# Compose 方式启动
-INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
+# Compose 方式启动（生产环境 pin 到版本号）
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.11 docker compose -f compose.prod.yml -f compose.sqlite.yml up -d
 ```
 
 镜像内置了 **Cloudflare Tunnel**（cloudflared）、**sing-box**（可选代理层）以及 **Hugging Face Dataset 备份/恢复**（可选，默认备份 `/app/data` + `/app/uploads` 即 SQLite 数据库、媒体文件、插件和发布的站点），通过 `start.sh` 统一编排。详见 [部署文档](docs-deploy/ci-cd-and-tunnel.md)。

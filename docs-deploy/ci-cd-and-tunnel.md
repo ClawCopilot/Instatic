@@ -23,7 +23,11 @@
 9. [安全扫描 (Trivy)](#9-安全扫描-trivy)
 10. [故障排查](#10-故障排查)
 11. [Hugging Face Dataset 备份与恢复](#11-hugging-face-dataset-备份与恢复)
-12. [相关文件索引](#12-相关文件索引)
+12. [稳定升级策略](#12-稳定升级策略)
+    - [核心原则](#核心原则)
+    - [升级操作流程](#升级操作流程)
+    - [回滚操作](#回滚操作)
+13. [相关文件索引](#13-相关文件索引)
 
 ---
 
@@ -1170,7 +1174,202 @@ PID 1: bash (start.sh)
 
 ---
 
-## 12. 相关文件索引
+## 12. 稳定升级策略
+
+### 核心原则
+
+**生产环境不要用 `:latest`。**
+
+原因很简单：GitHub Actions 有两条通道在更新 `latest`：
+
+| 通道 | 触发条件 | 标签 |
+|------|---------|------|
+| `docker-ci.yml` | **每次 push main** | `latest` + `ci-<sha>` |
+| `release.yml` | `git tag v*` | `0.0.X` + `0.0` + `latest` |
+
+这意味着 `:latest` 等同于"每日构建"——你永远不知道当前容器跑的是哪个具体版本。下次 `docker compose pull && up -d` 时，你得到的可能是：
+- 一个未经充分测试的 main 分支提交
+- 一个带有 breaking change 的新版本
+- 一个正在调试中的中间状态
+
+**正确做法**：将 `INSTATIC_IMAGE` pin 到具体版本号。
+
+```bash
+# ❌ 危险——生产环境
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest
+
+# ✅ 安全——生产环境
+INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.10
+```
+
+> 注意：Instatic 目前是 **pre-1.0**（参见 [CHANGELOG](../CHANGELOG.md)），minor 和 patch 版本都可能包含 **breaking change** 和数据库结构调整。每次升级前务必查看 CHANGELOG 并备份数据。
+
+---
+
+### 升级操作流程
+
+#### 步骤 1：升级前备份（必须！）
+
+如果已启用 HF Dataset 备份，立即触发一次手动备份：
+
+```bash
+# compose 方式
+docker compose exec app hf-backup
+
+# docker run 方式
+docker exec <容器名> hf-backup
+```
+
+如果未启用 HF 备份，手动备份数据目录：
+
+```bash
+# 备份 SQLite 数据库（如果有命名卷）
+docker run --rm -v instatic_data:/data -v $(pwd)/backup:/backup alpine \
+  cp -r /data /backup/data-$(date +%Y%m%d-%H%M%S)
+
+# 备份 uploads
+docker run --rm -v instatic_uploads:/uploads -v $(pwd)/backup:/backup alpine \
+  cp -r /uploads /backup/uploads-$(date +%Y%m%d-%H%M%S)
+```
+
+#### 步骤 2：查看 CHANGELOG
+
+在 [CHANGELOG](../CHANGELOG.md) 中确认目标版本是否有 **breaking change** 或数据库 schema 变更。如果存在不兼容变更，考虑先在测试环境验证。
+
+#### 步骤 3：确定目标版本
+
+```bash
+# 查看当前版本
+docker inspect <容器名> --format '{{.Config.Image}}'
+
+# 查看所有可用版本
+gh release list --repo clawcopilot/instatic
+# 或访问 https://github.com/clawcopilot/instatic/pkgs/container/instatic
+```
+
+#### 步骤 4：执行升级
+
+**Compose 方式（推荐）**：
+
+```bash
+cd /opt/instatic
+
+# 1. 修改 .env 中的镜像版本
+# INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.10  →  0.0.11
+vim .env
+
+# 2. 拉取新镜像
+docker compose -f compose.prod.yml -f compose.sqlite.yml pull app
+# 带 TLS 的情况：
+docker compose -f compose.prod.yml -f compose.tls.yml pull app
+# 带 Cloudflare Tunnel 的情况：
+docker compose -f compose.prod.yml -f compose.sqlite.yml -f compose.cloudflare-tunnel.yml pull app
+
+# 3. 滚动重启（停止旧容器，启动新容器）
+docker compose -f compose.prod.yml -f compose.sqlite.yml up -d app
+
+# 4. 查看启动日志，确认无报错
+docker compose logs -f app
+```
+
+**docker run 方式**：
+
+```bash
+# 1. 停止旧容器
+docker stop instatic
+
+# 2. 拉取新镜像
+docker pull ghcr.io/clawcopilot/instatic:0.0.11
+
+# 3. 删除旧容器（数据卷不受影响）
+docker rm instatic
+
+# 4. 启动新版本（保持原来的 -v、-e 参数不变，只改 tag）
+docker run -d --name instatic \
+  --restart unless-stopped \
+  -e INSTATIC_SECRET_KEY=xxxxx \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
+  -v instatic_data:/app/data \
+  -v instatic_uploads:/app/uploads \
+  ghcr.io/clawcopilot/instatic:0.0.11
+
+# 5. 查看启动日志
+docker logs -f instatic
+```
+
+#### 步骤 5：验证升级结果
+
+```bash
+# 检查健康状态
+curl -s http://localhost:3001/api/health
+
+# 登录 CMS 后台，确认：
+# - 页面能正常加载和编辑
+# - 媒体文件能正常访问
+# - AI 功能（如有配置）能正常使用
+# - 发布功能正常
+```
+
+---
+
+### 回滚操作
+
+如果新版本出现问题，回滚只需改回旧版本号：
+
+**Compose 方式**：
+
+```bash
+# 改回旧版本
+vim .env   # INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:0.0.10
+
+# 重新部署
+docker compose -f compose.prod.yml -f compose.sqlite.yml pull app
+docker compose -f compose.prod.yml -f compose.sqlite.yml up -d app
+```
+
+**docker run 方式**：
+
+```bash
+# 直接用旧版镜像重建容器
+docker stop instatic && docker rm instatic
+docker run -d --name instatic ... ghcr.io/clawcopilot/instatic:0.0.10
+```
+
+**如果数据库被新版本修改过**：从 HF Dataset 恢复备份或从手动备份目录恢复。
+
+```bash
+# 从 HF Dataset 恢复最新备份
+docker exec instatic hf-restore
+
+# 或从手动备份恢复
+docker run --rm -v instatic_data:/data -v $(pwd)/backup/data-20260709:/backup alpine \
+  cp -r /backup/* /data/
+```
+
+---
+
+### 不要用 Watchtower / 自动更新
+
+Watchtower、Diun 这类自动拉取最新镜像的工具对 Instatic 来说是危险的：
+
+- `:latest` 可能在你睡觉时变成一个带 bug 的 main 提交
+- pre-1.0 的 breaking change 可能静默破坏数据库
+- 你可能直到用户反馈才发现站点挂了
+
+**如果你想自动化检查更新**，用 Diun 通知你，而不是自动升级：
+
+```yaml
+# diun.yml — 仅通知，不自动升级
+- name: instatic
+  image: ghcr.io/clawcopilot/instatic:0.0.10
+  watch_repo: true
+  # 有新版本时发通知给你，由你决定是否升级
+```
+
+---
+
+## 13. 相关文件索引
 
 | 文件 | 说明 |
 |------|------|
