@@ -1,6 +1,6 @@
 # Instatic + Cloudflare Tunnel — 原理与操作手册
 
-> **最后更新**: 2026-07-07
+> **最后更新**: 2026-07-09
 > **适用版本**: Instatic v0.0.10+
 >
 > 核心价值：一个 `docker run` 命令即可将 Instatic CMS 通过 Cloudflare Tunnel 发布到公网，无需开放服务器端口。
@@ -102,8 +102,8 @@ Cloudflare CDN (cms.example.com, :443)
 |------|------|
 | `CLOUDFLARE_TUNNEL_TOKEN` 已设置 | cloudflared 前台运行并自动建立隧道（推荐） |
 | `CLOUDFLARE_TUNNEL_TOKEN` 未设置 | cloudflared 不启动，Instatic 前台运行 |
-| `CLOUDFLARE_TUNNEL_HOSTNAME` 已设置 | 启动日志显示公网 CMS 地址 + VLESS 连接串（依赖 Token 生效） |
-| `CLOUDFLARE_TUNNEL_HOSTNAME` 未设置 | 日志提示去 Cloudflare 面板绑定域名 |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` + `CLOUDFLARE_TUNNEL_TOKEN` 均已设置 | 启动日志显示公网 CMS 地址 + VLESS 连接串 |
+| `CLOUDFLARE_TUNNEL_TOKEN` 已设置但 HOSTNAME 未设置 | 日志提示去 Cloudflare 面板绑定域名 |
 | `SING_BOX_UUID` 已设置 | 自动生成 VLESS+WS 配置，sing-box 后台运行（推荐） |
 | `/app/sing-box-config.json` 存在 | sing-box 后台运行（高级：挂载自定义配置） |
 | 以上皆未设置 | sing-box **不启动**（默认） |
@@ -616,15 +616,14 @@ docker logs instatic
 # ==========================================
 ```
 
-容器内进程视图：
+容器内进程视图（`exec cloudflared` 后，cloudflared 替换 start.sh 成为 PID 1）：
 
 ```
-PID 1: bash (start.sh)
+PID 1: cloudflared（exec 替换 start.sh）
   ├─ bun (Instatic, :3001)
-  ├─ sing-box (:8080, 可选代理)
-  └─ cloudflared (Tunnel)
-       ├─ cms.example.com → :3001
-       └─ proxy.example.com → :8080
+  ├─ sing-box (:8080, 可选)
+  └─ hf-backup loop（可选）
+路由规则在 Cloudflare 控制台配置：cms.example.com → :3001, proxy.example.com → :8080
 ```
 
 ---
@@ -821,15 +820,16 @@ set -e
 │       Ready → 继续
 │       Timeout → exit 1
 │
-├─ 3. 检测 Cloudflare Tunnel（核心）
+├─ 3. 打印连接信息摘要
+│     CLOUDFLARE_TUNNEL_HOSTNAME 非空 且 CLOUDFLARE_TUNNEL_TOKEN 非空？
+│       YES → 显示 https://<HOSTNAME>/admin/ + VLESS 链接
+│       NO  → Token 非空？→ 提示去 Cloudflare 面板绑定域名
+│           → 否则 → 显示 localhost 地址
+│
+├─ 4. 启动 Cloudflare Tunnel（核心）
 │     CLOUDFLARE_TUNNEL_TOKEN 非空？
 │       YES → exec cloudflared tunnel ...（前台，接管 PID 1）
 │       NO  → wait $INSTATIC_PID（前台等待 Instatic）
-│
-├─ 4. 打印连接信息摘要（Token 已设置时）
-│     CLOUDFLARE_TUNNEL_HOSTNAME 非空？
-│       YES → 显示 https://<HOSTNAME>/admin/ + VLESS 链接
-│       NO  → 提示去 Cloudflare 面板绑定域名
 │
 ├─ (可选) 检测 sing-box 配置
 │     SING_BOX_UUID 非空？
@@ -838,11 +838,15 @@ set -e
 │         YES → sing-box run -c ... &（后台，高级用法）
 │         NO  → 跳过
 │
-└─ 进程树:
-    PID 1: bash (start.sh)
-      ├─ bun (Instatic, always)
-      ├─ cloudflared (if token set)
-      └─ sing-box (if config exists)
+└─ 进程树（有 Token 时 cloudflared exec 替换 start.sh 为 PID 1）:
+    有 Token → PID 1: cloudflared
+                ├─ bun (Instatic, always)
+                ├─ sing-box (if config exists)
+                └─ hf-backup loop (if enabled)
+    无 Token → PID 1: bash (start.sh)
+                ├─ bun (Instatic, always)
+                ├─ sing-box (if config exists)
+                └─ hf-backup loop (if enabled)
 ```
 
 ### 环境变量参考
@@ -1144,12 +1148,24 @@ docker exec instatic hf-restore
 
 ### 容器进程视图（启用 HF 备份后）
 
+有 Token → cloudflared 成为 PID 1：
+
+```
+PID 1: cloudflared（exec 替换 start.sh）
+  ├─ bun (Instatic, :3001)
+  ├─ sing-box (:8080, 可选)
+  ├─ hf-backup loop (后台定时备份, 仅 active)
+  └─ hf-restore（启动时一次性执行）
+```
+
+无 Token → bash 保持 PID 1：
+
 ```
 PID 1: bash (start.sh)
   ├─ bun (Instatic, :3001)
   ├─ sing-box (:8080, 可选)
   ├─ hf-backup loop (后台定时备份, 仅 active)
-  └─ cloudflared (Tunnel)
+  └─ hf-restore（启动时一次性执行）
 ```
 
 ---

@@ -192,7 +192,7 @@ echo "  连接信息"
 echo "=========================================="
 
 # Instatic CMS 地址
-if [ -n "${CLOUDFLARE_TUNNEL_HOSTNAME}" ]; then
+if [ -n "${CLOUDFLARE_TUNNEL_HOSTNAME}" ] && [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
     echo "  CMS 管理后台 : https://${CLOUDFLARE_TUNNEL_HOSTNAME}/admin/"
     echo "  公开站点     : https://${CLOUDFLARE_TUNNEL_HOSTNAME}/"
 elif [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
