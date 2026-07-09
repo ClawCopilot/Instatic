@@ -12,7 +12,8 @@
 #
 # 环境变量:
 #   PORT                     - Instatic 监听端口（默认 3001）
-#   CLOUDFLARE_TUNNEL_TOKEN  - Cloudflare Tunnel Token（设置后自动建隧道）
+#   CLOUDFLARE_TUNNEL_TOKEN   - Cloudflare Tunnel Token（设置后自动建隧道）
+#   CLOUDFLARE_TUNNEL_HOSTNAME - Cloudflare Tunnel 公网域名（可选，如 cms.example.com）
 #   SING_BOX_UUID            - VLESS UUID（设置后自动生成配置并启动，零文件方式）
 #   SING_BOX_PORT            - sing-box 监听端口（默认 8080）
 #   SING_BOX_PATH            - WebSocket 路径（默认 /vless）
@@ -184,15 +185,50 @@ for i in $(seq 1 30); do
 done
 echo ""
 
-# ---- 3. 启动 Cloudflare Tunnel（可选） ----
+# ---- 3. 打印连接信息摘要 ----
+echo ""
+echo "=========================================="
+echo "  连接信息"
+echo "=========================================="
+
+# Instatic CMS 地址
+if [ -n "${CLOUDFLARE_TUNNEL_HOSTNAME}" ]; then
+    echo "  CMS 管理后台 : https://${CLOUDFLARE_TUNNEL_HOSTNAME}/admin/"
+    echo "  公开站点     : https://${CLOUDFLARE_TUNNEL_HOSTNAME}/"
+elif [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
+    echo "  CMS 管理后台 : http://localhost:${PORT}/admin/"
+    echo "  (!) 已配置 Cloudflare Tunnel，但未设置 CLOUDFLARE_TUNNEL_HOSTNAME"
+    echo "      请在 Cloudflare Zero Trust 面板绑定域名，并设置此变量以显示公网地址"
+else
+    echo "  CMS 管理后台 : http://localhost:${PORT}/admin/"
+fi
+
+# sing-box VLESS 连接串
+if [ -n "${SING_BOX_PID}" ]; then
+    SB_PORT="${SING_BOX_PORT:-8080}"
+    SB_PATH="${SING_BOX_PATH:-/vless}"
+    echo ""
+    echo "  VLESS 代理 :"
+    if [ -n "${SING_BOX_UUID}" ] && [ -n "${CLOUDFLARE_TUNNEL_HOSTNAME}" ]; then
+        # 有域名 + env UUID → 输出完整 VLESS 链接
+        VLESS_URL="vless://${SING_BOX_UUID}@${CLOUDFLARE_TUNNEL_HOSTNAME}:443?encryption=none&security=tls&type=ws&path=${SB_PATH}#Instatic"
+        echo "    ${VLESS_URL}"
+    elif [ -n "${SING_BOX_UUID}" ]; then
+        # 有 UUID 但没域名 → 输出模板
+        echo "    vless://${SING_BOX_UUID}@<服务器IP>:${SB_PORT}?encryption=none&type=ws&path=${SB_PATH}#Instatic"
+    else
+        # 自定义配置文件，不知道协议细节
+        echo "    (自定义配置)  端口=${SB_PORT} 路径=${SB_PATH}"
+    fi
+fi
+
+echo "=========================================="
+echo ""
+
+# ---- 4. 启动 Cloudflare Tunnel（可选） ----
 if [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
     echo "[cloudflared] Starting Cloudflare Tunnel..."
-    echo "[cloudflared] Your site is now accessible via Cloudflare"
-    echo "=========================================="
-    echo "  All services running"
-    echo "  Instatic PID : ${INSTATIC_PID}"
-    [ -n "${SING_BOX_PID}" ] && echo "  sing-box PID : ${SING_BOX_PID}"
-    echo "=========================================="
+    echo "[cloudflared] Tunnel 正在建立，请稍候..."
     # cloudflared 前台运行，接管容器主进程
     exec cloudflared tunnel --no-autoupdate run --token "${CLOUDFLARE_TUNNEL_TOKEN}"
     # exec failed - should not reach here
@@ -200,11 +236,9 @@ if [ -n "${CLOUDFLARE_TUNNEL_TOKEN}" ]; then
     exit 1
 else
     echo "[cloudflared] Token not set — skipping"
-    echo "=========================================="
-    echo "  Instatic running (PID: ${INSTATIC_PID})"
-    [ -n "${SING_BOX_PID}" ] && echo "  sing-box running (PID: ${SING_BOX_PID})"
-    [ -n "${HF_BACKUP_LOOP_PID}" ] && echo "  HF backup running (PID: ${HF_BACKUP_LOOP_PID})"
-    echo "=========================================="
+    echo "  PID: Instatic=${INSTATIC_PID}"
+    [ -n "${SING_BOX_PID}" ] && echo "       sing-box=${SING_BOX_PID}"
+    [ -n "${HF_BACKUP_LOOP_PID}" ] && echo "       hf-backup=${HF_BACKUP_LOOP_PID}"
     # 无隧道时，等待 Instatic 主进程
     wait $INSTATIC_PID
 fi
