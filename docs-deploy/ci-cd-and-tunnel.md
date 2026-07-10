@@ -1,7 +1,9 @@
 # Instatic + Cloudflare Tunnel — 原理与操作手册
 
-> **最后更新**: 2026-07-09
-> **适用版本**: Instatic v0.0.10+
+> **最后更新**: 2026-07-10
+> **适用版本**: Instatic v0.0.11+
+>
+> **适用场景**：零公网 IP、零端口暴露、5 分钟将 Instatic CMS 发布到公网。本文档涵盖 Cloudflare Tunnel 的完整入门——从 Zero Trust 面板创建到容器部署、验证、故障排查。
 >
 > 核心价值：一个 `docker run` 命令即可将 Instatic CMS 通过 Cloudflare Tunnel 发布到公网，无需开放服务器端口。
 
@@ -13,6 +15,15 @@
 2. [文件清单](#2-文件清单)
 3. [Docker Compose 叠加模式](#3-docker-compose-叠加模式)
 4. [快速开始：Cloudflare Tunnel 托管 Instatic](#4-快速开始cloudflare-tunnel-托管-instati)
+   - [什么是 Cloudflare Tunnel？](#什么是-cloudflare-tunnel)
+   - [工作原理](#工作原理)
+   - [前置条件](#前置条件)
+   - [第一步：在 Cloudflare Zero Trust 面板创建 Tunnel](#第一步在-cloudflare-zero-trust-面板创建-tunnel)
+   - [第二步：部署 Instatic + Tunnel](#第二步部署-instatic--tunnel)
+   - [第三步：验证部署](#第三步验证部署)
+   - [可选：启用 sing-box 代理](#可选启用-sing-box-代理隧道内-vpn)
+   - [故障排查](#故障排查-1)
+   - [常见问题 FAQ](#常见问题-faq)
    - [多节点部署（高可用 / 故障转移）](#多节点部署高可用--故障转移)
    - [多端口转发（一条隧道承载多个服务）](#多端口转发一条隧道承载多个服务)
 5. [GitHub Actions CI/CD](#5-github-actions-cicd)
@@ -223,56 +234,172 @@ docker compose ... -f compose.build.yml up -d --build
 
 ## 4. 快速开始：Cloudflare Tunnel 托管 Instatic
 
+### 什么是 Cloudflare Tunnel？
+
+Cloudflare Tunnel（原 Argo Tunnel）是 Cloudflare 提供的**免费内网穿透服务**。它通过一个轻量级客户端（`cloudflared`）在你的服务器和 Cloudflare 全球边缘网络之间建立加密的 QUIC 出站隧道，将你的本地服务安全地暴露到公网。
+
+对比传统方案：
+
+| 方案 | 需要公网 IP | 需要开放端口 | 需要配置防火墙 | HTTPS | DDoS 防护 |
+|------|:----------:|:----------:|:------------:|:-----:|:--------:|
+| **Cloudflare Tunnel** | ❌ | ❌ | ❌ | ✅ 自动 | ✅ 内置 |
+| 端口转发 + 自签证书 | ✅ | ✅ | ✅ | 需手动 | ❌ |
+| 反向代理 (Nginx/Caddy) | ✅ | ✅ | ✅ | 需手动 | ❌ |
+
+Instatic 已经将 `cloudflared` 二进制预装到 Docker 镜像中。你只需要在 Cloudflare 面板创建一个 Tunnel，拿到 Token，容器启动后自动建立隧道——整个过程在 5 分钟内完成。
+
+---
+
 ### 工作原理
 
 ```
-公网用户
-    │
-    ▼
-Cloudflare CDN (cms.example.com, :443)
-    │
-    │ QUIC 加密隧道（出站连接，不需要开放端口！）
-    ▼
-你的服务器 → Instatic 容器 (start.sh)
-                └─ cloudflared → localhost:3001
+                        公网用户
+                           │
+                     Cloudflare CDN
+                  (cms.example.com :443)
+                     │           │
+          QUIC 隧道 1 │           │ QUIC 隧道 2（可选 HA）
+                     ▼           ▼
+              cloudflared     cloudflared
+              (东京 VPS)      (新加坡 VPS)
+                  │               │
+           localhost:3001   localhost:3001
+              Instatic        Instatic
+            role: active    role: standby
 ```
 
-**关键**：cloudflared 主动向 Cloudflare 发起**出站**连接，不需要服务器开放任何入站端口。即使服务器在 NAT 后面也能工作。
+每个关键点：
 
-### 前置配置（只需一次）
+| 节点 | 说明 |
+|------|------|
+| **cloudflared** | 启动后向 Cloudflare 边缘节点发起**出站** QUIC 连接——不需要服务器开放任何入站端口 |
+| **Token 认证** | 每个 Tunnel 有唯一 Token，cloudflared 凭此注册到正确的隧道 |
+| **Public Hostname** | 在 Cloudflare 面板配置——"收到 `cms.example.com` 的请求 → 转发到 `localhost:3001`" |
+| **自动 HTTPS** | Cloudflare 免费签发和续期 SSL 证书，无需额外配置 |
+| **多副本** | 多个服务器共用同一个 Token → 同一域名下多个 cloudflared 实例 → Cloudflare 自动健康检查和故障转移 |
 
-1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
-2. 左侧菜单 → **Networks** → **Tunnels**
-3. 点击 **Create a tunnel** → 选 **Cloudflared**
-4. 给 Tunnel 起名（如 `instatic-cms`）→ **Save tunnel**
-5. 复制 **Token**（`eyJhIjoi...` 开头）
-6. 配置 Public Hostname：
-   - Subdomain: `cms`
-   - Domain: `example.com`
-   - Type: `HTTP`
-   - URL: `localhost:3001`
-7. **Save hostname**
+---
 
-### Compose 部署
+### 前置条件
 
-`.env` 添加 Token：
+开始前，确认以下四项全部就绪：
+
+**① 域名托管在 Cloudflare**
+
+> 在 Cloudflare 仪表板 → **Websites** → 你的域名 → **DNS** → **Nameservers** 确认显示 Cloudflare 的 NS 记录。
+
+如果你的域名 DNS 不在 Cloudflare，需要先[将域名添加到 Cloudflare](https://developers.cloudflare.com/dns/zone-setups/full-setup/)（免费）。
+
+**② 激活 Cloudflare Zero Trust**
+
+> 访问 [one.dash.cloudflare.com](https://one.dash.cloudflare.com/) → 首次使用会提示选择计划 → 选择 **Free** 计划（Tunnel 功能完全免费，不限流量）。
+
+**③ 一台可运行 Docker 的服务器**
+
+> 任意 Linux VPS、家用 NAS、甚至树莓派均可。服务器不需要公网 IP，只要能从服务器访问互联网（出站方向）即可。
+
+**④ 服务器已安装 Docker**
+
+> 验证：`docker --version`（需要 Docker 20.10+）
+
+---
+
+### 第一步：在 Cloudflare Zero Trust 面板创建 Tunnel
+
+> **注意**：Instatic 使用 Token 模式，不需要在服务器上执行 `cloudflared tunnel login` 或编写 `config.yml`。一切路由规则在 Cloudflare 控制台配置。
+
+**1. 进入 Tunnel 管理页面**
+
+登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → 左侧导航栏 → **Networks** → **Tunnels**（部分界面显示为 "Connectors"（连接器））。
+
+**2. 创建 Tunnel**
+
+点击右上角 **Create a tunnel**（或 **Add a tunnel**）：
+- 选择 **Cloudflared** 作为连接器类型
+- 输入 Tunnel 名称（如 `instatic-cms`，仅用于识别，不影响域名）
+- 点击 **Save tunnel**
+
+**3. 获取 Token**
+
+保存后页面会跳转到安装指引。你不需要执行页面上的安装命令（Instatic 镜像已内置 cloudflared），只需要：
+
+- 找到 **Token** 字段中的长字符串（以 `eyJ` 开头，例如 `eyJhIjoiOWYxZjJi...`）
+- 点击旁边的复制按钮，**安全保存**这个 Token。
+
+> ⚠️ **Token = 你的 Tunnel 通行证**，任何人拿到这个 Token 都可以将服务接入你的 Tunnel。请像对待密码一样保管它。
+
+**4. 配置 Public Hostname（域名 → 本地端口映射）**
+
+在同一个页面，找到 **Public Hostnames** 标签页，点击 **Add a public hostname**：
+
+| 字段 | 值 | 说明 |
+|------|----|------|
+| **Subdomain** | `cms` | 子域名前缀，如想用 `admin` 就填 `admin` |
+| **Domain** | `example.com` | 下拉选择你托管在 Cloudflare 的域名 |
+| **Path** | _(留空)_ | 不填 = 匹配所有路径 |
+| **Type** | `HTTP` | Instatic 使用 HTTP 协议 |
+| **URL** | `localhost:3001` | `localhost` 指容器内部，3001 是 Instatic 默认端口 |
+
+> **重要**：URL 必须填 `localhost:3001`（不是 `127.0.0.1`，也不是服务器 IP）。cloudflared 和 Instatic 运行在**同一个容器内**，通过 localhost 通信。
+
+点击 **Save hostname**。
+
+**5. （可选）添加更多 Public Hostname**
+
+如果你还想通过 Tunnel 访问其他服务，可以继续添加：
+
+| Subdomain | URL | 用途 |
+|-----------|-----|------|
+| `api` | `localhost:3001` | API 专用子域名 |
+| `static` | `localhost:3001` | 静态站点（如果 Instatic 发布了站点） |
+
+Cloudflare 会自动为每个子域名签发 SSL 证书，所有域名都是 `https://`。
+
+**6. （可选）设置 CLOUDFLARE_TUNNEL_HOSTNAME**
+
+这不是 Cloudflare 面板的配置，而是 Instatic 的环境变量。设置后：
+- 容器启动日志会显示完整的公网访问地址
+- CSRF 保护自动配置正确的外部域名
+- 如果启用了 sing-box 代理，会自动生成带正确域名的 VLESS 链接
 
 ```bash
-CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你复制的Token...
+# 在 .env 或 docker run 中设置
+CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com
 ```
 
+---
+
+### 第二步：部署 Instatic + Tunnel
+
+#### Compose 方式（推荐）
+
+在 `/opt/instatic/.env` 中添加：
+
 ```bash
-# SQLite + 本地构建 + Tunnel（推荐）
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...你的TunnelToken...
+CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com
+```
+
+启动：
+
+```bash
+# 从 GitHub Container Registry 拉取预构建镜像
+docker compose -f compose.prod.yml -f compose.sqlite.yml \
+  -f compose.cloudflare-tunnel.yml up -d
+
+# 或者本地构建（开发/测试场景）
 docker compose -f compose.prod.yml -f compose.sqlite.yml \
   -f compose.build.yml -f compose.cloudflare-tunnel.yml up -d
 ```
 
-### docker run 部署
+#### docker run 方式
 
 ```bash
-# 生产环境请将 :0.0.11 替换为最新的具体版本号，不要用 :latest
+# 将 :0.0.11 替换为最新具体版本号，不要用 :latest
 docker run -d --name instatic \
+  --restart unless-stopped \
   -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
   -e INSTATIC_SECRET_KEY=$(openssl rand -base64 48) \
   -e DATABASE_URL="sqlite:/app/data/cms.db" \
   -v instatic_data:/app/data \
@@ -280,19 +407,192 @@ docker run -d --name instatic \
   ghcr.io/clawcopilot/instatic:0.0.11
 ```
 
-### 验证
+> 注意：使用 Tunnel 时，`-p 3001:3001` 可以省略（外部流量通过 Tunnel 进入，端口无需暴露到宿主机）。
+
+---
+
+### 第三步：验证部署
+
+**检查容器日志**
 
 ```bash
-# 查看 cloudflared 连接状态
-docker logs instatic 2>&1 | grep cloudflared
-
-# 应该看到类似输出：
-# [cloudflared] Starting Cloudflare Tunnel...
-# INF Starting tunnel tunnelID=xxxxx
-# INF Connection ... registered connIndex=0
+docker logs instatic 2>&1 | grep -E "cloudflared|CMS 管理后台"
 ```
 
-通过你配置的域名（如 `https://cms.example.com`）访问，即可看到 Instatic 登录页面。
+正常输出：
+
+```
+[cloudflared] Starting Cloudflare Tunnel...
+[cloudflared] Tunnel 正在建立，请稍候...
+INF Starting tunnel tunnelID=xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+INF Connection ... registered connIndex=0 location=NRT
+  CMS 管理后台 : https://cms.example.com/admin/
+  公开站点     : https://cms.example.com/
+```
+
+关键信号：
+
+| 日志内容 | 含义 |
+|----------|------|
+| `registered connIndex=0` | cloudflared 已成功连接到 Cloudflare 边缘 |
+| `location=NRT` | 连接的 Cloudflare 数据中心（NRT = 东京，SIN = 新加坡） |
+| 显示 `https://...` 地址 | HOSTNAME 已正确配置 |
+
+**在 Cloudflare 面板确认**
+
+回到 [Tunnel 页面](https://one.dash.cloudflare.com/) → 你的 Tunnel → 状态应显示 **HEALTHY**（绿色）。
+
+**浏览器访问**
+
+打开 `https://cms.example.com/admin/`（你配置的域名），应该看到 Instatic 登录界面。首次访问请用初始账号登录：
+
+- 用户名：`admin`
+- 密码：`admin123`（**请立即修改！**）
+
+---
+
+### 可选：启用 sing-box 代理（隧道内 VPN）
+
+Instatic 的 cloudflared 隧道可以同时承载 **Web 流量**（CMS 管理后台）和 **sing-box 代理流量**（VLESS over WebSocket），一个端口、一条隧道、两个用途。
+
+只需添加 `SING_BOX_UUID`：
+
+```bash
+# docker run 方式——添加一行环境变量
+docker run -d --name instatic \
+  -e CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi... \
+  -e CLOUDFLARE_TUNNEL_HOSTNAME=cms.example.com \
+  -e SING_BOX_UUID=$(uuidgen) \
+  ...（其余参数同上）
+
+# 查看 VLESS 连接地址
+docker logs instatic | grep vless
+# vless://550e8400-...@cms.example.com:443?encryption=none&security=tls&type=ws&path=/vless#Instatic
+```
+
+**如何在客户端使用**：
+1. 复制 vless:// 链接
+2. 导入到支持 VLESS 的客户端（v2rayN、Shadowrocket、Sing-box 等）
+3. 客户端通过你的域名 (`cms.example.com:443`) 连接到 Cloudflare CDN
+4. Cloudflare 识别 WebSocket 请求路径 `/vless`，转发到容器的 sing-box
+5. 普通 HTTP 请求仍然正常访问 CMS
+
+这相当于**一个免费域名同时做网站和代理**，且代理流量隐藏在正常的 HTTPS + WebSocket 流量中。
+
+---
+
+### 故障排查
+
+#### 容器无法启动——"CLOUDFLARE_TUNNEL_TOKEN:? 未设置"
+
+```
+service "app" refers to undefined volume: invalid compose project
+```
+
+`compose.cloudflare-tunnel.yml` 中 Token 标记为 `:?`（必填），`.env` 缺少或值为空。检查：
+
+```bash
+grep CLOUDFLARE_TUNNEL_TOKEN /opt/instatic/.env
+```
+
+#### 容器启动了但浏览器访问域名显示 502 Bad Gateway
+
+**最可能的原因**：cloudflared 连接成功，但无法访问 `localhost:3001`。
+
+排查步骤：
+
+```bash
+# 1. 确认 cloudflared 已注册
+docker logs instatic 2>&1 | grep "registered connIndex"
+
+# 2. 确认 Instatic 正在运行
+docker logs instatic 2>&1 | grep "Instatic PID"
+
+# 3. 在容器内验证 localhost:3001 可达
+docker exec instatic wget -qO- http://localhost:3001/health | head -1
+# 正常输出: {"status":"ok",...
+```
+
+如果步骤 3 无输出或超时，说明 Instatic 未启动。检查 `INSTATIC_SECRET_KEY` 是否设置。
+
+#### 容器启动了但 Cloudflare 面板显示 "Unhealthy"
+
+```bash
+# 查看 cloudflared 详细日志
+docker logs instatic 2>&1 | grep -E "INF|ERR|WARN" | tail -20
+```
+
+常见原因：
+
+| 错误信息 | 原因 | 解决 |
+|----------|------|------|
+| `failed to dial to edge` | 服务器无法连接 Cloudflare 边缘 | 检查 DNS/防火墙出站规则 |
+| `invalid token` | Token 复制不完整或过期 | 在面板重新生成 Token |
+| `connection timeout` | QUIC 端口被封 | 检查 `Tunnel` 页面 → **Protocol** 是否选择了 `Auto` |
+
+> 中国大陆服务器可能需要额外配置。cloudflared 默认连接最近的 Cloudflare 边缘节点，部分 IP 可能被干扰。如果连接不稳定，可尝试在结束点配置中指定 `protocol: http2`。
+
+#### HTTPS 证书错误 / "您的连接不是私密连接"
+
+新创建的 Public Hostname 可能需要 **1-5 分钟** 让 Cloudflare 签发 SSL 证书。如果超过 5 分钟仍报证书错误：
+
+1. 确认域名 DNS 解析出的是 Cloudflare 代理 IP → 检查 **DNS → DNS Records** → 代理状态列应为 **🟠 已代理 (Proxied)**。
+
+2. 在 **SSL/TLS** → **Overview** 中，加密模式设为 **Full** 或 **Full (strict)**。
+
+---
+
+### 常见问题 FAQ
+
+**Q: 可以用一个 Tunnel 管多个服务吗？**
+
+可以。在同一个 Tunnel 下添加多个 Public Hostname：
+
+```
+cms.example.com   → localhost:3001  （CMS 后台）
+api.example.com   → localhost:3001  （API 端点）
+blog.example.com  → localhost:3001  （已发布静态站点）
+```
+
+你也可以在同一条 Tunnel 的 Public Hostname 中映射不同内网服务：
+```
+cms.example.com   → localhost:3001
+vault.example.com → localhost:8200
+```
+
+**Q: 我的域名根域名（@ / apex）也想用 Tunnel 怎么办？**
+
+Subdomain 留空或填 `@` → Domain 选你的域名 → URL 填 `localhost:3001`。Cloudflare 会为根域名也创建 CNAME 记录（通过 [CNAME flattening](https://developers.cloudflare.com/dns/cname-flattening/)）。
+
+**Q: 能用自己的 SSL 证书吗？**
+
+不需要，也不推荐。Cloudflare 免费签发和续期的边缘证书已经覆盖了公网到 Cloudflare 这段链路。Instatic 容器内部（cloudflared ↔ localhost:3001）通过 localhost 通信，无需加密。
+
+**Q: Tunnel 每月流量有限制吗？**
+
+没有。Cloudflare Free 计划下 Tunnel 不限流量、不限带宽。但有 [Cloudflare 服务条款](https://www.cloudflare.com/zh-cn/terms/) 的使用限制——主要是不能代理大量非 HTML 内容（如视频流）。普通的 CMS 管理操作完全不受影响。
+
+**Q: 如何查看 Tunnel 的历史连接状态？**
+
+Cloudflare Zero Trust → **Logs** → **Gateway** → 筛选 Event Type: `DNS` / `HTTP`。Tunnel 的所有流量会在此处显示。
+
+**Q: 如何更新 cloudflared 版本？**
+
+cloudflared 预装在 Instatic 镜像内。更新 cloudflared = 拉取新版本的 Instatic 镜像并重新部署：
+
+```bash
+bash scripts/upgrade.sh --target 0.0.12
+```
+
+**Q: 其他方案对比——Tunnel vs Caddy TLS 怎么选？**
+
+| 需求 | 推荐方案 | 原因 |
+|------|---------|------|
+| 服务器无公网 IP | Tunnel | Tunnel 不需要公网 IP |
+| 速度优先、国内访问 | Caddy TLS | 直连延迟更低 |
+| 零配置 HTTPS + DDoS 防护 | Tunnel | Cloudflare 全自动 |
+| 需要自定义 SSL 证书 | Caddy TLS | 完全控制证书 |
+| 两者都要 | Tunnel + Caddy | 不冲突，可叠加
 
 ### 多节点部署（高可用 / 故障转移）
 
