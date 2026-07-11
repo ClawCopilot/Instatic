@@ -24,7 +24,6 @@ import {
   listDataRows,
 } from '../../../repositories/data'
 import { normalizeDataTableFields } from '@core/data/fields'
-import type { DataField } from '@core/data/schemas'
 
 // ---------------------------------------------------------------------------
 // Capability requirements
@@ -58,16 +57,6 @@ const HealthCheckInput = Type.Object({
 // ---------------------------------------------------------------------------
 // Tool definition
 // ---------------------------------------------------------------------------
-
-const HealthIssue = Type.Object({
-  kind: Type.String(),
-  tableId: Type.String(),
-  tableSlug: Type.String(),
-  documentId: Type.String(),
-  title: Type.String(),
-  slug: Type.String(),
-  detail: Type.String(),
-})
 
 const healthCheckTool: AiTool = {
   name: 'content_health_check',

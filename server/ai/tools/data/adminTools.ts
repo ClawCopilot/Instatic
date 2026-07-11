@@ -28,18 +28,17 @@ import {
 
 // Admin read — users list/read.
 const ADMIN_READ_CAPS: readonly CoreCapability[] = [
-  'iam.users.read',
-  'iam.users.manage',
+  'users.manage',
 ]
 
 // Admin write — user mutation.
 const ADMIN_WRITE_CAPS: readonly CoreCapability[] = [
-  'iam.users.manage',
+  'users.manage',
 ]
 
 // Role management.
 const ROLE_MANAGE_CAPS: readonly CoreCapability[] = [
-  'iam.roles.manage',
+  'roles.manage',
 ]
 
 // ---------------------------------------------------------------------------

@@ -48,7 +48,7 @@
 
 import { hookBus } from '@core/plugins/hookBus'
 import type { DbClient } from '../db/client'
-import { listDataTables, listDataRows, getDataRow } from '../repositories/data'
+import { listDataTables, listDataRows } from '../repositories/data'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -340,8 +340,11 @@ async function fireWebhooks(
 class ConcurrencySemaphore {
   private running = 0
   private queue: (() => void)[] = []
+  private max: number
 
-  constructor(private max: number) {}
+  constructor(max: number) {
+    this.max = max
+  }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     while (this.running >= this.max) {

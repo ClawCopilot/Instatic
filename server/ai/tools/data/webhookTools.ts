@@ -19,7 +19,6 @@ import { Type, type Static } from '@core/utils/typeboxHelpers'
 import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../types'
 import {
-  getDataTable,
   getDataRow,
   createDataRow,
   listDataRows,
@@ -211,7 +210,7 @@ const createWebhookTool: AiTool = {
       )
       return {
         ok: true,
-        webhook: { id: row.id, ...projectWebhook(row) },
+        webhook: projectWebhook(row),
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

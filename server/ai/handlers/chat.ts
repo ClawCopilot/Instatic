@@ -60,9 +60,8 @@ import { normalizeContextTokens } from '../contextTokens'
 import type {
   AiStreamEvent,
   ToolScope,
-  ToolContext,
 } from '../runtime/types'
-import type { AiStreamRequest } from '../drivers/types'
+import type { AiStreamRequest, ToolContextBase } from '../drivers/types'
 
 const ChatRequestBodySchema = Type.Object({
   conversationId: Type.String({ minLength: 1 }),
@@ -237,7 +236,7 @@ async function handleAiChat(
         // same mutable slot — the next tool call in the turn sees the
         // post-mutation state regardless of whether the last tool was
         // browser-bridged or server-direct.
-        const toolContextBase: Record<string, unknown> = {
+        const toolContextBase = {
           db,
           userId: user.id,
           capabilities: user.capabilities,
@@ -246,7 +245,7 @@ async function handleAiChat(
           snapshot,
           uploadsDir,
           onSnapshot: (next: unknown) => { toolContextBase.snapshot = next },
-        } as ToolContext
+        } as ToolContextBase
         const { bridgeId, bridge, destroy } = createBridge(
           emit,
           req.signal,

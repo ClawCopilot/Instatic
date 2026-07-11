@@ -99,7 +99,7 @@ const listMediaTool: AiTool = {
 
     let filtered = assets
     if (args.folderId) {
-      filtered = filtered.filter((a) => a.folderIds.includes(args.folderId))
+      filtered = filtered.filter((a) => a.folderIds.includes(args.folderId!))
     }
     if (args.search) {
       const q = args.search.toLowerCase()
@@ -110,7 +110,7 @@ const listMediaTool: AiTool = {
       )
     }
     if (args.mimePrefix) {
-      filtered = filtered.filter((a) => a.mimeType.startsWith(args.mimePrefix))
+      filtered = filtered.filter((a) => a.mimeType.startsWith(args.mimePrefix!))
     }
 
     return {

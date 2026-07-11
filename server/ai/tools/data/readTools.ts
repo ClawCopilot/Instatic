@@ -17,7 +17,6 @@ import {
   getDataRow,
   listDataRows,
   listDataTablesWithCounts,
-  getDataTable,
 } from '../../../repositories/data'
 import {
   readSlugCell,

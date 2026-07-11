@@ -115,7 +115,7 @@ export async function handleServerRequest(
 // Server start timestamp — used for uptime reporting in /health.
 const START_TS = Date.now()
 
-function tryServeHealth(_req: Request, runtime: ServerRuntime, _url: URL, pathname: string): Response | null {
+function tryServeHealth(_req: Request, runtime: ServerRuntime, _url: URL, pathname: string): Response | Promise<Response> | null {
   if (pathname !== '/health') return null
   // Lightweight DB probe — a failed connect or corrupt DB returns 503,
   // not a half-true "ok". Uses db.unsafe so we don't couple the health
