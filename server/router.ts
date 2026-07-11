@@ -155,7 +155,7 @@ function tryServeHealth(_req: Request, runtime: ServerRuntime, _url: URL, pathna
  * by the CMS dispatcher.
  */
 function tryServeAi(req: Request, runtime: ServerRuntime, url: URL, _pathname: string): Promise<Response> | null {
-  return tryHandleAi(req, runtime.db, url)
+  return tryHandleAi(req, runtime.db, url, runtime.uploadsDir)
 }
 
 /**

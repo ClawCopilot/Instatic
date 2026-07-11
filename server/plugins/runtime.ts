@@ -400,6 +400,13 @@ export async function activateInstalledServerPlugins(
   const { startPublishScheduler } = await import('../publish/publishScheduler')
   startPublishScheduler(db, uploadsDir)
 
+  // Webhook dispatcher: registers hookBus listeners for core events
+  // (content.entry.*, publish.*) and POSTs signed payloads to matching
+  // webhook endpoints. Fire-and-forget — delivery never blocks the
+  // event source. Idempotent; safe to call on every boot / re-bind.
+  const { startWebhookDispatcher } = await import('../webhook')
+  startWebhookDispatcher(db)
+
   const results = await listInstalledPlugins(db)
   for (const result of results) {
     // Phase: manifest-validation — the stored manifest_json failed to parse.

@@ -49,6 +49,7 @@ import {
   buildContentSystemPrompt,
   type ContentSnapshot,
 } from '../tools/content'
+import { buildDataSystemPrompt } from '../tools/data'
 import {
   createBridge,
   createConversationsPersister,
@@ -59,6 +60,7 @@ import { normalizeContextTokens } from '../contextTokens'
 import type {
   AiStreamEvent,
   ToolScope,
+  ToolContext,
 } from '../runtime/types'
 import type { AiStreamRequest } from '../drivers/types'
 
@@ -80,17 +82,19 @@ export function tryHandleAiChat(
   req: Request,
   db: DbClient,
   pathname: string,
+  uploadsDir?: string,
 ): Promise<Response> | null {
   if (!pathname.startsWith('/admin/api/ai/chat/')) return null
   const scope = pathname.slice('/admin/api/ai/chat/'.length)
   if (!VALID_SCOPES.includes(scope as ToolScope)) return null
-  return handleAiChat(req, db, scope as ToolScope)
+  return handleAiChat(req, db, scope as ToolScope, uploadsDir)
 }
 
 async function handleAiChat(
   req: Request,
   db: DbClient,
   scope: ToolScope,
+  uploadsDir?: string,
 ): Promise<Response> {
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, { status: 405 })
@@ -227,14 +231,22 @@ async function handleAiChat(
         // posted with the request and is refreshed in place by the bridge's
         // onSnapshot after each mutating browser tool — so a read tool run
         // later in the same turn sees current state, not stale turn-start state.
-        const toolContextBase = {
+        //
+        // Server-direct tools (content-scope write tools) call
+        // `toolContextBase.onSnapshot` to push a DB-fresh snapshot into the
+        // same mutable slot — the next tool call in the turn sees the
+        // post-mutation state regardless of whether the last tool was
+        // browser-bridged or server-direct.
+        const toolContextBase: Record<string, unknown> = {
           db,
           userId: user.id,
           capabilities: user.capabilities,
           scope,
           conversationId: conversation.id,
           snapshot,
-        }
+          uploadsDir,
+          onSnapshot: (next: unknown) => { toolContextBase.snapshot = next },
+        } as ToolContext
         const { bridgeId, bridge, destroy } = createBridge(
           emit,
           req.signal,
@@ -340,6 +352,9 @@ export function buildSystemPromptForScope(
   }
   if (scope === 'content') {
     return buildContentSystemPrompt((snapshot ?? emptyContentSnapshot()) as ContentSnapshot)
+  }
+  if (scope === 'data') {
+    return buildDataSystemPrompt()
   }
   // Other scopes don't have system prompts yet. The driver gets a minimal
   // prompt so the conversation isn't completely contextless.

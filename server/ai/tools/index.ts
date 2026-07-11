@@ -25,6 +25,7 @@ import { toolAllowedForCapabilities } from './capabilityGate'
 import type { AiTool, ToolScope } from './types'
 import { siteTools } from './site'
 import { contentTools } from './content'
+import { dataTools } from './data'
 
 function scopeToolset(scope: ToolScope): AiTool[] {
   switch (scope) {
@@ -33,8 +34,7 @@ function scopeToolset(scope: ToolScope): AiTool[] {
     case 'content':
       return contentTools
     case 'data':
-      // Phase 4 (data workspace)
-      return []
+      return dataTools
     case 'plugin':
       // Phase 5
       return []

@@ -24,6 +24,7 @@ export function tryHandleAi(
   req: Request,
   db: DbClient,
   url: URL,
+  uploadsDir?: string,
 ): Promise<Response> | null {
   const pathname = url.pathname
   if (!pathname.startsWith('/admin/api/ai/')) return null
@@ -42,7 +43,7 @@ export function tryHandleAi(
     tryHandleAiMcpConnectors(req, db, pathname) ??
     tryHandleAiEditorBridge(req, db, pathname) ??
     tryHandleAiAudit(req, db, url, pathname) ??
-    tryHandleAiChat(req, db, pathname) ??
+    tryHandleAiChat(req, db, pathname, uploadsDir) ??
     tryHandleAiToolResult(req, db, pathname) ??
     tryHandleAiCredentials(req, db, pathname) ??
     tryHandleAiConversations(req, db, url, pathname) ??

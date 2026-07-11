@@ -26,6 +26,7 @@ import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../runtime/types'
 import { toolAllowedForCapabilities } from '../tools/capabilityGate'
 import { contentTools } from '../tools/content'
+import { dataTools } from '../tools/data'
 import { siteTools } from '../tools/site'
 import { styleMcpTools } from './tools/styleTools'
 import { contextMcpTools } from './tools/contextTool'
@@ -41,7 +42,7 @@ function allMcpTools(): AiTool[] {
   // De-dup by tool name. Order matters: the headless style + content tools win
   // over the site toolset for any shared name (e.g. `list_documents`), so the
   // version that works without an open editor is the one exposed.
-  const ordered = [...contextMcpTools, ...styleMcpTools, ...contentTools, ...siteTools]
+  const ordered = [...contextMcpTools, ...styleMcpTools, ...contentTools, ...dataTools, ...siteTools]
   const byName = new Map<string, AiTool>()
   for (const tool of ordered) {
     if (MCP_EXCLUDED_TOOLS.has(tool.name)) continue

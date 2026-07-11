@@ -4,4 +4,4 @@
  * a single concise type without reaching into the runtime layer.
  */
 
-export type { AiTool,   ToolScope } from '../runtime/types'
+export type { AiTool, ToolScope, ToolContext } from '../runtime/types'

@@ -142,6 +142,20 @@ export interface ToolContext {
   readonly conversationId: string
   readonly snapshot: unknown
   readonly signal: AbortSignal
+  /**
+   * Filesystem path for uploaded media assets. Optional — only present when
+   * the server is configured with an uploads directory. Tools that write to
+   * disk (media_upload_from_url) gate on this being non-empty.
+   */
+  readonly uploadsDir?: string
+  /**
+   * Server-direct tools call this to push a fresh snapshot back into the
+   * turn's mutable context. After a write, the handler builds the updated
+   * snapshot from DB and passes it here — the NEXT tool call in the same
+   * turn then sees the post-mutation state instead of the stale turn-start
+   * snapshot. Mirrors the bridge's `onSnapshot` for browser-bridged tools.
+   */
+  onSnapshot?: (snapshot: unknown) => void
 }
 
 // ---------------------------------------------------------------------------

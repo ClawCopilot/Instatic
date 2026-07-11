@@ -16,6 +16,7 @@
 import type { DbClient } from '../db/client'
 import type { DataRow, DataRowVersion } from '@core/data/schemas'
 import { resolveTemplateChain } from '@core/templates'
+import { hookBus } from '@core/plugins/hookBus'
 import {
   getPublishedDataRowByRoute,
   getRowTableRouteBase,
@@ -76,6 +77,17 @@ async function publishDataRowLocked(
   // Layer B: invalidate the in-memory render cache so the next visitor request
   // re-renders against the freshly committed row version.
   bumpPublishVersion()
+
+  // Emit publish.row so webhooks + plugins can react (e.g. rebuild search
+  // indexes, notify external CI/CD pipelines, flush CDN caches).
+  void hookBus.emit('publish.row', {
+    rowId: row.id,
+    tableId: row.tableId,
+    slug: row.slug,
+    status: row.status,
+    versionId: version.id,
+    publisherUserId,
+  })
 
   return { row, version }
 }
