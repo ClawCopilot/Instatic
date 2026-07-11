@@ -1,0 +1,146 @@
+/**
+ * Commerce plugin — server entrypoint.
+ *
+ * Architecture:
+ *   - Products live in the host's `data_tables` (one table per catalog)
+ *   - Carts + orders + inventory ledger are plugin-owned tables
+ *   - Stripe handles payment processing + checkout UI
+ *   - Webhooks keep order status in sync with Stripe
+ *
+ * On first activation:
+ *   1. Creates the `products` data table (if missing) with sensible fields
+ *   2. Creates the carts/orders/inventory tables via migration
+ *   3. Registers all routes (catalog, cart, checkout, webhooks)
+ */
+
+import { definePlugin } from '@instatic/plugin-sdk'
+import migrations from './migrations'
+import {
+  handleAddToCart,
+  handleAdminListOrders,
+  handleAdminRefundOrder,
+  handleAdminRestock,
+  handleCheckout,
+  handleClearCart,
+  handleGetCart,
+  handleGetProduct,
+  handleListMyOrders,
+  handleListProducts,
+  handleRemoveCartItem,
+  handleStripeWebhook,
+  handleUpdateCartItem,
+} from './routes'
+
+interface CommerceSettings {
+  stripeSecretKey: string
+  stripeWebhookSecret: string
+  currency: string
+}
+
+const PRODUCTS_TABLE_SCHEMA = {
+  id: 'products',
+  name: 'Products',
+  slug: 'products',
+  kind: 'data',
+  routeBase: '/products',
+  singularLabel: 'Product',
+  pluralLabel: 'Products',
+  primaryFieldId: 'title',
+  fieldsJson: JSON.stringify([
+    { type: 'text', id: 'title', label: 'Title', required: true, builtIn: false },
+    { type: 'text', id: 'slug', label: 'Slug', required: true, builtIn: false },
+    { type: 'longText', id: 'description', label: 'Description', builtIn: false },
+    { type: 'media', id: 'featuredMedia', label: 'Featured image', mediaKind: 'image', builtIn: false },
+    { type: 'number', id: 'priceCents', label: 'Price (cents)', integer: true, required: true, builtIn: false },
+    { type: 'text', id: 'currency', label: 'Currency code', builtIn: false },
+    { type: 'number', id: 'availableQuantity', label: 'Available quantity', integer: true, builtIn: false },
+    { type: 'boolean', id: 'trackInventory', label: 'Track inventory', builtIn: false },
+    { type: 'boolean', id: 'isPublished', label: 'Published', builtIn: false },
+  ]),
+  system: false,
+}
+
+export default definePlugin({
+  id: 'commerce',
+  name: 'Commerce',
+  version: '0.1.0',
+
+  migrations,
+
+  async activate(api) {
+    // ─── Migrations ─────────────────────────────────────────────────────────
+    for (const migration of migrations) {
+      await api.cms.migrations.register(migration)
+    }
+
+    // ─── Ensure products table exists ──────────────────────────────────────
+    try {
+      const existing = await api.cms.content.tables.get('products')
+      if (!existing) {
+        await api.cms.content.tables.create(PRODUCTS_TABLE_SCHEMA)
+      }
+    } catch (err) {
+      api.log.warn('Failed to create products table', err)
+    }
+
+    // ─── Settings ───────────────────────────────────────────────────────────
+    const settings: CommerceSettings = {
+      stripeSecretKey: (await api.settings.get('stripeSecretKey') as string) ?? '',
+      stripeWebhookSecret: (await api.settings.get('stripeWebhookSecret') as string) ?? '',
+      currency: (await api.settings.get('currency') as string) ?? 'USD',
+    }
+
+    // ─── Public routes ─────────────────────────────────────────────────────
+    await api.cms.publicRoutes.register('/api/commerce', { exclusive: true })
+    await api.cms.routes.register('GET', '/api/commerce/products', 'public', handleListProducts)
+    await api.cms.routes.register('GET', '/api/commerce/products/:slug', 'public', async (ctx, _req, params) => {
+      return handleGetProduct(ctx, params.slug)
+    })
+    await api.cms.routes.register('POST', '/api/commerce/stripe/webhook', 'public', async (ctx, req) => {
+      return handleStripeWebhook(ctx, req, settings)
+    })
+
+    // ─── Authenticated routes ──────────────────────────────────────────────
+    await api.cms.routes.register('GET', '/api/commerce/cart', 'authenticated', handleGetCart)
+    await api.cms.routes.register('POST', '/api/commerce/cart/items', 'authenticated', handleAddToCart)
+    await api.cms.routes.register('PATCH', '/api/commerce/cart/items/:productId', 'authenticated', async (ctx, req, params) => {
+      return handleUpdateCartItem(ctx, req, params.productId)
+    })
+    await api.cms.routes.register('DELETE', '/api/commerce/cart/items/:productId', 'authenticated', async (ctx, _req, params) => {
+      return handleRemoveCartItem(ctx, params.productId)
+    })
+    await api.cms.routes.register('DELETE', '/api/commerce/cart', 'authenticated', handleClearCart)
+    await api.cms.routes.register('POST', '/api/commerce/checkout', 'authenticated', async (ctx, req) => {
+      return handleCheckout(ctx, req, settings)
+    })
+    await api.cms.routes.register('GET', '/api/commerce/orders', 'authenticated', handleListMyOrders)
+
+    // ─── Admin routes ──────────────────────────────────────────────────────
+    await api.cms.routes.register('GET', '/admin/api/commerce/orders', 'content.manage', handleAdminListOrders)
+    await api.cms.routes.register('POST', '/admin/api/commerce/orders/:id/refund', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminRefundOrder(ctx, settings, params.id)
+    })
+    await api.cms.routes.register('POST', '/admin/api/commerce/products/:id/restock', 'content.manage', async (ctx, req, params) => {
+      return handleAdminRestock(ctx, req, params.id)
+    })
+
+    // ─── viewerContext: cart count ─────────────────────────────────────────
+    api.viewerContext.register(async (ctx) => {
+      const viewer = ctx.viewer as { loggedIn?: boolean; userId?: string } | undefined
+      if (!viewer?.loggedIn || !viewer.userId) return {}
+      const { rows } = await ctx.db`
+        select coalesce(sum(quantity), 0)::int as count
+        from carts, jsonb_array_elements(line_items_json) as item
+        where user_id = ${viewer.userId}
+          and jsonb_typeof(line_items_json) = 'array'
+      `
+      return { cartCount: rows[0]?.count ?? 0 }
+    })
+
+    api.log.info('commerce plugin activated')
+  },
+
+  async deactivate(api) {
+    api.log.info('commerce plugin deactivated')
+  },
+})

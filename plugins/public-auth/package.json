@@ -1,0 +1,58 @@
+{
+  "name": "@instatic/plugin-public-auth",
+  "version": "0.1.0",
+  "description": "Public-facing user authentication: registration, login, JWT sessions, password reset, email verification. Provides a viewerContext provider for downstream plugins.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "authentication", "jwt", "users"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "public-auth",
+    "name": "Public Authentication",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "End-user registration, login, password reset, and JWT-based sessions for Instatic sites. Exposes a viewerContext provider.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "network.outbound"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "jwtSecret",
+        "type": "string",
+        "label": "JWT signing secret",
+        "description": "HMAC secret for signing access tokens. Rotate to invalidate all sessions.",
+        "required": true,
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "accessTokenTtlSeconds",
+        "type": "number",
+        "label": "Access token TTL (seconds)",
+        "description": "How long access tokens remain valid. Default 1 hour.",
+        "required": false,
+        "default": 3600
+      },
+      {
+        "id": "requireEmailVerification",
+        "type": "boolean",
+        "label": "Require email verification",
+        "description": "Block login until the user clicks the verification email.",
+        "required": false,
+        "default": false
+      }
+    ],
+    "networkAllowedHosts": []
+  }
+}

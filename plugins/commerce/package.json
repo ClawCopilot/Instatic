@@ -1,0 +1,68 @@
+{
+  "name": "@instatic/plugin-commerce",
+  "version": "0.1.0",
+  "description": "E-commerce catalog, cart, checkout, and order management. Uses the host data-table system for product catalog and Stripe for payment processing.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "commerce", "ecommerce", "stripe"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "commerce",
+    "name": "Commerce",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "Product catalog, shopping cart, checkout, and order management with Stripe payment integration.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "cms.content.read",
+      "cms.content.write",
+      "cms.content.publish",
+      "cms.content.tables.manage",
+      "network.outbound",
+      "cms.hooks"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "stripeSecretKey",
+        "type": "string",
+        "label": "Stripe secret key",
+        "description": "Stripe API secret key (sk_live_... or sk_test_...).",
+        "required": false,
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "stripeWebhookSecret",
+        "type": "string",
+        "label": "Stripe webhook signing secret",
+        "description": "Signing secret from Stripe dashboard (whsec_...).",
+        "required": false,
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "currency",
+        "type": "string",
+        "label": "Default currency",
+        "default": "USD"
+      }
+    ],
+    "networkAllowedHosts": ["api.stripe.com"],
+    "contentAccess": [
+      { "tableSlug": "products", "mode": "read" },
+      { "tableSlug": "products", "mode": "write" },
+      { "tableSlug": "products", "mode": "publish" },
+      { "tableSlug": "products", "mode": "tables.manage" }
+    ]
+  }
+}

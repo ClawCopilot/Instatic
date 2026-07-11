@@ -1,0 +1,49 @@
+{
+  "name": "@instatic/plugin-membership",
+  "version": "0.1.0",
+  "description": "Membership tiers, subscriptions, and content paywalls. Depends on @instatic/plugin-public-auth for end-user identity.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "membership", "subscriptions", "paywall"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "membership",
+    "name": "Membership & Paywalls",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "Tiered memberships, subscription lifecycle, and content gating. Builds on public-auth for end-user identity.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "cms.hooks"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "gracePeriodDays",
+        "type": "number",
+        "label": "Subscription grace period (days)",
+        "description": "Days after expiry during which subscribers retain access.",
+        "default": 3
+      },
+      {
+        "id": "trialDays",
+        "type": "number",
+        "label": "Default trial period (days)",
+        "description": "Free trial length for new subscriptions (0 = no trial).",
+        "default": 7
+      }
+    ],
+    "dependencies": {
+      "plugins": ["public-auth"]
+    }
+  }
+}

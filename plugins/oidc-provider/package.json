@@ -1,0 +1,83 @@
+{
+  "name": "@instatic/plugin-oidc-provider",
+  "version": "0.1.0",
+  "description": "OAuth 2.0 / OpenID Connect Provider — issue ID/access/refresh tokens to third-party applications. Built on @instatic/plugin-public-auth for end-user identity.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "oidc", "oauth2", "identity", "sso"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "oidc-provider",
+    "name": "OIDC Provider",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "OAuth 2.0 / OpenID Connect identity provider. Supports authorization code flow with PKCE, client credentials, refresh tokens, JWKS, and discovery.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "cms.hooks",
+      "network.outbound"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "issuer",
+        "type": "string",
+        "label": "Issuer URL",
+        "description": "The publicly-resolvable issuer URL (e.g. https://auth.example.com). Used in id_token iss claim and discovery document.",
+        "required": true,
+        "default": ""
+      },
+      {
+        "id": "accessTokenTtlSeconds",
+        "type": "number",
+        "label": "Access token TTL (seconds)",
+        "default": 3600
+      },
+      {
+        "id": "refreshTokenTtlSeconds",
+        "type": "number",
+        "label": "Refresh token TTL (seconds)",
+        "default": 2592000
+      },
+      {
+        "id": "idTokenTtlSeconds",
+        "type": "number",
+        "label": "ID token TTL (seconds)",
+        "default": 3600
+      },
+      {
+        "id": "authCodeTtlSeconds",
+        "type": "number",
+        "label": "Authorization code TTL (seconds)",
+        "default": 600
+      },
+      {
+        "id": "requirePkce",
+        "type": "boolean",
+        "label": "Require PKCE for all public clients",
+        "default": true
+      },
+      {
+        "id": "signingKeySecret",
+        "type": "string",
+        "label": "RSA signing key (PEM, optional)",
+        "description": "If empty, a new RS256 key pair is generated on first activate and persisted in plugin_secrets.",
+        "required": false,
+        "secret": true,
+        "default": ""
+      }
+    ],
+    "dependencies": {
+      "plugins": ["public-auth"]
+    }
+  }
+}
