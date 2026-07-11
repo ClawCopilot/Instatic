@@ -256,6 +256,8 @@ INSTATIC_IMAGE=ghcr.io/clawcopilot/instatic:latest
 
 # ─── AI 加密密钥 ──────────────────────────────────────────
 # 本地生成: bun run scripts/generate-secret-key.ts
+# 或: openssl rand -base64 32
+# ⚠️ 必须是 base64 编码的 32 字节随机密钥，不能用其他格式替代
 INSTATIC_SECRET_KEY=<你的密钥>
 
 # ─── 网络 ────────────────────────────────────────────────

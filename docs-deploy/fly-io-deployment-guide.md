@@ -212,12 +212,21 @@ fly logs
 ### 3.5 生成密钥并设置
 
 ```bash
-# 本地生成密钥
+# 本地生成密钥（三选一）
 bun run scripts/generate-secret-key.ts
+# 或
+openssl rand -base64 32
+# 或
+node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64'))"
 
 # 设置到 Fly 环境变量
 fly secrets set INSTATIC_SECRET_KEY="<生成的密钥>"
 ```
+
+> ⚠️ **格式要求**：`INSTATIC_SECRET_KEY` 必须是 **base64 编码的 32 字节随机密钥**（AES-256）。
+> 不能用 Cloudflare Tunnel Token 或其他 JWT 替代——格式不同，长度不对，会导致启动时报 `decoded to 138 bytes; must be exactly 32`。
+>
+> ⚠️ **更换密钥**：如果将来更换密钥，之前用旧密钥加密的 AI 凭据和 MFA TOTP 种子将无法解密，需要重新录入。
 
 ### 3.6 设置公开域名（关键！）
 

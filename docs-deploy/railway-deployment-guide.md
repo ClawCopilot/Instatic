@@ -140,7 +140,7 @@ railway up
 | `NODE_ENV` | `production` | 运行模式 |
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
-| `INSTATIC_SECRET_KEY` | `<生成的值>` | AI 凭据加密密钥 |
+| `INSTATIC_SECRET_KEY` | `<生成的值>` | AES-256 主密钥（**必须是 base64 编码的 32 字节**），用于加密 AI 凭据和 MFA TOTP 种子。⚠️ 不能用 Cloudflare Tunnel Token 替代 |
 | `TRUSTED_PROXY_CIDRS` | `0.0.0.0/0` | Railway 代理 CIDR |
 
 > **注意**：`DATABASE_URL` 由 Railway PostgreSQL 服务自动注入，无需手动设置。
@@ -153,12 +153,23 @@ railway up
 ### 3.5 生成加密密钥
 
 ```bash
-# 本地生成
+# 方式 1：用 bun 生成
 bun run scripts/generate-secret-key.ts
+
+# 方式 2：用 openssl 生成
+openssl rand -base64 32
+
+# 方式 3：用 node 生成
+node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64'))"
 
 # 将输出设置到 Railway Dashboard → Variables
 # 变量名: INSTATIC_SECRET_KEY
 ```
+
+> ⚠️ **格式要求**：`INSTATIC_SECRET_KEY` 必须是 **base64 编码的 32 字节随机密钥**（AES-256）。
+> 不能用 Cloudflare Tunnel Token 或其他 JWT 替代——格式不同，长度不对，会导致启动时报 `decoded to 138 bytes; must be exactly 32`。
+>
+> ⚠️ **更换密钥**：如果将来更换密钥，之前用旧密钥加密的 AI 凭据和 MFA TOTP 种子将无法解密，需要重新录入。
 
 ### 3.6 配置服务端口
 

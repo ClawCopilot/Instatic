@@ -154,7 +154,7 @@ Fly.io 部署配置，包含：
 
 | 变量 | 说明 |
 |------|------|
-| `INSTATIC_SECRET_KEY` | AI 凭据加密密钥（64字节随机字符串） |
+| `INSTATIC_SECRET_KEY` | AES-256 主密钥（base64 编码的 32 字节随机字符串），用于加密 AI 凭据和 MFA TOTP 种子。⚠️ 不能用 Cloudflare Tunnel Token 替代 |
 | `PUBLIC_ORIGIN` | CSRF 校验源（`https://<app>.fly.dev`） |
 | `TRUSTED_PROXY_CIDRS` | 信任代理 CIDR（`fdaa::/16`） |
 

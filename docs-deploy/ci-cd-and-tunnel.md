@@ -1166,6 +1166,7 @@ set -e
 | `PORT` | `3001` | Instatic 监听端口 |
 | `CLOUDFLARE_TUNNEL_TOKEN` | （空） | **必需**。Cloudflare Tunnel 凭证，是建立隧道的**唯一前提** |
 | `CLOUDFLARE_TUNNEL_HOSTNAME` | （空） | **依赖 Token**。Cloudflare 控制台中配置的 Public Hostname。必须与面板中设置的值**完全一致**。Compose overlay 中自动推导为 `PUBLIC_ORIGIN`（CSRF 功能）；`docker run` 中仅用于启动日志显示地址 |
+| `PUBLIC_ORIGIN` | （空） | **`docker run`/Railway 部署时必须手动设置**。外部域名，用于 CSRF Origin 校验。Compose overlay 下由 `CLOUDFLARE_TUNNEL_HOSTNAME` 自动推导。详见下方 [PUBLIC_ORIGIN 详解](#public-origin-详解) |
 | `DATABASE_URL` | `sqlite:/app/data/cms.db` | 数据库连接 |
 | `UPLOADS_DIR` | `/app/uploads` | 上传目录 |
 | `STATIC_DIR` | `/app/dist` | 静态文件目录 |
@@ -1175,7 +1176,7 @@ set -e
 | `SING_BOX_PATH` | `/vless` | sing-box WebSocket 路径 |
 | `SING_BOX_LOG_LEVEL` | `info` | sing-box 日志级别 |
 | `SING_BOX_CONFIG` | `/app/sing-box-config.json` | （高级）自定义 sing-box 配置文件路径 |
-| `INSTATIC_SECRET_KEY` | 必需 | 应用加密密钥 |
+| `INSTATIC_SECRET_KEY` | 必需 | AES-256 主密钥（**必须是 base64 编码的 32 字节**），用于加密 AI 凭据和 MFA TOTP 种子。生成：`bun run scripts/generate-secret-key.ts` 或 `openssl rand -base64 32`。⚠️ 不能用 Cloudflare Tunnel Token 替代（长度不对） |
 
 ### Token 与 Hostname 的关系
 
@@ -1189,6 +1190,54 @@ set -e
 | 值的约束 | Cloudflare 下发的 Token | **必须**与 Cloudflare Zero Trust 面板中为该 Tunnel 配置的 Public Hostname **完全一致** → 不一致会导致日志显示错误地址 |
 
 > **一句话总结**：Token 是"钥匙"（有它隧道才通），Hostname 是"门牌号标签"（有它日志才显示具体地址）。Hostname 在 Compose overlay 中还有额外 CSRF 功能。
+
+### PUBLIC_ORIGIN 详解
+
+#### 是什么
+
+`PUBLIC_ORIGIN` 告诉 Instatic 外部访问域名是什么，用于 CSRF（跨站请求伪造）防护。当浏览器发送 POST/PUT/PATCH/DELETE 请求时，Instatic 会比对请求的 `Origin` 头是否与 `PUBLIC_ORIGIN` 一致，不一致则返回 403。
+
+#### 什么时候需要手动设置
+
+| 部署方式 | 是否需要手动设 | 原因 |
+|----------|---------------|------|
+| Docker Compose overlay | ❌ 不需要 | `CLOUDFLARE_TUNNEL_HOSTNAME` 自动推导为 `PUBLIC_ORIGIN` |
+| `docker run` | ✅ 需要 | 没有 overlay 自动推导 |
+| Railway（走 Cloudflare Tunnel） | ✅ 需要 | 请求经 Tunnel 到达容器时 `Host` 头是 Railway 内部地址 |
+
+#### CSRF 校验逻辑（Cloudflare Tunnel 场景）
+
+```
+浏览器请求 POST /admin/setup
+  │  Origin: https://techidaily.com
+  │
+  ▼
+Cloudflare Tunnel (cloudflared)
+  │  转发到 localhost:3001
+  │
+  ▼
+Railway 容器内 Instatic
+  │  检测到 Origin: https://techidaily.com
+  │
+  ├─ 有 PUBLIC_ORIGIN → 对比 Origin === PUBLIC_ORIGIN → 匹配 ✓ → 200
+  │
+  └─ 无 PUBLIC_ORIGIN → 回退对比 Host 头（instatic.railway.internal）
+                         → https://techidaily.com ≠ instatic.railway.internal
+                         → 403 Forbidden: invalid origin
+```
+
+#### 与 Railway Public Domain 的区别（不会收费）
+
+`PUBLIC_ORIGIN` 和 Railway 的 "Public Domain" 功能**完全是两码事**：
+
+| 对比维度 | `PUBLIC_ORIGIN`（Instatic 变量） | Railway Public Domain（平台功能） |
+|----------|----------------------------------|-----------------------------------|
+| **谁读取** | Instatic 应用的 CSRF 校验代码 | Railway 平台路由层 |
+| **作用** | 告诉 Instatic "外部域名是什么" | 给容器分配公网域名，直接暴露到互联网 |
+| **是否收费** | ❌ 免费，只是一个普通字符串环境变量 | Railway TCP Proxy 按流量计费 |
+| **本项目是否使用** | ✅ 是，解决 CSRF 403 问题 | ❌ 否，我们走 Cloudflare Tunnel |
+
+**结论**：`PUBLIC_ORIGIN` 只是一个给 Instatic 看的字符串变量，不受 Railway 控制，与 Railway 计费没有任何关系。
 
 ---
 
