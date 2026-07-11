@@ -210,6 +210,8 @@ export function readFrame(
       return (context.site as unknown as Record<string, unknown>) ?? null
     case 'route':
       return (context.route as unknown as Record<string, unknown>) ?? null
+    case 'viewer':
+      return (context.viewer as unknown as Record<string, unknown>) ?? null
     default:
       return null
   }

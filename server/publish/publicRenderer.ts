@@ -68,6 +68,13 @@ interface RenderPublishedSnapshotContext {
   /** Optional request URL — when present, drives per-loop pagination. */
   url?: URL
   /**
+   * Optional incoming Request — forwarded to plugin viewer-context
+   * providers so they can read cookies / Authorization headers. When
+   * omitted (e.g. bake-time renders), providers receive `null` and
+   * must return a sensible default (typically `{}`).
+   */
+  req?: Request
+  /**
    * Publish version to stamp into `<instatic-hole data-instatic-version>` placeholders.
    * Defaults to the live `getPublishVersion()`. The full/incremental publish
    * bakes shells BEFORE bumping the version, so it passes the next version
@@ -75,6 +82,22 @@ interface RenderPublishedSnapshotContext {
    * a stale version and the hole endpoint would refuse to hydrate it.
    */
   publishVersion?: number
+}
+
+/**
+ * Resolve the viewer frame for the current request — calls every
+ * registered viewer-context provider and merges their partial objects
+ * into a single viewer frame for the template renderer.
+ *
+ * Returns `undefined` (so the frame is omitted) when no provider has
+ * registered yet OR every provider returned a null/empty object. The
+ * renderer binds `viewer.*` tokens only when the frame is present, so
+ * a no-op viewer is invisible to templates.
+ */
+async function buildViewerFrame(req: Request | undefined, db: DbClient, url: URL | undefined): Promise<Record<string, unknown> | undefined> {
+  if (!req || !url) return undefined
+  const viewer = await resolveViewerContext({ db, req, url, pathname: url.pathname })
+  return Object.keys(viewer).length > 0 ? viewer : undefined
 }
 
 /**
@@ -181,9 +204,11 @@ export async function renderPublishedDataRowTemplate(
   // URL. Loop interceptors push/pop iteration items on top of this stack;
   // nodes outside any loop resolve their `currentEntry` bindings against this
   // seed. page/site/viewer frames are filled by `publishPage` from the document.
+  const viewer = await buildViewerFrame(ctx.req, ctx.db, ctx.url)
   const templateContext: TemplateRenderDataContext = {
     entryStack: [publishedDataRowToLoopItem(row)],
     ...(ctx.url ? { route: buildRouteFrame(ctx.url.toString()) } : {}),
+    ...(viewer ? { viewer } : {}),
   }
 
   const rendered = await renderMergedTemplate(merged, snapshot, templateContext, ctx)

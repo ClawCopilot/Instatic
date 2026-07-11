@@ -92,6 +92,19 @@ export const PLUGIN_PERMISSION_VALUES = [
   // `hourly`, `every: { minutes }`, …) by the host's scheduler tick.
   // The handler runs inside the same QuickJS sandbox as everything else.
   'cms.schedule',
+  // ─── Extension points (Phase: commerce / membership / OIDC) ────────
+  //
+  // Plugins that need to ship their own DB schema (api_keys, public_users,
+  // subscription_plans, oauth_clients, …) require `cms.migrations`. Without
+  // it, the plugin can't declare tables — DDL is host-owned.
+  'cms.migrations',
+  // Plugins that need to own HTTP paths OUTSIDE the
+  // /admin/api/cms/plugins/<id>/runtime/ namespace (OAuth endpoints,
+  // /api/auth/*, /api/webhooks/*) require `cms.publicRoutes`.
+  'cms.publicRoutes',
+  // Plugins that need to inject request-pipeline middleware (API key
+  // auth, rate limiting, request logging) require `cms.httpMiddleware`.
+  'cms.httpMiddleware',
   // Reserved
   'unstable.internals',
 ] as const

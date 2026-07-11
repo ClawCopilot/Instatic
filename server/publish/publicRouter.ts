@@ -68,6 +68,7 @@ import {
 } from '../repositories/data/publish'
 import { getPublishedPageBySlug } from '../repositories/publish'
 import { applyPublishedHtmlPipeline } from './publishedHtmlPipeline'
+import { resolveViewerContext } from '../plugins/extensions/viewerContext'
 import {
   renderPublishedDataRowTemplate,
   renderPublishedNotFound,
@@ -216,6 +217,7 @@ export async function renderPublicResolution(
   db: DbClient,
   url: URL,
   uploadsDir?: string,
+  req?: Request,
 ): Promise<Response | null> {
   // Canonicalise the query to the loop-pagination params the renderer actually
   // consumes. Junk params collapse to '' (so they never mint cache slots), and
@@ -325,11 +327,10 @@ export async function renderNotFoundResponse(
 
   const syntheticUrl = new URL(NOT_FOUND_ARTEFACT_URL_PATH, url.origin)
   const cached = await getOrRender(cacheKey, async () => {
-    const rendered = await renderPublishedNotFound(snapshot, { db, url: syntheticUrl })
+    const rendered = await renderPublishedNotFound(snapshot, { db, url: syntheticUrl, ...(req ? { req } : {}) })
     if (!rendered) return null
     const html = await applyPublishedHtmlPipeline(rendered, db)
     return { body: html, headers: htmlHeaders, status: 200 }
   })
   if (!cached) return null
-  return new Response(cached.body, { headers: cached.headers, status: 404 })
-}
+  return new Response(cached.body, { headers: cached.headers, 

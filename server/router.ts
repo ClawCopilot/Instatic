@@ -20,6 +20,8 @@ import { registry } from '@core/module-engine'
 import type { CssBundleFile, SiteCssBundleId } from '@core/publisher'
 import { buildPublishedSiteCssBundle } from './publish/siteCssBundle'
 import { mediaStorageRegistry } from '@core/plugins/mediaStorageRegistry'
+import { runPluginHttpMiddleware } from './plugins/extensions/httpMiddleware'
+import { buildPluginPublicRoutesDispatcher } from './plugins/extensions/publicRoutes'
 
 const VITE_DEV_URL = 'http://localhost:5173'
 
@@ -86,6 +88,11 @@ const routes: readonly RouteHandler[] = [
   tryServeUpload,
   tryServeAdminApp,
   tryServePublicRoute,
+  // Plugin public routes — registered prefixes that own their own HTTP
+  // paths (OAuth endpoints, /api/auth/*, /api/webhooks/*). Matched AFTER
+  // the built-in admin/public/static dispatchers so admin/CMS routes win
+  // when a plugin path conflicts with a built-in one.
+  tryServePluginPublicRoute,
   trySetupRedirect,
   tryServeNotFoundPage,
 ]
@@ -491,7 +498,7 @@ async function trySetupRedirect(req: Request, runtime: ServerRuntime, _url: URL,
  */
 async function tryServeNotFoundPage(req: Request, runtime: ServerRuntime, url: URL, _pathname: string): Promise<Response | null> {
   if (req.method !== 'GET') return null
-  return await renderNotFoundResponse(runtime.db, url, runtime.uploadsDir)
+  return await renderNotFoundResponse(runtime.db, url, runtime.uploadsDir, req)
 }
 
 // ---------------------------------------------------------------------------

@@ -117,6 +117,10 @@ const apiHandlers = {
   'cms.content.search': handleContentSearch,
   'cms.content.snapshot': handleContentSnapshot,
   'cms.content.republishAll': handleContentRepublishAll,
+  // ─── Extension points ────────────────────────────────────────────────────
+  'cms.migrations.register': handleMigrationsRegister,
+  'cms.publicRoutes.register': handlePublicRoutesRegister,
+  'cms.httpMiddleware.register': handleHttpMiddlewareRegister,
 } satisfies HostApiHandlerTable
 
 export async function dispatchApiCall(msg: ValidatedApiCall): Promise<void> {

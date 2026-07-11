@@ -26,6 +26,16 @@ await syncSystemRoles(db)
 // always the fallback for unset roles. See `mediaStorageRegistry.ts`.
 mediaStorageRegistry.configureLocalDisk({ uploadsDir: config.uploadsDir })
 await activateInstalledServerPlugins(db, config.uploadsDir)
+// Plugin migrations: run AFTER every plugin's install/migrate hook has
+// registered its migrations through the api-call bridge, but BEFORE
+// the scheduler tick / webhook dispatcher start (so plugin tables exist
+// when those subsystems first query the DB).
+//
+// The dialect flag is derived from the runtime config so the same boot
+// path works on both Postgres and SQLite.
+const { runPluginMigrations } = await import('./plugins/extensions/migrations')
+const dialect: 'pg' | 'sqlite' = config.databaseUrl.startsWith('postgres') ? 'pg' : 'sqlite'
+await runPluginMigrations(db, dialect)
 // AI runtime: start the nightly conversation-purge tick. Operators add
 // their own provider credentials via /admin/ai/providers on first install.
 startConversationPurgeTick(db)

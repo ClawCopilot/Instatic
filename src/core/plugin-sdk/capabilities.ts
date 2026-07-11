@@ -140,6 +140,27 @@ export const PLUGIN_CAPABILITIES: PluginCapability[] = [
     surfaces: ['server'],
   },
   {
+    permission: 'cms.migrations',
+    label: 'Declare plugin-owned DB tables',
+    description: 'Allows the plugin to register SQL migrations that create / alter its own tables during install + boot. Required for plugins that need persistent state beyond `cms.storage` (api keys, public users, subscriptions, oauth clients, …). The host runs the SQL inside its own transaction; the plugin cannot execute DDL directly from the sandbox.',
+    risk: 'high',
+    surfaces: ['server'],
+  },
+  {
+    permission: 'cms.publicRoutes',
+    label: 'Own HTTP paths outside the plugin runtime namespace',
+    description: 'Allows the plugin to register root-path or arbitrary-prefix HTTP routes that do NOT live under /admin/api/cms/plugins/<id>/runtime/. Required for public-facing endpoints that need to be served from the host origin (OAuth authorize / token, /api/auth/login, /api/webhooks/stripe, …). The first plugin to register a path wins; conflicts throw at install time.',
+    risk: 'dangerous',
+    surfaces: ['server'],
+  },
+  {
+    permission: 'cms.httpMiddleware',
+    label: 'Inject HTTP request middleware',
+    description: 'Allows the plugin to register a function that runs BEFORE the main router on every incoming request. Required for cross-cutting concerns like API key authentication, rate limiting, and request logging. Middleware can short-circuit the pipeline with its own Response (e.g. 401 for invalid keys).',
+    risk: 'high',
+    surfaces: ['server'],
+  },
+  {
     permission: 'cms.content.read',
     label: 'Read CMS content',
     description: 'Allows the plugin to list / read entries (pages, posts, custom tables) in the tables declared in its manifest\'s `contentAccess[]`. Includes reading tree-shaped fields and published snapshots.',

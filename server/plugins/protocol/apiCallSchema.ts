@@ -142,6 +142,22 @@ export const ApiCallSchemas = {
   'cms.content.republishAll': apiCallSchema('cms.content.republishAll', ContentRepublishAllArgsSchema),
   'crypto.digest': apiCallSchema('crypto.digest', Type.Tuple([CryptoDigestArgSchema])),
   'crypto.signHmac': apiCallSchema('crypto.signHmac', Type.Tuple([CryptoSignHmacArgSchema])),
+  // ─── Extension points ────────────────────────────────────────────────────
+  // Each target registers one piece of capability that a plugin needs
+  // beyond the built-in admin-plugin-runtime surface. The host stores
+  // the registration and consults it during request dispatch / boot.
+  'cms.migrations.register': apiCallSchema(
+    'cms.migrations.register',
+    Type.Tuple([MigrationsRegisterArgSchema]),
+  ),
+  'cms.publicRoutes.register': apiCallSchema(
+    'cms.publicRoutes.register',
+    Type.Tuple([PublicRoutesRegisterArgSchema]),
+  ),
+  'cms.httpMiddleware.register': apiCallSchema(
+    'cms.httpMiddleware.register',
+    Type.Tuple([HttpMiddlewareRegisterArgSchema]),
+  ),
 } satisfies Record<string, TSchema>
 
 // ---------------------------------------------------------------------------

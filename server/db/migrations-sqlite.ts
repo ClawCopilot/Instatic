@@ -1109,4 +1109,23 @@ export const sqliteMigrations: Migration[] = [
       alter table ai_mcp_connectors add column expires_at text;
     `,
   },
+  {
+    id: '020_plugin_migrations_registry',
+    sql: `
+      -- ─── Plugin migration tracking — SQLite mirror of PG 020 ────────────
+      --
+      -- Tracks which plugin migrations have been applied. The host's plugin
+      -- extension point (server/plugins/extensions/migrations.ts) reads this
+      -- on every boot to skip already-applied migrations.
+      --
+      -- Dialect translations from PG:
+      --   timestamptz   → text   (ISO 8601)
+      create table if not exists plugin_migrations (
+        plugin_id text not null references installed_plugins(id) on delete cascade,
+        migration_id text not null,
+        applied_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        primary key (plugin_id, migration_id)
+      );
+    `,
+  },
 ]

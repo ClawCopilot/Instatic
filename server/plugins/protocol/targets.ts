@@ -44,6 +44,13 @@ export const TARGET_PERMISSIONS = {
   // Routes — base permission. Public-access routes also require
   // `cms.routes.public`, asserted conditionally in the route handler/shim.
   'cms.routes.register': 'cms.routes',
+  // ─── Extension points (commerce / membership / OIDC support) ──────────
+  // Each target here corresponds to a plugin capability the host exposes
+  // as a small, focused api-call. The permission gating matches the
+  // capability risk level (see PLUGIN_CAPABILITIES in src/core/plugin-sdk/).
+  'cms.migrations.register': 'cms.migrations',
+  'cms.publicRoutes.register': 'cms.publicRoutes',
+  'cms.httpMiddleware.register': 'cms.httpMiddleware',
   // Hooks
   'cms.hooks.on': 'cms.hooks',
   'cms.hooks.filter': 'cms.hooks',

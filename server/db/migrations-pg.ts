@@ -1045,4 +1045,30 @@ export const pgMigrations: Migration[] = [
       alter table ai_mcp_connectors add column expires_at timestamptz;
     `,
   },
+  {
+    id: '020_plugin_migrations_registry',
+    sql: `
+      -- ─── Plugin migration tracking ─────────────────────────────────────────
+      --
+      -- The host extension points (see server/plugins/extensions/migrations.ts)
+      -- let plugins declare their own DB migrations. Each plugin's migrations
+      -- are run AFTER the core migrations on every boot; the run state is
+      -- tracked in this table so a re-run is a no-op.
+      --
+      -- Schema is intentionally minimal — just (plugin_id, migration_id, applied_at).
+      -- The migration SQL itself is hosted in the plugin's source code (or in
+      -- the registry map for tests), NOT here. This table only records WHICH
+      -- migrations have been applied and WHEN.
+      --
+      -- on delete cascade matches installed_plugins: when a plugin is uninstalled,
+      -- its migration rows go too. The plugin's actual tables stay (we never
+      -- auto-drop plugin data on uninstall — that's a destructive vector).
+      create table if not exists plugin_migrations (
+        plugin_id text not null references installed_plugins(id) on delete cascade,
+        migration_id text not null,
+        applied_at timestamptz not null default now(),
+        primary key (plugin_id, migration_id)
+      );
+    `,
+  },
 ]
