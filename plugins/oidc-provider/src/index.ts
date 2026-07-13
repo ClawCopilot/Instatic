@@ -52,14 +52,20 @@ interface OidcSettings {
 }
 
 export default definePlugin({
-  id: 'oidc-provider',
+id: 'instatic.oidc-provider',
   name: 'OIDC Provider',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes']
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    // ─── Migrations ─────────────────────────────────────────────────────────
+export async function activate(api: any) {
+// ─── Migrations ─────────────────────────────────────────────────────────
     for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
@@ -142,12 +148,12 @@ export default definePlugin({
     })
 
     api.log.info(`oidc-provider activated; issuer=${settings.issuer}`)
-  },
+}
 
-  async deactivate(api) {
-    // Host automatically removes registered routes. Signing key stays in
+export async function deactivate(api: any) {
+// Host automatically removes registered routes. Signing key stays in
     // plugin_secrets so re-activation doesn't invalidate tokens (re-use the
     // same key pair). To rotate, use the plugin settings UI (TODO).
     api.log.info('oidc-provider deactivated')
-  },
-})
+}
+

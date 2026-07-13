@@ -49,14 +49,20 @@ const DEFAULT_RULES: Array<{ path: string; method: string; requests: number; win
 ]
 
 export default definePlugin({
-  id: 'rate-limit',
+id: 'instatic.rate-limit',
   name: 'Rate Limit',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.httpMiddleware']
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    for (const migration of migrations) {
+export async function activate(api: any) {
+for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
     const settings: RateLimitSettings = {
@@ -167,12 +173,11 @@ export default definePlugin({
     })
 
     api.log.info('rate-limit plugin activated')
-  },
+}
 
-  async deactivate(api) {
-    api.log.info('rate-limit plugin deactivated')
-  },
-})
+export async function deactivate(api: any) {
+api.log.info('rate-limit plugin deactivated')
+}
 
 function extractIp(req: Request, trustProxy: boolean): string | null {
   if (trustProxy) {

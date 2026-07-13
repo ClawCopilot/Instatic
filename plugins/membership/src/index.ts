@@ -45,14 +45,21 @@ interface MembershipSettings {
 }
 
 export default definePlugin({
-  id: 'membership',
+id: 'instatic.membership',
   name: 'Membership & Paywalls',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes'],
+  version: '0.1.0'
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    // ─── Migrations ─────────────────────────────────────────────────────────
+export async function activate(api: any) {
+// ─── Migrations ─────────────────────────────────────────────────────────
     for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
@@ -151,9 +158,9 @@ export default definePlugin({
     }, 100)  // higher priority than generic gates
 
     api.log.info('membership plugin activated')
-  },
+}
 
-  async deactivate(api) {
-    api.log.info('membership plugin deactivated')
-  },
-})
+export async function deactivate(api: any) {
+api.log.info('membership plugin deactivated')
+}
+

@@ -9,7 +9,7 @@
   "keywords": ["instatic", "plugin", "commerce", "ecommerce", "stripe"],
   "license": "MIT",
   "instaticManifest": {
-    "id": "commerce",
+    "id": "instatic.commerce",
     "name": "Commerce",
     "version": "0.1.0",
     "apiVersion": "1.0.0",

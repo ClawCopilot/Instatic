@@ -9,7 +9,7 @@
   "keywords": ["instatic", "plugin", "api-keys", "authentication"],
   "license": "MIT",
   "instaticManifest": {
-    "id": "api-keys",
+    "id": "instatic.api-keys",
     "name": "API Keys",
     "version": "0.1.0",
     "apiVersion": "1.0.0",

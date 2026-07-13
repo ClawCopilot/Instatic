@@ -38,14 +38,20 @@ interface NotificationSettings {
 }
 
 export default definePlugin({
-  id: 'notifications',
+id: 'instatic.notifications',
   name: 'Notifications',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes', 'cms.hooks', 'network.outbound']
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    for (const migration of migrations) {
+export async function activate(api: any) {
+for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
 
@@ -144,9 +150,9 @@ export default definePlugin({
     })
 
     api.log.info('notifications plugin activated')
-  },
+}
 
-  async deactivate(api) {
-    api.log.info('notifications plugin deactivated')
-  },
-})
+export async function deactivate(api: any) {
+api.log.info('notifications plugin deactivated')
+}
+

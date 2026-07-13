@@ -59,7 +59,9 @@
     "bench:browser": "bun run scripts/bench/index.ts --only=browser",
     "bench:browser:install": "bunx playwright install chromium",
     "doctor": "react-doctor",
-    "build:plugins": "bun run scripts/build-plugins.ts"
+    "build:plugins": "bun run scripts/build-plugins.ts",
+    "test:plugins": "bun run scripts/integration-test-plugins.ts",
+    "typecheck:plugins": "bun run scripts/typecheck-plugins.ts"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

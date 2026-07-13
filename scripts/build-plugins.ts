@@ -38,11 +38,11 @@ for (const name of plugins) {
       entrypoints: [entry],
       target: 'bun',
       outdir,
-      // Externalize the SDK so each plugin can declare its own pinned version
-      // of @instatic/plugin-sdk if needed (forks with different SDK versions).
-      external: ['@instatic/*'],
+      // Inline the SDK so the plugin is fully self-contained. A plugin's
+      // .tgz can then be uploaded to a fresh host install with no
+      // need to install @instatic/plugin-sdk separately.
+      // (Forks with multiple SDK versions can override via plugin-level bundler config.)
       format: 'esm',
-      target: 'bun',
       minify: false,
       sourcemap: 'linked',
     })

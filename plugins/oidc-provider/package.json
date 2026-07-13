@@ -9,7 +9,7 @@
   "keywords": ["instatic", "plugin", "oidc", "oauth2", "identity", "sso"],
   "license": "MIT",
   "instaticManifest": {
-    "id": "oidc-provider",
+    "id": "instatic.oidc-provider",
     "name": "OIDC Provider",
     "version": "0.1.0",
     "apiVersion": "1.0.0",

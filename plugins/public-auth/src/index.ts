@@ -57,14 +57,20 @@ interface PublicAuthSettings {
 }
 
 export default definePlugin({
-  id: 'public-auth',
+id: 'instatic.public-auth',
   name: 'Public Authentication',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes', 'cms.hooks']
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    // ─── Migrations ─────────────────────────────────────────────────────────
+export async function activate(api: any) {
+// ─── Migrations ─────────────────────────────────────────────────────────
     for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
@@ -226,14 +232,9 @@ export default definePlugin({
     })
 
     api.log.info('public-auth plugin activated')
-  },
+}
 
-  async deactivate(api) {
-    api.log.info('public-auth plugin deactivated')
-  },
+export async function deactivate(api: any) {
+api.log.info('public-auth plugin deactivated')
+}
 
-  // ─── Exported helpers for downstream plugins ─────────────────────────────
-  exports: {
-    resolveUserFromRequest,
-  },
-})

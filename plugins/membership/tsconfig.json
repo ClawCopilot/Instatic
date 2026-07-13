@@ -1,0 +1,29 @@
+{
+  "extends": "../../packages/plugin-sdk/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "types": [
+      "bun"
+    ],
+    "paths": {
+      "@instatic/plugin-sdk": [
+        "../../packages/plugin-sdk/index.ts"
+      ],
+      "@instatic/plugin-sdk/*": [
+        "../../packages/plugin-sdk/src/*"
+      ]
+    }
+  },
+  "include": [
+    "C:\\Users\\A5050\\Desktop\\workspace\\Instatic\\plugins\\membership\\src\\**\\*.ts"
+  ]
+}

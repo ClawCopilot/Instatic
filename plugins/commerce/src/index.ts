@@ -84,14 +84,20 @@ const PRODUCTS_TABLE_SCHEMA = {
 }
 
 export default definePlugin({
-  id: 'commerce',
+id: 'instatic.commerce',
   name: 'Commerce',
   version: '0.1.0',
+  permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes', 'cms.content.read', 'cms.content.write', 'cms.content.publish', 'cms.content.tables.manage', 'network.outbound', 'cms.hooks']
+})
 
-  migrations,
+export async function install(api: any) {
+  for (const migration of migrations) {
+    await api.cms.migrations.register(migration)
+  }
+}
 
-  async activate(api) {
-    // ─── Migrations ─────────────────────────────────────────────────────────
+export async function activate(api: any) {
+// ─── Migrations ─────────────────────────────────────────────────────────
     for (const migration of migrations) {
       await api.cms.migrations.register(migration)
     }
@@ -230,9 +236,9 @@ export default definePlugin({
     })
 
     api.log.info('commerce plugin activated')
-  },
+}
 
-  async deactivate(api) {
-    api.log.info('commerce plugin deactivated')
-  },
-})
+export async function deactivate(api: any) {
+api.log.info('commerce plugin deactivated')
+}
+

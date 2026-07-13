@@ -9,7 +9,7 @@
   "keywords": ["instatic", "plugin", "social-login", "oauth", "google", "github", "apple", "wechat"],
   "license": "MIT",
   "instaticManifest": {
-    "id": "social-login",
+    "id": "instatic.social-login",
     "name": "Social Login",
     "version": "0.1.0",
     "apiVersion": "1.0.0",
