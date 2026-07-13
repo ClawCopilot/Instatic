@@ -222,6 +222,79 @@ export default [
 
       create index if not exists product_variants_product_idx
         on product_variants (product_id, sort_order);
+
+      -- ─── Inventory reservations (prevent overselling) ───────────────
+      create table if not exists inventory_reservations (
+        id text primary key,
+        user_id text not null,
+        cart_id text not null,
+        product_id text not null,
+        variant_id text,
+        quantity integer not null check (quantity > 0),
+        expires_at timestamptz not null,
+        consumed_at timestamptz,
+        released_at timestamptz,
+        order_id text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        constraint inventory_reservations_variant_unique
+          unique (cart_id, variant_id)
+      );
+
+      create index if not exists inventory_reservations_active_idx
+        on inventory_reservations (product_id, variant_id, expires_at)
+        where consumed_at is null and released_at is null;
+
+      create index if not exists inventory_reservations_cart_idx
+        on inventory_reservations (cart_id);
+
+      -- ─── Shipping rates ────────────────────────────────────────────────
+      create table if not exists shipping_rates (
+        id text primary key,
+        country_code text not null,
+        region_code text,
+        min_subtotal_cents integer not null default 0,
+        max_subtotal_cents integer not null default 0,
+        min_weight_grams integer not null default 0,
+        max_weight_grams integer not null default 0,
+        cost_cents integer not null,
+        currency text not null default 'USD',
+        enabled boolean not null default true,
+        description text not null default '',
+        sort_order integer not null default 0,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+
+      create index if not exists shipping_rates_lookup_idx
+        on shipping_rates (country_code, enabled, sort_order)
+        where enabled = true;
+
+      -- ─── Order refunds ────────────────────────────────────────────────
+      create table if not exists order_refunds (
+        id text primary key,
+        order_id text not null references orders(id) on delete cascade,
+        amount_cents integer not null,
+        currency text not null,
+        reason text not null default '',
+        stripe_refund_id text,
+        status text not null default 'pending',
+        refunded_by_user_id text,
+        notes text,
+        created_at timestamptz not null default now(),
+        completed_at timestamptz,
+        constraint order_refunds_status_check
+          check (status in ('pending', 'succeeded', 'failed', 'canceled'))
+      );
+
+      create index if not exists order_refunds_order_idx
+        on order_refunds (order_id, created_at desc);
+
+      alter table orders
+        add column if not exists refunded_cents integer not null default 0;
+
+      alter table orders
+        add column if not exists shipping_method text;
     `,
     sqliteSql: `
       create table if not exists coupons (
@@ -267,6 +340,61 @@ export default [
         updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         unique (product_id, variant_key)
       );
+
+      create table if not exists inventory_reservations (
+        id text primary key,
+        user_id text not null,
+        cart_id text not null,
+        product_id text not null,
+        variant_id text,
+        quantity integer not null check (quantity > 0),
+        expires_at text not null,
+        consumed_at text,
+        released_at text,
+        order_id text,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        constraint inventory_reservations_variant_unique
+          unique (cart_id, variant_id)
+      );
+
+      create table if not exists shipping_rates (
+        id text primary key,
+        country_code text not null,
+        region_code text,
+        min_subtotal_cents integer not null default 0,
+        max_subtotal_cents integer not null default 0,
+        min_weight_grams integer not null default 0,
+        max_weight_grams integer not null default 0,
+        cost_cents integer not null,
+        currency text not null default 'USD',
+        enabled integer not null default 1,
+        description text not null default '',
+        sort_order integer not null default 0,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+
+      create table if not exists order_refunds (
+        id text primary key,
+        order_id text not null references orders(id) on delete cascade,
+        amount_cents integer not null,
+        currency text not null,
+        reason text not null default '',
+        stripe_refund_id text,
+        status text not null default 'pending',
+        refunded_by_user_id text,
+        notes text,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        completed_at text,
+        constraint order_refunds_status_check
+          check (status in ('pending', 'succeeded', 'failed', 'canceled'))
+      );
+
+      -- SQLite: ALTER TABLE ADD COLUMN is supported but not idempotent.
+      -- Use the try/catch wrapper via the schema_migrations safety.
+      alter table orders add column refunded_cents integer not null default 0;
+      alter table orders add column shipping_method text;
     `,
   },
 ]

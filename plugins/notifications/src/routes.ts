@@ -160,19 +160,23 @@ async function deliverToWebhooks(
   let lastError: string | null = null
   for (const webhook of webhooks) {
     const maxAttempts = settings.webhookRetries + 1
+    // Look up the plaintext signing secret (stored in plugin_secrets on create)
+    const { getWebhookSecret } = await import('./store')
+    const secret = await getWebhookSecret(api, webhook.id)
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // The receiver's secret is stored as a hash; we can't sign without
-        // the plaintext. In production, store the secret in plugin_secrets
-        // instead. For this stub, we send an unsigned payload marked as
-        // such; real signing is a TODO.
+        const headers: Record<string, string> = {
+          'content-type': 'application/json',
+          'x-instatic-event': event,
+          'x-instatic-webhook-id': webhook.id,
+        }
+        if (secret) {
+          const { signHmacPayload } = await import('../../_shared/hmacWebhook')
+          headers['x-instatic-signature'] = signHmacPayload(secret, payload)
+        }
         const response = await fetch(webhook.url, {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-instatic-event': event,
-            'x-instatic-webhook-id': webhook.id,
-          },
+          headers,
           body: payload,
         })
         if (response.ok) {

@@ -43,6 +43,16 @@ import {
   handleApplyCoupon,
   handleValidateCoupon,
 } from './couponRoutes'
+import {
+  handleAdminCreateRefund,
+  handleAdminDeleteShippingRate,
+  handleAdminListRefunds,
+  handleAdminListShippingRates,
+  handleAdminUpsertShippingRate,
+  handleReleaseCart,
+  handleReserveCart,
+  handleShippingQuote,
+} from './fulfillmentRoutes'
 
 interface CommerceSettings {
   stripeSecretKey: string
@@ -166,6 +176,44 @@ export default definePlugin({
     })
     await api.cms.routes.register('POST', '/api/admin/commerce/variants/:id/restock', 'content.manage', async (ctx, req, params) => {
       return handleAdminRestockVariant(ctx, req, params.id)
+    })
+
+    // ─── Shipping routes ──────────────────────────────────────────────────
+    const shippingSettings = {
+      freeShippingThresholdCents: Number(await api.settings.get('freeShippingThresholdCents')) || 0,
+      fallbackFlatRateCents: Number(await api.settings.get('fallbackFlatRateCents')) || 999,
+      defaultCurrency: (await api.settings.get('currency') as string) ?? 'USD',
+    }
+    await api.cms.routes.register('POST', '/api/commerce/shipping/quote', 'public', async (ctx, req) => {
+      return handleShippingQuote(ctx, req, shippingSettings)
+    })
+    await api.cms.routes.register('GET', '/api/admin/commerce/shipping-rates', 'content.manage', handleAdminListShippingRates)
+    await api.cms.routes.register('POST', '/api/admin/commerce/shipping-rates', 'content.manage', async (ctx, req) => {
+      return handleAdminUpsertShippingRate(ctx, req)
+    })
+    await api.cms.routes.register('DELETE', '/api/admin/commerce/shipping-rates/:id', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminDeleteShippingRate(ctx, params.id)
+    })
+
+    // ─── Reservation routes ───────────────────────────────────────────────
+    await api.cms.routes.register('POST', '/api/commerce/cart/reserve', 'authenticated', async (ctx, _req) => {
+      const userId = ((ctx as { userId?: string }).userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleReserveCart(ctx, userId)
+    })
+    await api.cms.routes.register('POST', '/api/commerce/cart/release', 'authenticated', async (ctx, _req) => {
+      const userId = ((ctx as { userId?: string }).userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleReleaseCart(ctx, userId)
+    })
+
+    // ─── Refund routes (admin) ────────────────────────────────────────────
+    await api.cms.routes.register('GET', '/api/admin/commerce/orders/:id/refunds', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminListRefunds(ctx, params.id)
+    })
+    await api.cms.routes.register('POST', '/api/admin/commerce/orders/:id/refund', 'content.manage', async (ctx, req, params) => {
+      const userId = (ctx as { userId?: string }).userId ?? ''
+      return handleAdminCreateRefund(ctx, req, params.id, settings, String(userId))
     })
 
     // ─── viewerContext: cart count ─────────────────────────────────────────

@@ -291,8 +291,11 @@ export async function recordWebhookDelivery(
 }
 
 export function signWebhookPayload(secret: string, body: string, timestamp: number): string {
-  const hmac = createHash('sha256')
-  hmac.update(`${timestamp}.${body}`)
-  const sig = hmac.digest('base64url')
-  return `t=${timestamp},v1=${sig}`
+  // Delegated to the shared hmacWebhook utility.
+  // The signature format is the same as Stripe's:
+  //   X-Instatic-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, `${t}.${body}`)>
+  return signHmacPayloadShared(secret, body, timestamp)
 }
+
+// Re-export from the shared utility (avoids cross-plugin import)
+import { signHmacPayload as signHmacPayloadShared } from '../../_shared/hmacWebhook'
