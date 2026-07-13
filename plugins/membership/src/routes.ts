@@ -35,11 +35,13 @@ import {
   recordSubscriptionStatus,
   updateTier,
 } from './store'
+import { verifyAndParseStripeWebhook } from '../_shared/stripeWebhook'
 
 interface MembershipSettings {
   gracePeriodDays: number
   trialDays: number
   stripeSecretKey?: string
+  stripeWebhookSecret?: string
 }
 
 function getMembershipTier(cell: unknown): string | null {

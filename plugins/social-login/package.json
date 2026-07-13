@@ -1,0 +1,122 @@
+{
+  "name": "@instatic/plugin-social-login",
+  "version": "0.1.0",
+  "description": "Social login bridges: Google, GitHub, Apple, WeChat. Auto-creates public_users on first social login, links to OIDC provider for token issuance.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "social-login", "oauth", "google", "github", "apple", "wechat"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "social-login",
+    "name": "Social Login",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "Social login bridges. Auto-provisions public_users from Google/GitHub/Apple/WeChat identity, then redirects into the OIDC authorize flow.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "network.outbound",
+      "cms.hooks"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "googleClientId",
+        "type": "string",
+        "label": "Google OAuth client ID",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "googleClientSecret",
+        "type": "string",
+        "label": "Google OAuth client secret",
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "githubClientId",
+        "type": "string",
+        "label": "GitHub OAuth app client ID",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "githubClientSecret",
+        "type": "string",
+        "label": "GitHub OAuth app client secret",
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "appleClientId",
+        "type": "string",
+        "label": "Apple Sign-In client ID (Services ID)",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "appleTeamId",
+        "type": "string",
+        "label": "Apple Developer Team ID",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "appleKeyId",
+        "type": "string",
+        "label": "Apple private key ID",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "applePrivateKey",
+        "type": "string",
+        "label": "Apple private key (PEM, with newlines)",
+        "required": false,
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "wechatAppId",
+        "type": "string",
+        "label": "WeChat Open Platform AppID",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "wechatAppSecret",
+        "type": "string",
+        "label": "WeChat AppSecret",
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "enabledProviders",
+        "type": "string",
+        "label": "Enabled providers (comma-separated)",
+        "description": "e.g. 'google,github' — only listed providers will accept callbacks.",
+        "default": "google,github"
+      }
+    ],
+    "networkAllowedHosts": [
+      "accounts.google.com",
+      "oauth2.googleapis.com",
+      "github.com",
+      "api.github.com",
+      "appleid.apple.com",
+      "openapi.work.weixin.qq.com"
+    ],
+    "dependencies": {
+      "plugins": ["public-auth", "oidc-provider"]
+    }
+  }
+}

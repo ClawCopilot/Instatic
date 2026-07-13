@@ -43,8 +43,10 @@ import {
   findClientByClientId,
   findConsent,
   findRefreshToken,
+  findRefreshTokenIncludingRevoked,
   listClients,
   recordConsent,
+  revokeTokenFamily,
   rotateRefreshToken,
   touchAccessToken,
   revokeAccessToken,
@@ -395,9 +397,41 @@ export async function handleToken(
     }
     case 'refresh_token': {
       const refreshToken = String(body.get('refresh_token') ?? '')
-      const existing = await findRefreshToken(api.db, hashToken(refreshToken))
+      const tokenHash = hashToken(refreshToken)
+      const existing = await findRefreshToken(api.db, tokenHash)
       if (!existing || existing.clientId !== client.clientId) {
         return Response.json({ error: 'invalid_grant' }, { status: 400 })
+      }
+      // ── Replay detection ─────────────────────────────────────────────
+      // The token hasn't been revoked yet AND hasn't expired. But we need
+      // to also check if a NEWER token in the same family has been issued
+      // (which would mean this token was already rotated). If so, this is
+      // a replay — the legitimate user has moved on; this caller is the
+      // attacker (or a misbehaving client).
+      const newerInFamily = await api.db`
+        select 1 from oidc_refresh_tokens
+        where rotated_from = ${tokenHash}
+          and revoked_at is null
+        limit 1
+      `
+      if (newerInFamily.length > 0) {
+        // REPLAY DETECTED — revoke the entire token family
+        const revokedCount = await revokeTokenFamily(api.db, tokenHash)
+        // Emit a hook so the security plugin can notify the user
+        await api.hooks.emit('oidc.tokenReplayDetected', {
+          userId: existing.userId,
+          clientId: existing.clientId,
+          tokenHashPrefix: tokenHash.slice(0, 8),
+          revokedCount,
+          clientIp: req.headers.get('x-forwarded-for'),
+          userAgent: req.headers.get('user-agent'),
+          detectedAt: new Date().toISOString(),
+        })
+        // TODO: log to oidc_token_replay_signals + rate-limit the client
+        return Response.json({
+          error: 'invalid_grant',
+          error_description: 'Token replay detected. All sessions for this client have been revoked.',
+        }, { status: 400 })
       }
       const issued = await issueTokens(api, settings, keyPair, client, existing.userId ?? '', existing.scopes)
       // Rotate refresh token (one-time use)

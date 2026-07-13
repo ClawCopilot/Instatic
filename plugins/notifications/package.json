@@ -1,0 +1,92 @@
+{
+  "name": "@instatic/plugin-notifications",
+  "version": "0.1.0",
+  "description": "Multi-channel notification delivery (email/SMS/webhook). Consumes hook events from other plugins and delivers them.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "notifications", "email", "sms", "webhook"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "notifications",
+    "name": "Notifications",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "Multi-channel notification delivery. Consumes hook events from other plugins (public-auth, commerce, membership) and delivers via email, SMS, or webhook.",
+    "permissions": [
+      "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
+      "cms.hooks",
+      "network.outbound"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "smtpHost",
+        "type": "string",
+        "label": "SMTP host",
+        "description": "Outgoing SMTP server hostname (e.g. smtp.sendgrid.net).",
+        "required": false,
+        "default": ""
+      },
+      {
+        "id": "smtpPort",
+        "type": "number",
+        "label": "SMTP port",
+        "default": 587
+      },
+      {
+        "id": "smtpUser",
+        "type": "string",
+        "label": "SMTP username",
+        "default": ""
+      },
+      {
+        "id": "smtpPassword",
+        "type": "string",
+        "label": "SMTP password",
+        "secret": true,
+        "default": ""
+      },
+      {
+        "id": "smtpFromAddress",
+        "type": "string",
+        "label": "From address",
+        "description": "e.g. noreply@example.com",
+        "default": ""
+      },
+      {
+        "id": "smtpFromName",
+        "type": "string",
+        "label": "From name",
+        "default": "Instatic"
+      },
+      {
+        "id": "webhookRetries",
+        "type": "number",
+        "label": "Webhook delivery retries",
+        "default": 3
+      },
+      {
+        "id": "siteName",
+        "type": "string",
+        "label": "Site display name (used in email templates)",
+        "default": "Our Site"
+      },
+      {
+        "id": "siteUrl",
+        "type": "string",
+        "label": "Public site URL (used in email links)",
+        "default": ""
+      }
+    ],
+    "networkAllowedHosts": []
+  }
+}

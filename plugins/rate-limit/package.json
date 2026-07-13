@@ -1,0 +1,48 @@
+{
+  "name": "@instatic/plugin-rate-limit",
+  "version": "0.1.0",
+  "description": "Per-IP and per-user rate limiting for public endpoints. Defends against brute force on login, signup, and API abuse.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
+  },
+  "keywords": ["instatic", "plugin", "rate-limit", "security"],
+  "license": "MIT",
+  "instaticManifest": {
+    "id": "rate-limit",
+    "name": "Rate Limit",
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "description": "Per-IP and per-user rate limiting. Sliding-window counters. Defends login/signup/API against brute force.",
+    "permissions": [
+      "cms.migrations",
+      "cms.httpMiddleware"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "defaultLimit",
+        "type": "number",
+        "label": "Default requests per minute (per IP)",
+        "default": 60
+      },
+      {
+        "id": "authLimit",
+        "type": "number",
+        "label": "Login/register limit per 15 min (per IP)",
+        "default": 10
+      },
+      {
+        "id": "trustProxy",
+        "type": "boolean",
+        "label": "Trust X-Forwarded-For header",
+        "description": "Enable when behind a reverse proxy (Caddy, nginx). Disable for direct exposure.",
+        "default": false
+      }
+    ]
+  }
+}

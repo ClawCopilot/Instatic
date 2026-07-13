@@ -39,6 +39,7 @@ import {
   updateCartLineItems,
   type CartLineItem,
 } from './store'
+import { verifyAndParseStripeWebhook } from '../_shared/stripeWebhook'
 
 interface CommerceSettings {
   stripeSecretKey: string
@@ -256,14 +257,15 @@ export async function handleStripeWebhook(
   req: Request,
   settings: CommerceSettings,
 ): Promise<Response> {
-  const body = await req.text()
-  // Verify Stripe signature (skipped in this example; required in production)
-  let event: { type: string; data: { object: Record<string, unknown> } }
-  try {
-    event = JSON.parse(body)
-  } catch {
-    return new Response('Invalid JSON', { status: 400 })
+  if (!settings.stripeWebhookSecret) {
+    return new Response('Webhook secret not configured', { status: 503 })
   }
+  const parsed = await verifyAndParseStripeWebhook(req, settings.stripeWebhookSecret)
+  if ('error' in parsed) {
+    api.log.warn(`Stripe webhook signature verification failed: ${parsed.error}`)
+    return new Response('Invalid signature', { status: 400 })
+  }
+  const event = parsed.event
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as {

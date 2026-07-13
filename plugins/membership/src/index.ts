@@ -41,6 +41,7 @@ interface MembershipSettings {
   gracePeriodDays: number
   trialDays: number
   stripeSecretKey?: string
+  stripeWebhookSecret?: string
 }
 
 export default definePlugin({
@@ -61,6 +62,7 @@ export default definePlugin({
       gracePeriodDays: Number(await api.settings.get('gracePeriodDays')) || 3,
       trialDays: Number(await api.settings.get('trialDays')) || 7,
       stripeSecretKey: (await api.settings.get('stripeSecretKey') as string) || undefined,
+      stripeWebhookSecret: (await api.settings.get('stripeWebhookSecret') as string) || undefined,
     }
 
     // ─── Public routes ─────────────────────────────────────────────────────

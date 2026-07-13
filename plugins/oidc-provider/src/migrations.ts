@@ -113,6 +113,25 @@ export default [
 
       create index if not exists oidc_consents_user_idx
         on oidc_consents (user_id);
+
+      -- Token theft signals: when a refresh token is used twice (replay),
+      -- we mark the family as suspicious and (optionally) lock the user.
+      create table if not exists oidc_token_replay_signals (
+        id text primary key,
+        token_hash text not null,
+        user_id text,
+        client_id text not null,
+        replayed_at timestamptz not null default now(),
+        family_root_hash text not null,
+        revoked_count integer not null,
+        client_ip text,
+        user_agent text,
+        notes text
+      );
+
+      create index if not exists oidc_replay_signals_user_idx
+        on oidc_token_replay_signals (user_id, replayed_at desc)
+        where user_id is not null;
     `,
     sqliteSql: `
       create table if not exists oidc_clients (

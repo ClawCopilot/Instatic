@@ -312,6 +312,90 @@ export async function findRefreshToken(
   } : null
 }
 
+/**
+ * Find a refresh token regardless of revocation state.
+ * Used by replay detection: if a token was already rotated, the second
+ * use is a replay (token theft) → revoke the entire token family.
+ */
+export async function findRefreshTokenIncludingRevoked(
+  db: DbClient,
+  tokenHash: string,
+): Promise<RefreshToken | null> {
+  const { rows } = await db`
+    select * from oidc_refresh_tokens
+    where token_hash = ${tokenHash}
+    limit 1
+  `
+  return rows[0] ? {
+    tokenHash: rows[0].token_hash,
+    accessTokenHash: rows[0].access_token_hash,
+    clientId: rows[0].client_id,
+    userId: rows[0].user_id,
+    scopes: parseJson<string[]>(rows[0].scopes_json),
+    expiresAt: rows[0].expires_at,
+    revokedAt: rows[0].revoked_at,
+    rotatedFrom: rows[0].rotated_from,
+    createdAt: rows[0].created_at,
+    lastUsedAt: rows[0].last_used_at,
+  } : null
+}
+
+/**
+ * Revoke the entire token family rooted at the given refresh token.
+ * Walks `rotated_from` chain to find the root, then revokes all tokens
+ * in the subtree.
+ *
+ * Called on replay detection: a refresh token was used twice, which
+ * means the second use is by an attacker (or a misbehaving client).
+ * The legitimate user's next refresh attempt will also fail, which is
+ * the cost we accept for prompt breach notification.
+ */
+export async function revokeTokenFamily(
+  db: DbClient,
+  rootTokenHash: string,
+): Promise<number> {
+  // Walk up to find the root
+  let current: string | null = rootTokenHash
+  let root: string = rootTokenHash
+  for (let i = 0; i < 1000 && current; i++) {  // bounded loop
+    const { rows } = await db<{ rotated_from: string | null }>`
+      select rotated_from from oidc_refresh_tokens where token_hash = ${current} limit 1
+    `
+    if (!rows[0]?.rotated_from) break
+    root = rows[0].rotated_from
+    current = rows[0].rotated_from
+  }
+  // Revoke the root + all descendants
+  const { rows: revoked } = await db`
+    with recursive family as (
+      select token_hash from oidc_refresh_tokens where token_hash = ${root}
+      union all
+      select rt.token_hash from oidc_refresh_tokens rt
+      join family f on rt.rotated_from = f.token_hash
+    )
+    update oidc_refresh_tokens
+    set revoked_at = now()
+    where token_hash in (select token_hash from family) and revoked_at is null
+    returning token_hash
+  `
+  // Also revoke all access tokens issued from this family
+  await db`
+    update oidc_access_tokens
+    set revoked_at = now()
+    where user_id in (
+      select user_id from oidc_refresh_tokens where token_hash = ${root}
+    )
+      and client_id in (
+        select client_id from oidc_refresh_tokens where token_hash = ${root}
+      )
+      and created_at > (
+        select created_at from oidc_refresh_tokens where token_hash = ${root}
+      )
+      and revoked_at is null
+  `
+  return revoked.length
+}
+
 export async function rotateRefreshToken(
   db: DbClient,
   oldHash: string,
