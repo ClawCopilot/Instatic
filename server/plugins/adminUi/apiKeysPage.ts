@@ -238,7 +238,7 @@ export function renderApiKeysPage(): string {
         }
 
         async function loadApiKeys() {
-          const { ok, data } = await api('GET', '/admin/api/cms/api-keys')
+          const { ok, data } = await api('GET', '/admin/api/keys')
           if (!ok) { showAlert('apikeys-alert', 'error', 'Failed to load API keys'); return }
           const tb = document.getElementById('apikeys-tbody')
           if (!data.keys?.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">No API keys yet. Create one to get started.</td></tr>'; return }
@@ -269,7 +269,7 @@ export function renderApiKeysPage(): string {
           if (scope === 'public' && capsRaw) {
             body.capabilities = capsRaw.split(',').map(s => s.trim()).filter(Boolean)
           }
-          const { ok, data } = await api('POST', '/admin/api/cms/api-keys', body)
+          const { ok, data } = await api('POST', '/admin/api/keys', body)
           if (!ok) { showAlert('apikeys-alert', 'error', data.error || 'Failed to create'); return }
           document.getElementById('apikeys-create-modal').style.display = 'none'
           document.getElementById('apikeys-token-display').textContent = data.token
@@ -277,7 +277,7 @@ export function renderApiKeysPage(): string {
         }
         async function revokeApiKey(id) {
           if (!confirm('Revoke this API key? Clients using it will stop working immediately.')) return
-          const { ok, data } = await api('DELETE', '/admin/api/cms/api-keys/' + id)
+          const { ok, data } = await api('DELETE', '/admin/api/keys/' + id)
           if (!ok) { showAlert('apikeys-alert', 'error', data.error || 'Failed to revoke'); return }
           showAlert('apikeys-alert', 'success', 'API key revoked')
           loadApiKeys()
@@ -484,14 +484,61 @@ export function renderMembershipTiersPage(): string {
       <script>
         let editingTierId = null
         async function loadTiers() {
-          const { ok, data } = await api('GET', '/api/admin/commerce/coupons')  // placeholder
-          const r = await api('GET', '/api/admin/commerce/coupons')  // try real one
-          if (!r.ok) { showAlert('tiers-alert', 'error', 'Failed to load tiers (is membership plugin activated?)'); return }
-          // Hmm, the coupon endpoint returns coupons, not tiers. Use the correct endpoint:
-          // We don't have a list-tiers endpoint registered. For now, return empty.
-          // TODO: add a /api/admin/membership/tiers endpoint.
+          const r = await api('GET', '/admin/api/membership/tiers')
+          if (!r.ok) {
+            showAlert('tiers-alert', 'error', 'Failed to load tiers (is the membership plugin activated?)')
+            return
+          }
+          const tiers = r.data.tiers || []
           const tb = document.getElementById('tiers-tbody')
-          tb.innerHTML = '<tr><td colspan="7" class="empty">Tier management UI requires the membership plugin to expose a list-tiers endpoint. <a href="/admin/plugins">Configure membership plugin</a> first.</td></tr>'
+          if (!tiers.length) {
+            tb.innerHTML = '<tr><td colspan="7" class="empty">No tiers yet. Create one to get started.</td></tr>'
+            return
+          }
+          tb.innerHTML = tiers.sort((a, b) => a.rank - b.rank).map(t => {
+            const priceStr = t.priceCents === 0
+              ? 'Free'
+              : (t.priceCents / 100).toFixed(2) + ' ' + t.currency
+            return \`
+              <tr>
+                <td><span class="pill">\${t.rank}</span></td>
+                <td><code>\${escapeHtml(t.slug)}</code></td>
+                <td><strong>\${escapeHtml(t.name)}</strong></td>
+                <td>\${priceStr}</td>
+                <td>\${t.billingInterval}</td>
+                <td>\${t.enabled ? '<span class="pill scope-public">active</span>' : '<span class="pill">disabled</span>'}</td>
+                <td>
+                  <button class="secondary" onclick="editTier('\${t.id}')">Edit</button>
+                  <button class="danger" onclick="deleteTier('\${t.id}')">Delete</button>
+                </td>
+              </tr>
+            \`
+          }).join('')
+        }
+        function editTier(id) {
+          // Pre-populate modal and save as update
+          api('GET', '/admin/api/membership/tiers').then(r => {
+            const t = r.data.tiers.find(x => x.id === id)
+            if (!t) return
+            document.getElementById('tiers-modal-title').textContent = 'Edit Tier'
+            document.getElementById('tier-slug').value = t.slug
+            document.getElementById('tier-slug').disabled = true  // slug is identity
+            document.getElementById('tier-name').value = t.name
+            document.getElementById('tier-rank').value = t.rank
+            document.getElementById('tier-currency').value = t.currency
+            document.getElementById('tier-price').value = t.priceCents
+            document.getElementById('tier-interval').value = t.billingInterval
+            document.getElementById('tier-description').value = t.description
+            editingTierId = id
+            document.getElementById('tiers-create-modal').style.display = 'flex'
+          })
+        }
+        async function deleteTier(id) {
+          if (!confirm('Delete this tier? Active subscribers retain access until their period ends.')) return
+          const { ok, data } = await api('DELETE', '/admin/api/membership/tiers/' + id)
+          if (!ok) { showAlert('tiers-alert', 'error', data.error || 'Failed to delete'); return }
+          showAlert('tiers-alert', 'success', 'Tier deleted')
+          loadTiers()
         }
         function showCreateTier() {
           editingTierId = null
@@ -505,7 +552,31 @@ export function renderMembershipTiersPage(): string {
           document.getElementById('tiers-create-modal').style.display = 'flex'
         }
         async function saveTier() {
-          showAlert('tiers-alert', 'error', 'Tier list/create API not yet exposed by membership plugin. See TODO in code.')
+          const body = {
+            slug: document.getElementById('tier-slug').value.trim(),
+            name: document.getElementById('tier-name').value.trim(),
+            description: document.getElementById('tier-description').value.trim(),
+            rank: Number(document.getElementById('tier-rank').value),
+            currency: document.getElementById('tier-currency').value.trim() || 'USD',
+            priceCents: Number(document.getElementById('tier-price').value),
+            billingInterval: document.getElementById('tier-interval').value,
+          }
+          if (!body.slug || !body.name) {
+            showAlert('tiers-alert', 'error', 'Slug and name are required')
+            return
+          }
+          let res
+          if (editingTierId) {
+            res = await api('PATCH', '/admin/api/membership/tiers/' + editingTierId, body)
+          } else {
+            res = await api('POST', '/admin/api/membership/tiers', body)
+          }
+          if (!res.ok) { showAlert('tiers-alert', 'error', res.data.error || 'Failed to save'); return }
+          document.getElementById('tiers-create-modal').style.display = 'none'
+          document.getElementById('tier-slug').disabled = false
+          editingTierId = null
+          showAlert('tiers-alert', 'success', editingTierId ? 'Tier updated' : 'Tier created')
+          loadTiers()
         }
         loadTiers()
       </script>

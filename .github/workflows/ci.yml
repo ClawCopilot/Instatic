@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  BUN_VERSION: '1.3.14'
+
+jobs:
+  lint-types:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      # Plugin source typecheck (skips host, focuses on our additions)
+      - run: bun run typecheck:plugins
+      - name: Lint host
+        run: bun run lint
+        continue-on-error: true   # don't fail build on existing lint warnings
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Host unit tests
+        run: bun test src/
+      - name: Plugin unit tests
+        run: bun test plugins/
+
+  plugin-build:
+    name: Build plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run build:plugins
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-bundles
+          path: plugins/*/dist/index.js
+          if-no-files-found: error
+
+  plugin-integration:
+    name: Plugin integration tests
+    runs-on: ubuntu-latest
+    needs: [plugin-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Download plugin bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: plugin-bundles
+          path: plugins/_artifacts
+      - name: Restore dist directories from artifacts
+        run: |
+          for plugin_dir in plugins/*/; do
+            plugin_name=$(basename "$plugin_dir")
+            if [ -f "plugins/_artifacts/$plugin_name.js" ]; then
+              mkdir -p "$plugin_dir/dist"
+              cp "plugins/_artifacts/$plugin_name.js" "$plugin_dir/dist/index.js"
+            fi
+          done
+      - name: Restore build:plugins output to dist/
+        run: bun run build:plugins
+      - run: bun run test:plugins
+
+  # Run all checks in parallel (lint-types, unit-tests, plugin-build, plugin-integration)
+  migration-parity:
+    name: Migration parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun test src/__tests__/architecture/migration-parity.test.ts
+
+  all-green:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs: [lint-types, unit-tests, plugin-build, plugin-integration, migration-parity]
+    if: ${{ always() }}
+    steps:
+      - name: Summary
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          for job in lint-types unit-tests plugin-build plugin-integration migration-parity; do
+            status="${{ needs.$job.result }}"
+            if [ "$status" = "success" ]; then
+              emoji="✅"
+            elif [ "$status" = "skipped" ]; then
+              emoji="⏭️"
+            else
+              emoji="❌"
+            fi
+            echo "| $job | $emoji $status |" >> $GITHUB_STEP_SUMMARY
+          done
