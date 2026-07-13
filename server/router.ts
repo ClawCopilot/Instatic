@@ -87,6 +87,7 @@ const routes: readonly RouteHandler[] = [
   tryServeStaticAsset,
   tryServeUpload,
   tryServeAdminApp,
+  tryServePluginAdminPages,
   tryServePublicRoute,
   // Plugin public routes — registered prefixes that own their own HTTP
   // paths (OAuth endpoints, /api/auth/*, /api/webhooks/*). Matched AFTER
@@ -469,6 +470,20 @@ async function tryServeAdminApp(
  * fast-path (pre-rendered static artefacts via `readArtefact`), then
  * `resolvePublicRoute`, then the live renderer + `applyPublishedHtmlPipeline`.
  */
+async function tryServePluginAdminPages(req: Request, runtime: ServerRuntime, _url: URL, pathname: string): Promise<Response | null> {
+  // Self-contained HTML admin/marketplace pages for plugin management.
+  // Matched AFTER tryServeAdminApp so /admin/* continues to be owned
+  // by the host's React admin shell.
+  if (pathname !== '/marketplace' &&
+      pathname !== '/admin/plugins/api-keys' &&
+      pathname !== '/admin/plugins/oidc-clients' &&
+      pathname !== '/admin/plugins/membership-tiers') {
+    return null
+  }
+  const { handlePluginAdminPages } = await import('./plugins/adminUi/routes')
+  return await handlePluginAdminPages(req, runtime.db, pathname)
+}
+
 async function tryServePublicRoute(req: Request, runtime: ServerRuntime, url: URL, _pathname: string): Promise<Response | null> {
   if (req.method !== 'GET') return null
   return await renderPublicResolution(runtime.db, url, runtime.uploadsDir)
