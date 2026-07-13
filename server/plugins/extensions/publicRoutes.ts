@@ -33,7 +33,7 @@
  *   or the `cms.http.resolveApiKey` helper exposed below.
  */
 
-import type { RouteHandler } from '../../router'
+import type { RouteHandler } from '../../routerTypes'
 
 interface PublicRouteEntry {
   pluginId: string
