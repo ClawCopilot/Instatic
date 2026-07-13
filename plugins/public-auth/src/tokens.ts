@@ -105,6 +105,10 @@ export function verifyAccessToken(token: string, secret: string): VerifyResult {
   return { ok: true, claims }
 }
 
+export function hashForStorage(token: string): string {
+  return hashAccessToken(token)
+}
+
 export function hashAccessToken(token: string): string {
   // SHA-256 hex — same scheme as api-keys plugin
   return Buffer.from(token).toString('base64url').slice(0, 43) // truncate to base64url-safe fingerprint

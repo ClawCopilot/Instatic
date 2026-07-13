@@ -298,4 +298,4 @@ export function signWebhookPayload(secret: string, body: string, timestamp: numb
 }
 
 // Re-export from the shared utility (avoids cross-plugin import)
-import { signHmacPayload as signHmacPayloadShared } from '../../_shared/hmacWebhook'
+import { signHmacPayload as signHmacPayloadShared } from '@instatic/plugin-sdk/shared/hmacWebhook'

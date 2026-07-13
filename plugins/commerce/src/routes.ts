@@ -39,7 +39,7 @@ import {
   updateCartLineItems,
   type CartLineItem,
 } from './store'
-import { verifyAndParseStripeWebhook } from '../_shared/stripeWebhook'
+import { verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
 
 interface CommerceSettings {
   stripeSecretKey: string

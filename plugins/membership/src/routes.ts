@@ -35,7 +35,7 @@ import {
   recordSubscriptionStatus,
   updateTier,
 } from './store'
-import { verifyAndParseStripeWebhook } from '../_shared/stripeWebhook'
+import { verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
 
 interface MembershipSettings {
   gracePeriodDays: number

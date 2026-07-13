@@ -17,6 +17,9 @@
     "url": "https://github.com/clawcopilot/instatic/issues"
   },
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run scripts/dev.ts",
     "dev:agent": "bun run dev:server",
@@ -55,7 +58,8 @@
     "bench:health": "bun run scripts/bench/index.ts --only=health",
     "bench:browser": "bun run scripts/bench/index.ts --only=browser",
     "bench:browser:install": "bunx playwright install chromium",
-    "doctor": "react-doctor"
+    "doctor": "react-doctor",
+    "build:plugins": "bun run scripts/build-plugins.ts"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

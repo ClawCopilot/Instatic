@@ -6,6 +6,9 @@
   "scripts": {
     "build": "bun build src/index.ts --target=bun --outdir=dist --external @instatic/*"
   },
+  "dependencies": {
+    "hash-wasm": "^4.12.0"
+  },
   "keywords": ["instatic", "plugin", "authentication", "jwt", "users"],
   "license": "MIT",
   "instaticManifest": {

@@ -40,7 +40,7 @@ export interface NotificationSettings {
   siteUrl: string
 }
 
-const DEFAULT_TEMPLATES: Array<{ event: string; channel: 'email' | 'webhook'; subject: string; body: string; format: 'text' | 'html' | 'json' }> = [
+export const DEFAULT_TEMPLATES: Array<{ event: string; channel: 'email' | 'webhook'; subject: string; body: string; format: 'text' | 'html' | 'json' }> = [
   {
     event: 'public-auth.userRegistered',
     channel: 'email',
@@ -171,7 +171,7 @@ async function deliverToWebhooks(
           'x-instatic-webhook-id': webhook.id,
         }
         if (secret) {
-          const { signHmacPayload } = await import('../../_shared/hmacWebhook')
+          const { signHmacPayload } = await import('@instatic/plugin-sdk/shared/hmacWebhook')
           headers['x-instatic-signature'] = signHmacPayload(secret, payload)
         }
         const response = await fetch(webhook.url, {

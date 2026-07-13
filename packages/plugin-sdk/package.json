@@ -1,0 +1,30 @@
+{
+  "name": "@instatic/plugin-sdk",
+  "version": "0.1.0",
+  "description": "Plugin SDK for Instatic — types, builders, and the API surface available to plugin server entrypoints.",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*",
+    "./shared": "./src/shared/index.ts",
+    "./shared/*": "./src/shared/*"
+  },
+  "files": [
+    "index.ts",
+    "types",
+    "builders",
+    "modules.ts",
+    "capabilities.ts",
+    "contentSchemas.ts",
+    "storageSchemas.ts",
+    "guards.ts",
+    "src/shared",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}
