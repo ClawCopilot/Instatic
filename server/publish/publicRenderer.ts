@@ -14,6 +14,7 @@ import type { Page } from '@core/page-tree'
 import type { SiteCssBundle } from '@core/publisher'
 import type { PublishedDataRow } from '@core/data/schemas'
 import type { DbClient } from '../db/client'
+import { resolveViewerContext } from '../plugins/extensions/viewerContext'
 import type { PublishedPageSnapshot } from '../repositories/publish'
 
 /**

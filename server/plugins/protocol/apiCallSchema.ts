@@ -30,6 +30,11 @@ import {
 } from './schemas/media'
 import { CryptoDigestArgSchema, CryptoSignHmacArgSchema } from './schemas/crypto'
 import {
+  MigrationsRegisterArgSchema,
+  PublicRoutesRegisterArgSchema,
+  HttpMiddlewareRegisterArgSchema,
+} from './schemas/extensions'
+import {
   ContentEntriesCreateArgsSchema,
   ContentEntriesCreateManyArgsSchema,
   ContentEntriesDeleteArgsSchema,

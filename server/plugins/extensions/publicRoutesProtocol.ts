@@ -22,13 +22,15 @@
  * at path X") during install.
  */
 
-import type { ApiCallFor } from '../../protocol/apiCallSchema'
-import type { DbClient } from '../../../db/client'
-import { replyApiOk } from '../apiReplies'
+import type { ApiCallFor } from '../protocol/apiCallSchema'
+import type { DbClient } from '../../db/client'
+import type { HostPluginRecord } from '../host/types'
+import { replyApiOk } from '../host/apiReplies'
 import { registerPluginPublicRoute } from './publicRoutes'
 
 export async function handlePublicRoutesRegister(
   msg: ApiCallFor<'cms.publicRoutes.register'>,
+  _entry: HostPluginRecord,
   _db: DbClient,
 ): Promise<void> {
   const [{ prefix, exclusive }] = msg.args
@@ -39,7 +41,7 @@ export async function handlePublicRoutesRegister(
   // plugin runtime), so the plugin code can use the existing
   // `api.cms.routes.register('/api/auth/login', ...)` to register the
   // concrete route handler.
-  const handler = async (req: Request, runtime: { db: DbClient; uploadsDir?: string; databaseUrl?: string }, _url: URL, pathname: string): Promise<Response | null> => {
+  const handler = async (req: Request, _runtime: { db: DbClient; uploadsDir?: string; databaseUrl?: string }, _url: URL, pathname: string): Promise<Response | null> => {
     const { findPluginRouteAccess, runRouteInWorker } = await import('../host/rpc')
     const route = findPluginRouteAccess(msg.pluginId, req.method, pathname)
     if (!route) {
