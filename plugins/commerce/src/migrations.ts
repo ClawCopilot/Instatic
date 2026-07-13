@@ -162,4 +162,111 @@ export default [
         on inventory_ledger (product_id, created_at desc);
     `,
   },
+  {
+    id: 'commerce.002_coupons_and_variants',
+    pgSql: `
+      -- ─── Coupons / discount codes ──────────────────────────────────────
+      create table if not exists coupons (
+        id text primary key,
+        code text not null unique,
+        type text not null,
+        value integer not null,
+        min_order_cents integer not null default 0,
+        max_uses integer not null default 0,
+        max_uses_per_user integer not null default 0,
+        current_uses integer not null default 0,
+        valid_from timestamptz not null,
+        valid_until timestamptz not null,
+        applicable_to_json jsonb not null default '{}'::jsonb,
+        enabled boolean not null default true,
+        description text not null default '',
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        constraint coupons_type_check check (type in ('percent', 'fixed'))
+      );
+
+      create index if not exists coupons_enabled_valid_idx
+        on coupons (enabled, valid_from, valid_until);
+
+      create table if not exists coupon_redemptions (
+        id text primary key,
+        coupon_id text not null references coupons(id) on delete cascade,
+        user_id text not null,
+        order_id text not null references orders(id) on delete cascade,
+        discount_cents integer not null,
+        redeemed_at timestamptz not null default now()
+      );
+
+      create index if not exists coupon_redemptions_coupon_idx
+        on coupon_redemptions (coupon_id, redeemed_at desc);
+
+      create index if not exists coupon_redemptions_user_idx
+        on coupon_redemptions (user_id, redeemed_at desc);
+
+      -- ─── Product variants ──────────────────────────────────────────────
+      create table if not exists product_variants (
+        id text primary key,
+        product_id text not null,
+        variant_key text not null,
+        sku text not null,
+        label text not null,
+        price_cents integer not null,
+        currency text not null default 'USD',
+        enabled boolean not null default true,
+        sort_order integer not null default 0,
+        attributes_json jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique (product_id, variant_key)
+      );
+
+      create index if not exists product_variants_product_idx
+        on product_variants (product_id, sort_order);
+    `,
+    sqliteSql: `
+      create table if not exists coupons (
+        id text primary key,
+        code text not null unique,
+        type text not null,
+        value integer not null,
+        min_order_cents integer not null default 0,
+        max_uses integer not null default 0,
+        max_uses_per_user integer not null default 0,
+        current_uses integer not null default 0,
+        valid_from text not null,
+        valid_until text not null,
+        applicable_to_json text not null default '{}',
+        enabled integer not null default 1,
+        description text not null default '',
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        constraint coupons_type_check check (type in ('percent', 'fixed'))
+      );
+
+      create table if not exists coupon_redemptions (
+        id text primary key,
+        coupon_id text not null references coupons(id) on delete cascade,
+        user_id text not null,
+        order_id text not null references orders(id) on delete cascade,
+        discount_cents integer not null,
+        redeemed_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+
+      create table if not exists product_variants (
+        id text primary key,
+        product_id text not null,
+        variant_key text not null,
+        sku text not null,
+        label text not null,
+        price_cents integer not null,
+        currency text not null default 'USD',
+        enabled integer not null default 1,
+        sort_order integer not null default 0,
+        attributes_json text not null default '{}',
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        unique (product_id, variant_key)
+      );
+    `,
+  },
 ]

@@ -30,6 +30,19 @@ import {
   handleStripeWebhook,
   handleUpdateCartItem,
 } from './routes'
+import {
+  handleAdminCreateCoupon,
+  handleAdminDeleteCoupon,
+  handleAdminDeleteVariant,
+  handleAdminListCoupons,
+  handleAdminListRedemptions,
+  handleAdminListVariants,
+  handleAdminRestockVariant,
+  handleAdminSyncVariants,
+  handleAdminUpdateCoupon,
+  handleApplyCoupon,
+  handleValidateCoupon,
+} from './couponRoutes'
 
 interface CommerceSettings {
   stripeSecretKey: string
@@ -122,6 +135,37 @@ export default definePlugin({
     })
     await api.cms.routes.register('POST', '/admin/api/commerce/products/:id/restock', 'content.manage', async (ctx, req, params) => {
       return handleAdminRestock(ctx, req, params.id)
+    })
+
+    // ─── Coupon routes ────────────────────────────────────────────────────
+    await api.cms.routes.register('POST', '/api/commerce/coupons/validate', 'authenticated', handleValidateCoupon)
+    await api.cms.routes.register('POST', '/api/commerce/coupons/apply', 'authenticated', handleApplyCoupon)
+    await api.cms.routes.register('GET', '/api/admin/commerce/coupons', 'content.manage', handleAdminListCoupons)
+    await api.cms.routes.register('POST', '/api/admin/commerce/coupons', 'content.manage', async (ctx, req) => {
+      return handleAdminCreateCoupon(ctx, req)
+    })
+    await api.cms.routes.register('PATCH', '/api/admin/commerce/coupons/:id', 'content.manage', async (ctx, req, params) => {
+      return handleAdminUpdateCoupon(ctx, req, params.id)
+    })
+    await api.cms.routes.register('DELETE', '/api/admin/commerce/coupons/:id', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminDeleteCoupon(ctx, params.id)
+    })
+    await api.cms.routes.register('GET', '/api/admin/commerce/coupons/:id/redemptions', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminListRedemptions(ctx, params.id)
+    })
+
+    // ─── Variant routes (admin) ───────────────────────────────────────────
+    await api.cms.routes.register('GET', '/api/admin/commerce/products/:productId/variants', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminListVariants(ctx, params.productId)
+    })
+    await api.cms.routes.register('POST', '/api/admin/commerce/products/:productId/variants', 'content.manage', async (ctx, req, params) => {
+      return handleAdminSyncVariants(ctx, req, params.productId)
+    })
+    await api.cms.routes.register('DELETE', '/api/admin/commerce/variants/:id', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminDeleteVariant(ctx, params.id)
+    })
+    await api.cms.routes.register('POST', '/api/admin/commerce/variants/:id/restock', 'content.manage', async (ctx, req, params) => {
+      return handleAdminRestockVariant(ctx, req, params.id)
     })
 
     // ─── viewerContext: cart count ─────────────────────────────────────────

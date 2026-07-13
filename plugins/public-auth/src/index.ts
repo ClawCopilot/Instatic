@@ -30,8 +30,23 @@ import {
   handleVerifyEmail,
   resolveUserFromRequest,
 } from './routes'
+import { handleDelete, handleExport } from './gdprRoutes'
+import {
+  handleMfaDisable,
+  handleMfaEnable,
+  handleMfaRegenerateRecoveryCodes,
+  handleMfaSetup,
+  handleMfaVerify,
+  issueMfaToken,
+} from './mfaRoutes'
+import { handlePasswordlessRequest, handlePasswordlessVerify } from './passwordless'
 import { extractBearerToken, extractCookieToken, hashForStorage, verifyAccessToken } from './tokens'
 import { findActiveSession } from './store'
+
+interface MfaSettings {
+  jwtSecret: string
+  mfaTokenTtlSeconds: number
+}
 
 const COOKIE_NAME = 'public_auth_token'
 
@@ -103,6 +118,65 @@ export default definePlugin({
     })
     await api.cms.routes.register('POST', '/api/auth/password-reset/confirm', 'public', async (ctx, req) => {
       return handlePasswordResetConfirm({ ...ctx, ...publicHandlers }, req)
+    })
+
+    // ─── GDPR routes (authenticated) ──────────────────────────────────────
+    await api.cms.routes.register('GET', '/api/auth/me/export', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleExport(ctx, userId)
+    })
+    await api.cms.routes.register('POST', '/api/auth/me/delete', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleDelete(ctx, userId, req)
+    })
+
+    // ─── MFA / 2FA routes ───────────────────────────────────────────────────
+    const mfaSettings: MfaSettings = {
+      jwtSecret: settings.jwtSecret,
+      mfaTokenTtlSeconds: 300,  // 5 min
+    }
+    await api.cms.routes.register('POST', '/api/auth/mfa/setup', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleMfaSetup(ctx, userId, mfaSettings)
+    })
+    await api.cms.routes.register('POST', '/api/auth/mfa/enable', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleMfaEnable(ctx, userId, req, mfaSettings)
+    })
+    await api.cms.routes.register('POST', '/api/auth/mfa/disable', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleMfaDisable(ctx, userId, req)
+    })
+    await api.cms.routes.register('POST', '/api/auth/mfa/verify', 'public', async (ctx, req) => {
+      return handleMfaVerify(ctx, req, mfaSettings)
+    })
+    await api.cms.routes.register('POST', '/api/auth/mfa/recovery-codes/regenerate', 'authenticated', async (ctx, req) => {
+      const userId = (ctx.userId ?? '') as string
+      if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
+      return handleMfaRegenerateRecoveryCodes(ctx, userId, req)
+    })
+
+    // Expose issueMfaToken for downstream plugins (login flow integration)
+    ;(api as { exports?: Record<string, unknown> }).exports = {
+      issueMfaToken: (userId: string) => issueMfaToken(userId, mfaSettings),
+    }
+
+    // ─── Passwordless login ────────────────────────────────────────────────
+    const passwordlessSettings = {
+      baseUrl: (await api.settings.get('siteUrl') as string) ?? 'http://localhost:3000',
+      jwtSecret: settings.jwtSecret,
+      mfaTokenTtlSeconds: 300,
+    }
+    await api.cms.routes.register('POST', '/api/auth/passwordless/request', 'public', async (ctx, req) => {
+      return handlePasswordlessRequest(ctx, req, passwordlessSettings)
+    })
+    await api.cms.routes.register('GET', '/api/auth/passwordless/verify', 'public', async (ctx, req) => {
+      return handlePasswordlessVerify(ctx, req, passwordlessSettings)
     })
 
     // ─── Admin endpoints ───────────────────────────────────────────────────

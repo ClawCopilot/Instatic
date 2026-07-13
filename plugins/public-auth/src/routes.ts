@@ -163,6 +163,25 @@ export async function handleLogin(
     return jsonError('invalid_credentials', 401)
   }
   await recordSuccessfulLogin(api.db, user.id)
+  // ── 2FA gate ─────────────────────────────────────────────────────────
+  // If the user has 2FA enabled, return an mfaToken (NOT a full access
+  // token). The client POSTs to /api/auth/mfa/verify with the mfaToken +
+  // a 6-digit code; the verify endpoint exchanges them for the real token.
+  if (user.emailVerifiedAt && (await isMfaEnabled(api, user.id))) {
+    const { issueMfaToken } = await import('./mfaRoutes')
+    const mfaToken = issueMfaToken(user.id, { jwtSecret: settings.jwtSecret, mfaTokenTtlSeconds: 300 })
+    await api.hooks.emit('public-auth.userLoggedIn', { userId: user.id, sessionId: 'pending-mfa' })
+    return Response.json({
+      requiresMfa: true,
+      mfaToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        emailVerified: true,
+      },
+    })
+  }
   const token = await issueSession(api, user.id, req, settings)
   await api.hooks.emit('public-auth.userLoggedIn', {
     userId: user.id,
@@ -178,6 +197,15 @@ export async function handleLogin(
     },
     expiresAt: token.expiresAt,
   })
+}
+
+async function isMfaEnabled(api: ApiCallContext, userId: string): Promise<boolean> {
+  const { rows } = await api.db`
+    select mfa_enabled_at from public_users
+    where id = ${userId} and deleted_at is null
+    limit 1
+  `
+  return !!rows[0]?.mfa_enabled_at
 }
 
 interface IssuedToken {
