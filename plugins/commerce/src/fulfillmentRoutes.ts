@@ -31,6 +31,7 @@ import {
   listRefundsForOrder,
   markRefundFailed,
   markRefundSucceeded,
+  recordManualRefund,
   validateRefundAmount,
   type _Refund,
 } from './refunds'
@@ -177,7 +178,7 @@ export async function handleAdminCreateRefund(
   settings: { stripeSecretKey: string },
   userId: string,
 ): Promise<Response> {
-  let body: { amountCents?: number; reason?: string; notes?: string }
+  let body: { amountCents?: number; reason?: string; notes?: string; method?: string }
   try {
     body = await req.json() as typeof body
   } catch {
@@ -200,6 +201,18 @@ export async function handleAdminCreateRefund(
     refundedByUserId: userId,
     notes: body.notes ?? null,
   })
+
+  // 非 Stripe 手动退款方式
+  const isManualMethod = body.method && body.method !== 'stripe'
+  if (isManualMethod) {
+    await recordManualRefund(
+      api.db,
+      refund.id,
+      body.method as 'bank_transfer' | 'store_credit' | 'cash' | 'other',
+    )
+    return Response.json({ refundId: refund.id, method: body.method, status: 'succeeded' })
+  }
+
   // Call Stripe
   if (!settings.stripeSecretKey) {
     return Response.json({

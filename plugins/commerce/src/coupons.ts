@@ -23,7 +23,7 @@
 import { randomBytes } from 'node:crypto'
 import type { DbClient } from '@instatic/plugin-sdk/host'
 
-export type CouponType = 'percent' | 'fixed'
+export type CouponType = 'percent' | 'fixed' | 'bogo' | 'free_shipping'
 
 export interface Coupon {
   id: string
@@ -251,8 +251,13 @@ export function computeDiscount(coupon: Coupon, applicableSubtotalCents: number)
   if (coupon.type === 'percent') {
     return Math.floor((applicableSubtotalCents * coupon.value) / 100)
   }
-  // fixed
-  return Math.min(coupon.value, applicableSubtotalCents)
+  if (coupon.type === 'fixed') {
+    return Math.min(coupon.value, applicableSubtotalCents)
+  }
+  // BOGO 和免运费类型不直接产生折扣金额
+  // BOGO: 标记为"可用"，checkout 层负责买一送一逻辑
+  // free_shipping: 标记为"可用"，shipping 模块负责免除运费
+  return 0
 }
 
 /**

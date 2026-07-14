@@ -103,7 +103,7 @@ X-Instatic-Webhook-Id: wh_abc123
 }
 ```
 
-**TODO**: Implement HMAC signature verification (header `X-Instatic-Signature` with `t=...,v1=...` format). Currently the secret is stored hashed; for signing, store the plaintext in `plugin_secrets` instead.
+**HMAC signature** — outbound webhooks are signed with `X-Instatic-Signature: t=<unix>,v1=<hex>` (HMAC-SHA256). The plaintext secret is stored in `plugin_secrets`. Inbound webhooks are received at `POST /api/notifications/webhooks/:webhookId/inbound` with the same signature format and verified server-side.
 
 ## API
 
@@ -173,7 +173,7 @@ create table notification_webhooks (
 - **No PII in logs** — only provider message id, error message, status; body is the rendered template
 - **Constant-time template lookup** — N/A (no auth in template fetch)
 - **SMTP credentials** — stored in plugin_secrets (encrypted at rest)
-- **TODO**: webhook signature verification (HMAC-SHA256 with timestamp, like Stripe)
+- **Webhook HMAC signature** — outbound signed with `X-Instatic-Signature`; inbound verified at `POST /api/notifications/webhooks/:webhookId/inbound`
 
 ## License
 

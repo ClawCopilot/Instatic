@@ -166,3 +166,24 @@ export async function consumeState(
 export function generateState(): string {
   return randomBytes(32).toString('base64url')
 }
+
+// ─── Token 更新（用于 refresh token 轮换） ─────────────────────────────
+
+/**
+ * 更新已有社交身份的 token 信息（refresh token 轮换后使用）。
+ */
+export async function updateIdentityTokens(
+  db: DbClient,
+  userId: string,
+  provider: string,
+  tokens: { accessToken: string; refreshToken?: string | null; tokenExpiresAt?: string | null },
+): Promise<void> {
+  await db`
+    update social_identities
+    set access_token = ${tokens.accessToken},
+        refresh_token = ${tokens.refreshToken ?? null},
+        token_expires_at = ${tokens.tokenExpiresAt ?? null},
+        updated_at = now()
+    where user_id = ${userId} and provider = ${provider}
+  `
+}

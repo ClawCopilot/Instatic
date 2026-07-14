@@ -297,5 +297,27 @@ export function signWebhookPayload(secret: string, body: string, timestamp: numb
   return signHmacPayloadShared(secret, body, timestamp)
 }
 
+/**
+ * 从 plugin_secrets 中读取指定 webhook 的原始 secret。
+ * 出站签名和入站验证均依赖此值。
+ */
+export async function getWebhookSecret(
+  api: { secrets: { get: (key: string) => Promise<string | null> } },
+  webhookId: string,
+): Promise<string | null> {
+  return api.secrets.get(`webhook_secret_${webhookId}`)
+}
+
+/**
+ * 将 webhook 的原始 secret 持久化到 plugin_secrets 中。
+ */
+export async function setWebhookSecret(
+  api: { secrets: { set: (key: string, value: string) => Promise<void> } },
+  webhookId: string,
+  secret: string,
+): Promise<void> {
+  await api.secrets.set(`webhook_secret_${webhookId}`, secret)
+}
+
 // Re-export from the shared utility (avoids cross-plugin import)
 import { signHmacPayload as signHmacPayloadShared } from '@instatic/plugin-sdk/shared/hmacWebhook'

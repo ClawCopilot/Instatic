@@ -28,7 +28,7 @@ E-commerce catalog, cart, checkout, and order management for Instatic. Products 
    - URL: `https://<your-site>/api/commerce/stripe/webhook`
    - Events: `checkout.session.completed`, `charge.refunded`
 3. Copy the signing secret (whsec_...) into plugin settings
-4. **TODO before production**: implement Stripe signature verification in `handleStripeWebhook`
+4. Stripe webhook signature verification is implemented via `verifyAndParseStripeWebhook`
 
 ## API
 
@@ -152,8 +152,12 @@ User pays on Stripe
   → cart cleared
 
 Admin fulfills
-  → (manual via admin UI — TODO)
+  → POST /admin/api/commerce/orders/:id/fulfill
   → order.status=fulfilled, fulfilled_at=now
+
+Admin cancels
+  → POST /admin/api/commerce/orders/:id/cancel
+  → order.status=canceled, canceled_at=now (releases reserved inventory)
 
 Admin refunds (or Stripe refund)
   → POST /admin/.../orders/:id/refund
@@ -164,9 +168,9 @@ Admin refunds (or Stripe refund)
 ## Security notes
 
 - **PCI compliance** — Stripe Checkout means card data never touches Instatic
-- **Webhook signature verification** — TODO before production
-- **Inventory race conditions** — current implementation allows overselling under high concurrency; for high-volume stores, wrap checkout in a serializable transaction
-- **Cart abandonment** — carts persist forever; add a cron job (via another plugin) to expire old carts
+- **Webhook signature verification** — implemented via `verifyAndParseStripeWebhook`
+- **Inventory race conditions** — `reservations.ts` uses `SELECT FOR UPDATE` + transaction to prevent overselling
+- **Cart expiration** — `expireOldCarts` runs hourly via cron (configurable max age, default 30 days)
 
 ## License
 

@@ -99,7 +99,7 @@ DELETE /admin/api/cms/plugins/membership/runtime/admin/api/membership/tiers/:id
 3. Set the `stripeSecretKey` plugin setting
 4. Add a Stripe webhook endpoint pointing to `https://<your-site>/api/membership/stripe/webhook`
    - Subscribe to events: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
-5. Save the webhook signing secret in plugin settings (TODO: implement signature verification)
+5. Save the webhook signing secret in plugin settings (signature verification is implemented via `verifyAndParseStripeWebhook`)
 
 ## Database schema
 

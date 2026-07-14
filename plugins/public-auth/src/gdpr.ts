@@ -29,7 +29,7 @@
  * cancel via email link.
  */
 
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { DbClient } from '@instatic/plugin-sdk/host'
 
 export interface DeletedUserExport {
@@ -129,7 +129,11 @@ export async function exportUserData(
  * Note: we don't anonymize the email if it ALREADY contains a deleted-*
  * marker, which lets us call this multiple times safely.
  */
-export async function anonymizeUser(db: DbClient, userId: string): Promise<{
+export async function anonymizeUser(
+  db: DbClient,
+  userId: string,
+  options?: { coolingOffDays?: number },
+): Promise<{
   anonymizedFields: string[]
   sessionRevokedCount: number
 }> {
@@ -140,9 +144,27 @@ export async function anonymizeUser(db: DbClient, userId: string): Promise<{
 
   // Anonymize the main row
   const { rows: current } = await db`
-    select email, display_name from public_users where id = ${userId} limit 1
+    select email, display_name, deletion_scheduled_at from public_users where id = ${userId} limit 1
   `
   if (!current[0]) throw new Error('user_not_found')
+
+  // 冷静期检查：如果设置了 coolingOffDays，仅当 deletion_scheduled_at 已到期才执行实际删除
+  if (options?.coolingOffDays != null) {
+    const scheduledAt = new Date(Date.now() + options.coolingOffDays * 86_400_000).toISOString()
+    await db`
+      update public_users
+      set status = 'pending_deletion',
+          deletion_scheduled_at = ${scheduledAt},
+          updated_at = now()
+      where id = ${userId} and deleted_at is null
+    `
+    return { anonymizedFields: [], sessionRevokedCount: 0 }
+  }
+
+  // 如果用户有未到期的 deletion_scheduled_at，不执行删除
+  if (current[0].deletion_scheduled_at && new Date(current[0].deletion_scheduled_at) > new Date()) {
+    return { anonymizedFields: [], sessionRevokedCount: 0 }
+  }
   const newEmail = current[0].email?.startsWith('deleted-') ? current[0].email : deletedEmail
   const newName = current[0].display_name?.startsWith('Deleted User ') ? current[0].display_name : deletedName
   if (newEmail !== current[0].email) anonymizedFields.push('email', 'email_normalized')
@@ -185,4 +207,64 @@ export async function anonymizeUser(db: DbClient, userId: string): Promise<{
     anonymizedFields,
     sessionRevokedCount: revoked.length,
   }
+}
+
+/**
+ * 调度用户删除（冷静期模式）。设置 deletion_scheduled_at 而非立即删除。
+ * 冷静期内用户可以通过 handleCancelDeletion 取消删除。
+ */
+export async function scheduleUserDeletion(
+  db: DbClient,
+  userId: string,
+  coolingOffDays = 7,
+): Promise<{ scheduledAt: string; cancelToken: string }> {
+  const cancelToken = randomBytes(16).toString('hex')
+  const scheduledAt = new Date(Date.now() + coolingOffDays * 86_400_000).toISOString()
+  await db`
+    update public_users
+    set status = 'pending_deletion',
+        deletion_scheduled_at = ${scheduledAt},
+        deletion_cancel_token_hash = ${createHash('sha256').update(cancelToken).digest('hex')},
+        updated_at = now()
+    where id = ${userId} and deleted_at is null
+  `
+  return { scheduledAt, cancelToken }
+}
+
+/**
+ * 取消已调度的用户删除（冷静期内）。
+ */
+export async function cancelScheduledDeletion(
+  db: DbClient,
+  cancelToken: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const tokenHash = createHash('sha256').update(cancelToken).digest('hex')
+  const { rows } = await db`
+    update public_users
+    set status = 'active',
+        deletion_scheduled_at = null,
+        deletion_cancel_token_hash = null,
+        updated_at = now()
+    where deletion_cancel_token_hash = ${tokenHash}
+      and deletion_scheduled_at > now()
+    returning id
+  `
+  if (!rows[0]) return { ok: false, reason: 'invalid_or_expired_cancel_token' }
+  return { ok: true }
+}
+
+/**
+ * 执行已过冷静期的定时删除任务。返回已处理的用户数。
+ */
+export async function processScheduledDeletions(db: DbClient): Promise<number> {
+  const { rows } = await db`
+    select id from public_users
+    where status = 'pending_deletion'
+      and deletion_scheduled_at is not null
+      and deletion_scheduled_at <= now()
+  `
+  for (const row of rows) {
+    await anonymizeUser(db, row.id)
+  }
+  return rows.length
 }

@@ -115,7 +115,7 @@ create table social_auth_states (
 - **Auto-provisioned users** — random unusable password hash; only social
   login works for them (defense in depth)
 - **Provider-side rate limits** — Apple 1000 req/min, Google 10k/100s, GitHub 5000/h
-- **TODO**: refresh-token rotation on WeChat (wechat access tokens expire 2h)
+- **WeChat token refresh** — callback immediately exchanges refresh_token for a new access_token using `grant_type=refresh_token` (2h TTL on WeChat access tokens)
 
 ## License
 

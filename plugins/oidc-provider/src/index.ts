@@ -147,6 +147,19 @@ export async function activate(api: any) {
       return handleAdminDeleteClient(ctx, params.id)
     })
 
+    // ─── Key rotation ────────────────────────────────────────────────────
+    await api.cms.routes.register('POST', '/admin/api/oidc/rotate-keys', 'users.manage', async (ctx) => {
+      const newKeyPair = generateKeyPair()
+      // 保留旧密钥供当前 token 验证使用（双密钥过渡期 1 小时）
+      const oldKeyJson = JSON.stringify(keyPair!)
+      await api.secrets.set('signingKeyPrevious', oldKeyJson)
+      await api.secrets.set('signingKey', JSON.stringify(newKeyPair))
+      // 替换运行时引用
+      keyPair = newKeyPair
+      api.log.info('OIDC signing keys rotated')
+      return Response.json({ rotated: true, kid: newKeyPair.kid })
+    })
+
     api.log.info(`oidc-provider activated; issuer=${settings.issuer}`)
 }
 
