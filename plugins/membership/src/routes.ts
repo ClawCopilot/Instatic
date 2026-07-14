@@ -22,7 +22,7 @@
  *   "manual" mode — admins set subscription state directly via DB.
  */
 
-import { nanoid } from 'nanoid'
+import { nanoid as _nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   cancelSubscription,
@@ -35,7 +35,7 @@ import {
   recordSubscriptionStatus,
   updateTier,
 } from './store'
-import { verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
+import { verifyAndParseStripeWebhook as _verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
 
 interface MembershipSettings {
   gracePeriodDays: number
@@ -44,7 +44,7 @@ interface MembershipSettings {
   stripeWebhookSecret?: string
 }
 
-function getMembershipTier(cell: unknown): string | null {
+function _getMembershipTier(cell: unknown): string | null {
   if (!cell || typeof cell !== 'object') return null
   const c = cell as Record<string, unknown>
   return typeof c.tier === 'string' ? c.tier : null

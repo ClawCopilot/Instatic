@@ -29,10 +29,10 @@ import { nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   signAccessToken,
-  verifyAccessToken,
+  verifyAccessToken as _verifyAccessToken,
   extractBearerToken,
   extractCookieToken,
-  generateOpaqueToken,
+  generateOpaqueToken as _generateOpaqueToken,
 } from './tokens'
 import {
   consumeVerificationToken,

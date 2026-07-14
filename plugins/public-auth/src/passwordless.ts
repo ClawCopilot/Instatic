@@ -28,9 +28,9 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { nanoid } from 'nanoid'
+import { nanoid as _nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
-import { findUserByEmail, createSession, findUserById, recordSuccessfulLogin, createVerificationToken } from './store'
+import { findUserByEmail, createSession as _createSession, findUserById, recordSuccessfulLogin, createVerificationToken } from './store'
 import { signAccessToken } from './tokens'
 
 interface PasswordlessSettings {

@@ -43,7 +43,7 @@ import {
   findClientByClientId,
   findConsent,
   findRefreshToken,
-  findRefreshTokenIncludingRevoked,
+  findRefreshTokenIncludingRevoked as _findRefreshTokenIncludingRevoked,
   listClients,
   recordConsent,
   revokeTokenFamily,
@@ -54,7 +54,7 @@ import {
 } from './store'
 import {
   generateAuthCode,
-  generateKeyPair,
+  generateKeyPair as _generateKeyPair,
   generateOpaqueToken,
   hashToken,
   publicKeyToJwk,

@@ -19,15 +19,15 @@
  *   POST   /api/admin/commerce/variants/:id/restock { delta, notes? }
  */
 
-import { createHash, randomBytes } from 'node:crypto'
-import { nanoid } from 'nanoid'
+import { createHash as _createHash, randomBytes } from 'node:crypto'
+import { nanoid as _nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   applyCoupon,
-  computeDiscount,
+  computeDiscount as _computeDiscount,
   createCoupon,
   deleteCoupon,
-  findCouponById,
+  findCouponById as _findCouponById,
   generateCouponCode,
   listCoupons,
   listRedemptionsForCoupon,
@@ -39,12 +39,12 @@ import {
 import {
   adjustVariantInventory,
   deleteVariant,
-  findVariant,
-  getVariantInventory,
+  findVariant as _findVariant,
+  getVariantInventory as _getVariantInventory,
   getVariantInventories,
   listVariantsForProduct,
   syncVariantsForProduct,
-  upsertVariant,
+  upsertVariant as _upsertVariant,
 } from './variants'
 
 // ─── Coupon routes ──────────────────────────────────────────────────────

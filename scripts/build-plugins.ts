@@ -10,7 +10,7 @@
  * or run directly via `bun run plugins/<name>/dist/index.js`.
  */
 
-import { Glob } from 'bun'
+import { Glob as _Glob } from 'bun'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dir, '..')

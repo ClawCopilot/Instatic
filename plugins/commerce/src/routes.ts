@@ -26,7 +26,6 @@
  *   POST /admin/api/commerce/products/:id/restock — adjust inventory
  */
 
-import { nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   adjustInventory,
@@ -37,7 +36,6 @@ import {
   listOrdersForUser,
   markOrderPaid,
   updateCartLineItems,
-  type CartLineItem,
 } from './store'
 import { verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
 

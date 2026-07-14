@@ -84,4 +84,17 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
+  {
+    // Plugin source under `plugins/` ships into a QuickJS sandbox where the
+    // host's `api` and `ctx` are dynamically-dispatched — their TypeScript
+    // shape is what `@instatic/plugin-sdk` types, but the runtime sees
+    // them as `any` over the worker RPC boundary. Enforcing `no-explicit-any`
+    // here would force every plugin to re-type the SDK surface inline,
+    // which duplicates effort and drifts from the SDK as it evolves.
+    // Allow `any` at the plugin/host boundary; the SDK stays strict.
+    files: ['plugins/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 ])

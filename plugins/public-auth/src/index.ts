@@ -40,8 +40,8 @@ import {
   issueMfaToken,
 } from './mfaRoutes'
 import { handlePasswordlessRequest, handlePasswordlessVerify } from './passwordless'
-import { extractBearerToken, extractCookieToken, hashForStorage, verifyAccessToken } from './tokens'
-import { findActiveSession } from './store'
+import { extractBearerToken, extractCookieToken, hashForStorage, verifyAccessToken as _verifyAccessToken } from './tokens'
+import { findActiveSession as _findActiveSession } from './store'
 
 interface MfaSettings {
   jwtSecret: string
@@ -127,7 +127,7 @@ export async function activate(api: any) {
     })
 
     // ─── GDPR routes (authenticated) ──────────────────────────────────────
-    await api.cms.routes.register('GET', '/api/auth/me/export', 'authenticated', async (ctx, req) => {
+    await api.cms.routes.register('GET', '/api/auth/me/export', 'authenticated', async (ctx, _req) => {
       const userId = (ctx.userId ?? '') as string
       if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
       return handleExport(ctx, userId)
@@ -143,7 +143,7 @@ export async function activate(api: any) {
       jwtSecret: settings.jwtSecret,
       mfaTokenTtlSeconds: 300,  // 5 min
     }
-    await api.cms.routes.register('POST', '/api/auth/mfa/setup', 'authenticated', async (ctx, req) => {
+    await api.cms.routes.register('POST', '/api/auth/mfa/setup', 'authenticated', async (ctx, _req) => {
       const userId = (ctx.userId ?? '') as string
       if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
       return handleMfaSetup(ctx, userId, mfaSettings)

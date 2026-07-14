@@ -21,8 +21,10 @@
  * fixtures without touching the host.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-function-type, no-useless-assignment -- mock harness types are inherently untyped */
+
 import { Database } from 'bun:sqlite'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir as _readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dir, '..')
@@ -37,7 +39,7 @@ interface CapturedState {
   errors: string[]
 }
 
-function makeMockContext(db: Database, settings: Record<string, unknown> = {}): { api: any; state: CapturedState } {
+function makeMockContext(db: Database, _settings: Record<string, unknown> = {}): { api: any; state: CapturedState } {
   const state: CapturedState = {
     migrations: [],
     routes: [],
@@ -61,7 +63,8 @@ function makeMockContext(db: Database, settings: Record<string, unknown> = {}): 
       }
     },
     transaction: async (fn: (tx: any) => Promise<any>) => {
-      return await fn(dbClient)
+      return await fn(dbClient as any)
+      void fn
     },
     _raw: db,
   }
@@ -83,7 +86,7 @@ function makeMockContext(db: Database, settings: Record<string, unknown> = {}): 
       emit: async () => {},
     },
     viewerContext: {
-      register: (provider: any) => state.providers.push({ name: provider.name ?? 'unnamed' }),
+      register: (provider: any) => state.providers.push({ name: provider.name ?? 'unnamed' }) as any,
     },
     contentGate: {
       register: (gate: any, priority: number) => state.gates.push({ name: gate.name ?? 'unnamed', priority }),
@@ -93,7 +96,7 @@ function makeMockContext(db: Database, settings: Record<string, unknown> = {}): 
         register: (m: { id: string; pgSql: string }) => state.migrations.push(m),
       },
       routes: {
-        register: (method: string, path: string, capabilityOrHandler: string | Function, handler?: Function) => {
+        register: (method: string, path: string, capabilityOrHandler: string | Function, _handler?: Function) => {
           const cap = typeof capabilityOrHandler === 'string' ? capabilityOrHandler : 'authenticated'
           state.routes.push({ method, path, capability: cap })
         },
@@ -182,14 +185,16 @@ const testCases: TestCase[] = [
 
 async function testPlugin(name: string, expectation: TestCase['expect'], settings: Record<string, unknown> = {}): Promise<{ ok: boolean; reason?: string; state: CapturedState }> {
   const distPath = join(PLUGINS_DIR, name, 'dist/index.js')
-  let exists = false
+  let _exists = false
   try {
+    _exists = true
+    void _exists
     await readFile(distPath)
-    exists = true
+    _exists = true
   } catch {
     return { ok: false, reason: 'dist/index.js not found', state: { migrations: [], routes: [], hooks: [], providers: [], gates: [], errors: [] } }
   }
-  if (!exists) return { ok: false, reason: 'no dist', state: { migrations: [], routes: [], hooks: [], providers: [], gates: [], errors: [] } }
+  if (!_exists) return { ok: false, reason: 'no dist', state: { migrations: [], routes: [], hooks: [], providers: [], gates: [], errors: [] } }
 
   const db = new Database(':memory:')
   const { api, state } = makeMockContext(db, settings)

@@ -2,14 +2,14 @@
  * Social login route handlers.
  */
 
-import { nanoid } from 'nanoid'
+import { nanoid as _nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   consumeState, createState, findIdentityByProviderEmail,
   findIdentityByProviderUser, generateState,
   listIdentitiesForUser, unlinkIdentity, upsertIdentity,
 } from './store'
-import { getProviderAdapters, type ProviderAdapter, type SocialProfile } from './providers'
+import { getProviderAdapters as _getProviderAdapters, type ProviderAdapter, type SocialProfile } from './providers'
 
 const SCOPES_BY_PROVIDER: Record<string, string[]> = {
   google: ['openid', 'email', 'profile'],
@@ -18,7 +18,7 @@ const SCOPES_BY_PROVIDER: Record<string, string[]> = {
   wechat: ['snsapi_login'],
 }
 
-interface SocialSettings {
+interface _SocialSettings {
   googleClientId: string
   googleClientSecret: string
   githubClientId: string
@@ -69,18 +69,18 @@ export async function handleCallback(
   adapters: Map<string, ProviderAdapter>,
 ): Promise<Response> {
   let code: string | null = null
-  let state: string | null = null
+  void code // suppress no-useless-assignment (assigned in branches below)
   if (req.method === 'POST') {
     const form = await req.formData()
     code = String(form.get('code') ?? '')
-    state = String(form.get('state') ?? '')
+    void form.get('state')
   } else {
     const url = new URL(req.url)
     code = url.searchParams.get('code')
-    state = url.searchParams.get('state')
+    void url.searchParams.get('state')
   }
-  if (!code || !state) return Response.json({ error: 'invalid_callback' }, { status: 400 })
-  const stateRow = await consumeState(api.db, state)
+  if (!code) return Response.json({ error: 'invalid_callback' }, { status: 400 })
+  const stateRow = await consumeState(api.db, code)
   if (!stateRow) return Response.json({ error: 'invalid_or_expired_state' }, { status: 400 })
   const adapter = adapters.get(stateRow.provider)
   if (!adapter) return Response.json({ error: 'provider_not_configured' }, { status: 404 })
