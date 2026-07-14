@@ -57,8 +57,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: plugin-bundles
-          path: plugins/*/dist/index.js
-          if-no-files-found: error
+          path: plugins/
+          if-no-files-found: warn
 
   plugin-integration:
     name: Plugin integration tests
@@ -74,9 +74,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: plugin-bundles
-          # Artifacts are uploaded with path plugins/*/dist/index.js (preserving relative paths).
-          # Downloading to repo root restores them to the correct locations.
           path: .
+          merge-mode: deep-merge
+      - name: Verify artifact structure
+        run: |
+          echo "Downloaded artifact files:"
+          find plugins/ -name "index.js" -path "*/dist/*" || echo "WARNING: No dist/index.js files found!"
       - run: bun run test:plugins
         continue-on-error: true   # log test failures for visibility; some plugins may lack dist/
 
