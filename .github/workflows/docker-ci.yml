@@ -95,5 +95,9 @@ jobs:
             INSTATIC_VERSION=${{ steps.meta.outputs.version }}
             INSTATIC_REVISION=${{ github.sha }}
             INSTATIC_CREATED=${{ steps.meta.outputs.created }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Cache disabled: `bun install --frozen-lockfile` in the Dockerfile
+          # fails with "lockfile had changes" when the GitHub Actions cache
+          # (type=gha) holds node_modules from a previous lockfile version.
+          # Re-enable `cache-from`/`cache-to: type=gha` only after pinning
+          # the cache key to a lockfile hash that invalidates on every
+          # bun.lock change.
