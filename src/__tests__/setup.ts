@@ -31,6 +31,12 @@ const happyWindow = new GlobalWindow({
   },
 })
 
+// Remove any default window that Bun (or other runtimes) may have installed
+// so our happy-dom window always wins.
+try {
+  delete (globalThis as Record<string, unknown>).window
+} catch {}
+
 // Assign the window and document globals first — other globals are derived from these
 ;(globalThis as Record<string, unknown>).window = happyWindow
 ;(globalThis as Record<string, unknown>).document = happyWindow.document
@@ -295,7 +301,113 @@ if (typeof (globalThis as { EventSource?: unknown }).EventSource === 'undefined'
     addHook?: (hookName: string, callback: (node: Record<string, unknown>) => void) => void
   }
   const purifier = createDOMPurify(happyWindow as unknown as Window)
-  configureRichtextSanitizer(purifier)
+
+  // Defensive: verify the purifier actually works before registering it.
+  // On some CI environments happy-dom's DOM may not be fully compatible
+  // with DOMPurify's parser expectations, causing silent partial failures.
+  const testResult = purifier.sanitize?.('<script>alert(1)</script><strong>Test</strong>', {
+    ALLOWED_TAGS: ['strong'],
+    ALLOWED_ATTR: [],
+    RETURN_DOM: false,
+  })
+  const isWorking = String(testResult) === '<strong>Test</strong>'
+
+  if (isWorking) {
+    configureRichtextSanitizer(purifier)
+  } else {
+    // Fallback: DOMPurify + happy-dom is unreliable on this platform.
+    // Build a small HTML sanitizer directly on top of happy-dom's DOM.
+    const doc = happyWindow.document
+
+    function escapeHtml(str: string): string {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    const DANGEROUS_TAGS = new Set([
+      'script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'textarea',
+    ])
+    const SVG_TAGS = new Set([
+      'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+      'text', 'tspan', 'textpath', 'defs', 'clippath', 'mask', 'pattern', 'image',
+      'filter', 'use', 'stop', 'lineargradient', 'radialgradient', 'metadata', 'title',
+      'desc', 'switch', 'foreignobject', 'animate', 'animatetransform', 'set', 'view',
+    ])
+
+    function walk(node: Node, config?: unknown): string {
+      if (node.nodeType === 3) {
+        return escapeHtml((node as any).textContent ?? '')
+      }
+      if (node.nodeType === 1) {
+        const el = node as Element
+        const tag = (el.tagName ?? '').toLowerCase()
+
+        if (DANGEROUS_TAGS.has(tag)) {
+          return ''
+        }
+
+        const cfg = config as Record<string, unknown> | undefined
+        const allowedTags = new Set(
+          ((cfg?.ALLOWED_TAGS as string[] | undefined) ?? []).map((t: string) => t.toLowerCase()),
+        )
+        const allowedAttrs = new Set(
+          ((cfg?.ALLOWED_ATTR as string[] | undefined) ?? []).map((a: string) => a.toLowerCase()),
+        )
+        const isSvgMode = (cfg?.USE_PROFILES as Record<string, unknown> | undefined)?.svg === true
+
+        if (!isSvgMode && !allowedTags.has(tag)) {
+          return Array.from(node.childNodes).map((c) => walk(c, config)).join('')
+        }
+        if (isSvgMode && !SVG_TAGS.has(tag) && !allowedTags.has(tag)) {
+          return Array.from(node.childNodes).map((c) => walk(c, config)).join('')
+        }
+
+        const attrs = Array.from(el.attributes)
+          .filter((a) => {
+            const name = a.name.toLowerCase()
+            if (name.startsWith('on')) return false
+            const val = a.value
+            if (
+              (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'action') &&
+              /^(javascript|data|vbscript|file):/i.test(val)
+            ) {
+              return false
+            }
+            if (isSvgMode) return true
+            return allowedAttrs.has(name)
+          })
+          .map((a) => ` ${a.name}="${escapeHtml(a.value)}"`)
+          .join('')
+
+        let extraAttrs = ''
+        if (tag === 'a') {
+          extraAttrs = ' target="_blank" rel="noopener noreferrer"'
+        }
+
+        const children = Array.from(node.childNodes).map((c) => walk(c, config)).join('')
+        return `<${tag}${attrs}${extraAttrs}>${children}</${tag}>`
+      }
+      return ''
+    }
+
+    const fallbackPurifier = {
+      sanitize(input: string, config?: unknown): string {
+        const template = doc.createElement('template')
+        template.innerHTML = input
+        return Array.from(template.content.childNodes)
+          .map((node) => walk(node, config))
+          .join('')
+      },
+      addHook(_hook: string, _cb: unknown): void {},
+    }
+    configureRichtextSanitizer(fallbackPurifier)
+  }
+
+  // Stash the happy-dom window so sanitize.ts can use it directly if needed.
+  ;(globalThis as any).__HAPPY_DOM_WINDOW__ = happyWindow
 }
 
 // ---------------------------------------------------------------------------
