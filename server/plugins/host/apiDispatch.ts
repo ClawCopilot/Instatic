@@ -35,6 +35,9 @@ import { handleNetworkFetch, handleNetworkAbort } from './handlers/network'
 import { handleScheduleRegister, handleScheduleCancel } from './handlers/schedule'
 import { handleMediaRegisterStorageAdapter, handleMediaRegisterUrlTransformer, handleMediaRegisterVariantDelegate } from './handlers/media'
 import { handleCryptoDigest, handleCryptoSignHmac } from './handlers/crypto'
+import { handleMigrationsRegister } from '../extensions/migrationsProtocol'
+import { handlePublicRoutesRegister } from '../extensions/publicRoutesProtocol'
+import { handleHttpMiddlewareRegister } from '../extensions/httpMiddlewareProtocol'
 import {
   handleContentEntriesCreate,
   handleContentEntriesCreateMany,

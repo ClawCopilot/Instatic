@@ -20,37 +20,9 @@ import { registry } from '@core/module-engine'
 import type { CssBundleFile, SiteCssBundleId } from '@core/publisher'
 import { buildPublishedSiteCssBundle } from './publish/siteCssBundle'
 import { mediaStorageRegistry } from '@core/plugins/mediaStorageRegistry'
-import { runPluginHttpMiddleware } from './plugins/extensions/httpMiddleware'
-import { buildPluginPublicRoutesDispatcher } from './plugins/extensions/publicRoutes'
+import type { ServerRuntime, RouteHandler } from './routerTypes'
 
 const VITE_DEV_URL = 'http://localhost:5173'
-
-interface ServerRuntime {
-  db: DbClient
-  staticDir?: string
-  uploadsDir?: string
-  /**
-   * The raw `DATABASE_URL` the server booted with — forwarded down to
-   * CMS handlers that need to resolve the on-disk SQLite file (e.g. the
-   * storage dashboard widget).
-   */
-  databaseUrl?: string
-}
-
-/**
- * A route handler returns a `Response` if it owns the request, or `null` if
- * the URL/method doesn't match — the dispatcher walks the `routes` table and
- * returns the first non-null response. Prefix-namespaced handlers (e.g.
- * `/_instatic/css/`, `/_instatic/runtime/cache/`) absorb their entire namespace and emit
- * a 404 themselves rather than falling through, so unknown paths under a
- * known prefix can't accidentally match a later route.
- */
-type RouteHandler = (
-  req: Request,
-  runtime: ServerRuntime,
-  url: URL,
-  pathname: string,
-) => Promise<Response | null> | Response | null
 
 // ---------------------------------------------------------------------------
 // Dispatcher
@@ -89,11 +61,6 @@ const routes: readonly RouteHandler[] = [
   tryServeAdminApp,
   tryServePluginAdminPages,
   tryServePublicRoute,
-  // Plugin public routes — registered prefixes that own their own HTTP
-  // paths (OAuth endpoints, /api/auth/*, /api/webhooks/*). Matched AFTER
-  // the built-in admin/public/static dispatchers so admin/CMS routes win
-  // when a plugin path conflicts with a built-in one.
-  tryServePluginPublicRoute,
   trySetupRedirect,
   tryServeNotFoundPage,
 ]

@@ -15,7 +15,7 @@
     "id": "instatic.public-auth",
     "name": "Public Authentication",
     "version": "0.1.0",
-    "apiVersion": "1.0.0",
+    "apiVersion": 1,
     "description": "End-user registration, login, password reset, and JWT-based sessions for Instatic sites. Exposes a viewerContext provider.",
     "permissions": [
       "cms.migrations",

@@ -65,6 +65,13 @@ const EXPECTED_TARGET_PERMISSIONS: Record<string, string> = {
   'cms.media.registerStorageAdapter': 'media.storage.adapter',
   'cms.media.registerUrlTransformer': 'media.url.transform',
   'cms.media.registerVariantDelegate': 'media.variant.delegate',
+  // ─── Extension points (commerce / membership / OIDC support) ──────────
+  // Each target here corresponds to a plugin capability the host exposes
+  // as a small, focused api-call. The permission gating matches the
+  // capability risk level (see PLUGIN_CAPABILITIES in src/core/plugin-sdk/).
+  'cms.migrations.register': 'cms.migrations',
+  'cms.publicRoutes.register': 'cms.publicRoutes',
+  'cms.httpMiddleware.register': 'cms.httpMiddleware',
   'cms.content.tables.list': 'cms.content.read',
   'cms.content.tables.get': 'cms.content.read',
   'cms.content.tables.create': 'cms.content.tables.manage',

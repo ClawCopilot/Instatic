@@ -135,12 +135,22 @@ function timingSafeEqualHex(a: string, b: string): boolean {
  * Generate a set of single-use recovery codes. Each is 10 chars
  * (alphanumeric, easy to type), shown to the user ONCE at enable time.
  */
+const RECOVERY_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
 export function generateRecoveryCodes(count: number = 8): string[] {
   return Array.from({ length: count }, () => {
-    // 8 bytes → 11 base64url chars (no padding). Filter to A-Z0-9 and
-    // pad/truncate to exactly 10 chars.
-    const bytes = randomBytes(8)
-    return bytes.toString('base64url').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)
+    // 10 random bytes → 10 indices into a 36-char alphabet. The previous
+    // implementation encoded 8 bytes as base64url (11 chars), stripped the
+    // `-` / `_` characters, and sliced to 10 — which silently produced
+    // 8-10 char codes depending on how many of the 11 base64url chars landed
+    // in the index-62/63 range. Generate exactly 10 alphanumeric chars
+    // here instead. Modulo bias (256 % 36 = 4) is acceptable: recovery codes
+    // are rate-limited and shown to the user once, not a bearer of long-lived
+    // access.
+    const bytes = randomBytes(10)
+    let code = ''
+    for (let i = 0; i < 10; i++) code += RECOVERY_CODE_ALPHABET[bytes[i]! % 36]
+    return code
   })
 }
 

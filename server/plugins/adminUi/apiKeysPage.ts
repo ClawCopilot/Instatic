@@ -149,7 +149,7 @@ function renderPage(opts: { title: string; active: 'apikeys' | 'oidc' | 'tiers' 
  */
 export async function renderPluginAdminPage(
   req: Request,
-  db: DbClient,
+  _db: DbClient,
   options: {
     title: string
     active: 'apikeys' | 'oidc' | 'tiers' | null

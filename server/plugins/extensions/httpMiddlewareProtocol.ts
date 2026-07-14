@@ -18,13 +18,15 @@
  * concrete first use case (api-keys plugin will be that case).
  */
 
-import type { ApiCallFor } from '../../protocol/apiCallSchema'
-import type { DbClient } from '../../../db/client'
-import { replyApiOk } from '../apiReplies'
+import type { ApiCallFor } from '../protocol/apiCallSchema'
+import type { DbClient } from '../../db/client'
+import type { HostPluginRecord } from '../host/types'
+import { replyApiOk } from '../host/apiReplies'
 import { registerPluginHttpMiddleware, type HttpMiddleware } from './httpMiddleware'
 
 export async function handleHttpMiddlewareRegister(
   msg: ApiCallFor<'cms.httpMiddleware.register'>,
+  _entry: HostPluginRecord,
   _db: DbClient,
 ): Promise<void> {
   // Placeholder middleware — for now this is a no-op pass-through.

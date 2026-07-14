@@ -19,9 +19,10 @@
  *     migration already been applied?".
  */
 
-import type { ApiCallFor } from '../../protocol/apiCallSchema'
-import type { DbClient } from '../../../db/client'
-import { replyApiOk } from '../apiReplies'
+import type { ApiCallFor } from '../protocol/apiCallSchema'
+import type { DbClient } from '../../db/client'
+import type { HostPluginRecord } from '../host/types'
+import { replyApiOk } from '../host/apiReplies'
 import {
   registerPluginMigration,
   type PluginMigration,
@@ -29,6 +30,7 @@ import {
 
 export async function handleMigrationsRegister(
   msg: ApiCallFor<'cms.migrations.register'>,
+  _entry: HostPluginRecord,
   _db: DbClient,
 ): Promise<void> {
   const [{ id, pgSql, sqliteSql }] = msg.args
