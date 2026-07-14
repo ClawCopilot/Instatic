@@ -20,7 +20,7 @@
  * TODO: BOGO (buy X get Y) and free-shipping coupons.
  */
 
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import type { DbClient } from '@instatic/plugin-sdk/host'
 
 export type CouponType = 'percent' | 'fixed'

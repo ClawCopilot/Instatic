@@ -32,11 +32,11 @@ import {
   markRefundFailed,
   markRefundSucceeded,
   validateRefundAmount,
-  type Refund,
+  type _Refund,
 } from './refunds'
 import {
   gcExpiredReservations,
-  listReservationsForCart,
+  listReservationsForCart as _listReservationsForCart,
   releaseReservationsForCart,
   reserveStock,
 } from './reservations'

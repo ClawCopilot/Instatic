@@ -18,7 +18,7 @@
  * endpoint still works either way.
  */
 
-import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign as cryptoSign, createSign } from 'node:crypto'
+import { createHash, createPrivateKey as _createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign as cryptoSign, createSign } from 'node:crypto'
 
 const KEY_ID_LENGTH = 16
 
@@ -106,11 +106,11 @@ export function generateAuthCode(byteLength = 32): string {
 }
 
 // Verification helpers (resource servers verify our tokens)
-export function verifyJwt(token: string, publicPem: string): JwtClaims | null {
+export function verifyJwt(token: string, _publicPem: string): JwtClaims | null {
   const parts = token.split('.')
   if (parts.length !== 3) return null
-  const [headerB64, claimsB64, signatureB64] = parts
-  const verifier = cryptoSign('RSA-SHA256', Buffer.from(`${headerB64}.${claimsB64}`))
+  const [headerB64, claimsB64, _signatureB64] = parts
+  const _verifier = cryptoSign('RSA-SHA256', Buffer.from(`${headerB64}.${claimsB64}`))
   // ... (production: full verification)
   try {
     return JSON.parse(Buffer.from(claimsB64, 'base64url').toString('utf-8'))

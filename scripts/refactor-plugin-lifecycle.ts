@@ -82,15 +82,15 @@ async function refactorPlugin(name: string): Promise<void> {
   // Simpler: remove `migrations,` line, the `async activate(api) { ... }` block, and `async deactivate(api) { ... }` block.
 
   // Find "migrations," - it's the last property before activate
-  const migrationsMatch = body.match(/,\s*migrations\s*,/)
-  let manifestPart = ''
-  if (migrationsMatch) {
-    manifestPart = body.slice(0, migrationsMatch.index!)
+  const _migrationsMatch = body.match(/,\s*migrations\s*,/)
+  let _manifestPart = ''
+  if (_migrationsMatch) {
+    _manifestPart = body.slice(0, _migrationsMatch.index!)
   } else {
     // No migrations property — find the last property before activate
     const activateMatch = body.match(/,?\s*async\s+activate\(/)
     if (activateMatch) {
-      manifestPart = body.slice(0, activateMatch.index!)
+      _manifestPart = body.slice(0, activateMatch.index!)
     } else {
       manifestPart = body
     }
@@ -119,10 +119,10 @@ async function refactorPlugin(name: string): Promise<void> {
     console.log(`  ${name.padEnd(20)} - no end of activate`)
     return
   }
-  const activateBody = body.slice(activateStart, activateEnd)
+  const _activateBody = body.slice(activateStart, activateEnd)
 
   // Find the deactivate function block
-  let deactivateStart = -1
+  const _deactivateStart = -1
   const deactivateSearch = body.indexOf('async deactivate(api)', activateEnd)
   if (deactivateSearch !== -1) {
     let dDepth = 0
@@ -148,7 +148,7 @@ async function refactorPlugin(name: string): Promise<void> {
     console.log(`  ${name.padEnd(20)} - activate signature not found`)
     return
   }
-  const activateHeader = activateFnMatch[0].replace(/\s*\{$/, '')
+  const _activateHeader = activateFnMatch[0].replace(/\s*\{$/, '')
   // Find body between first { and matching }
   const openIdx = body.indexOf('{', activateStart)
   let d2 = 0

@@ -236,7 +236,7 @@ export function createAppleAdapter(args: {
         scope: 'name email',
       }
     },
-    async fetchProfile(accessToken) {
+    async fetchProfile(_accessToken) {
       // Apple Sign In doesn't have a userinfo endpoint; identity comes
       // from the id_token returned alongside the access token. For this
       // simplified implementation, the caller passes the id_token claims
@@ -286,7 +286,7 @@ export function createWeChatAdapter(appId: string, appSecret: string): ProviderA
       })
       return `https://open.weixin.qq.com/connect/oauth2/authorize?${params}#wechat_redirect`
     },
-    async exchangeCode({ code, redirectUri }) {
+    async exchangeCode({ code, redirectUri: _redirectUri }) {
       const res = await fetch(`https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`)
       if (!res.ok) throw new Error(`WeChat token exchange failed: ${res.status}`)
       const data = await res.json() as {

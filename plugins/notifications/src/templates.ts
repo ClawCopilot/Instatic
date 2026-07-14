@@ -11,8 +11,8 @@
  */
 
 import { createConnection } from 'node:net'
-import { createHash, createHmac, createPrivateKey, createPublicKey, randomBytes } from 'node:crypto'
-import { promisify } from 'node:util'
+import { createHash as _createHash, createHmac as _createHmac, createPrivateKey as _createPrivateKey, createPublicKey as _createPublicKey, randomBytes } from 'node:crypto'
+import { promisify as _promisify } from 'node:util'
 
 export interface SmtpConfig {
   host: string

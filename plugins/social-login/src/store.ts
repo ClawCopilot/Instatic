@@ -2,7 +2,7 @@
  * DB CRUD for social-login.
  */
 
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash as _createHash, randomBytes } from 'node:crypto'
 import type { DbClient } from '@instatic/plugin-sdk/host'
 
 export interface SocialIdentity {

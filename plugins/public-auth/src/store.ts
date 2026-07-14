@@ -11,8 +11,8 @@
  * impractical.
  */
 
-import { createHash, randomBytes } from 'node:crypto'
-import { promisify } from 'node:util'
+import { createHash as _createHash, randomBytes } from 'node:crypto'
+import { promisify as _promisify } from 'node:util'
 import { argon2id as _argon2id } from 'hash-wasm'
 import type { DbClient } from '@instatic/plugin-sdk/host'
 

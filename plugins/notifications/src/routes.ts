@@ -22,7 +22,7 @@ import {
   listEnabledWebhooksForEvent,
   recordLog,
   recordWebhookDelivery,
-  signWebhookPayload,
+  signWebhookPayload as _signWebhookPayload,
   upsertTemplate,
 } from './store'
 import { renderTemplate, sendEmail, type SmtpConfig } from './templates'

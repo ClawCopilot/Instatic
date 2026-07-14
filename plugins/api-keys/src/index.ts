@@ -40,13 +40,14 @@ export async function activate(api: any) {
   for (const migration of migrations) {
     await api.cms.migrations.register(migration)
   }
-  await api.cms.routes.register('GET', '/admin/api/keys', 'users.manage', async (ctx: any, req: Request) => {
+  await api.cms.routes.register('GET', '/admin/api/keys', 'users.manage', async (ctx: any, _req: Request) => {
     return handleListKeys({ ...ctx, extractBearerToken, hashToken })
   })
   await api.cms.routes.register('POST', '/admin/api/keys', 'users.manage', async (ctx: any, req: Request) => {
     return handleCreateKey({ ...ctx, extractBearerToken, hashToken }, req)
   })
   await api.cms.routes.register('DELETE', '/admin/api/keys/:id', 'users.manage', async (ctx: any, _req: Request, params: any) => {
+    void _req
     return handleRevokeKey({ ...ctx, extractBearerToken, hashToken }, params.id)
   })
   await api.cms.publicRoutes.register('/api/keys', { exclusive: true })

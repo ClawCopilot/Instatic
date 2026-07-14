@@ -23,7 +23,7 @@
  * if they need to preserve data alongside the deletion record.
  */
 
-import { randomBytes } from 'node:crypto'
+import { randomBytes as _randomBytes } from 'node:crypto'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import { anonymizeUser, exportUserData } from './gdpr'
 
@@ -55,7 +55,7 @@ export async function handleExport(
 export async function handleDelete(
   api: ApiCallContext,
   userId: string,
-  req: Request,
+  _req: Request,
 ): Promise<Response> {
   // Emit pre-deletion hook (plugins can collect data, run cleanup)
   await api.hooks.emit('public-auth.userDeleting', { userId })

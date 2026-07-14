@@ -23,12 +23,12 @@
  * can be used instead of TOTP at the /api/auth/mfa/verify endpoint.
  */
 
-import { createHmac, randomBytes } from 'node:crypto'
-import { nanoid } from 'nanoid'
+import { createHmac as _createHmac, randomBytes as _randomBytes } from 'node:crypto'
+import { nanoid as _nanoid } from 'nanoid'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
 import {
   generateRecoveryCodes,
-  generateTotpCode,
+  generateTotpCode as _generateTotpCode,
   generateTotpSecret,
   hashRecoveryCode,
   verifyTotpCode,
@@ -50,7 +50,7 @@ function buildOtpauthUrl(secret: string, accountName: string, issuer: string): s
 export async function handleMfaSetup(
   api: ApiCallContext,
   userId: string,
-  settings: MfaSettings,
+  _settings: MfaSettings,
 ): Promise<Response> {
   // Look up the user
   const { rows } = await api.db`
@@ -94,8 +94,8 @@ export async function handleMfaSetup(
 export async function handleMfaEnable(
   api: ApiCallContext,
   userId: string,
-  req: Request,
-  settings: MfaSettings,
+  _req: Request,
+  _settings: MfaSettings,
 ): Promise<Response> {
   let body: { code?: string }
   try {
@@ -137,7 +137,7 @@ export async function handleMfaDisable(
   }
   if (!body.password) return Response.json({ error: 'password required for confirmation' }, { status: 400 })
   // Verify password (imported lazily to keep mfaRoutes focused on 2FA logic)
-  const { findUserByEmail, findUserById, verifyPassword } = await import('./store')
+  const { findUserById, verifyPassword } = await import('./store')
   const user = await findUserById(api.db, userId)
   if (!user) return Response.json({ error: 'not_found' }, { status: 404 })
   const ok = await verifyPassword(user.passwordHash, body.password)

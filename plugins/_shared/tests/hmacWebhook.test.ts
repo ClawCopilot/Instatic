@@ -3,7 +3,6 @@
  */
 
 import { describe, test, expect } from 'bun:test'
-import { createHmac } from 'node:crypto'
 import { signHmacPayload, verifyHmacSignature } from '../hmacWebhook'
 
 const SECRET = 'test-webhook-secret-12345'
