@@ -282,6 +282,23 @@ if (typeof (globalThis as { EventSource?: unknown }).EventSource === 'undefined'
 }
 
 // ---------------------------------------------------------------------------
+// Install DOMPurify with happy-dom so sanitizeRichtext() preserves safe tags.
+//
+// Without this, sanitizeRichtext() falls back to stripHtmlFallback() which
+// removes ALL tags (including safe formatting like <strong>, <p>, <ul>).
+// Tests that assert safe markup preservation depend on DOMPurify being active.
+{
+  const { configureRichtextSanitizer } = await import('@core/sanitize')
+  const DOMPurifyModule = await import('dompurify')
+  const createDOMPurify = DOMPurifyModule.default as unknown as (window: Window) => {
+    sanitize?: (value: string, config?: unknown) => unknown
+    addHook?: (hookName: string, callback: (node: Record<string, unknown>) => void) => void
+  }
+  const purifier = createDOMPurify(happyWindow as unknown as Window)
+  configureRichtextSanitizer(purifier)
+}
+
+// ---------------------------------------------------------------------------
 // Global React Testing Library cleanup after every test.
 //
 // @testing-library/react auto-registers an `afterEach(cleanup)` ONLY when
