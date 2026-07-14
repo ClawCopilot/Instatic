@@ -75,7 +75,6 @@ jobs:
         with:
           name: plugin-bundles
           path: .
-          merge-mode: deep-merge
       - name: Verify artifact structure
         run: |
           echo "Downloaded artifact files:"
