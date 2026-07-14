@@ -31,7 +31,7 @@ export interface ProviderAdapter {
   id: string
   name: string
   getAuthorizeUrl(args: { state: string; redirectUri: string; scopes: string[] }): string
-  exchangeCode(args: { code: string; redirectUri: string }): Promise<TokenResponse>
+  exchangeCode(args: { code: string; redirectUri: string; isRefresh?: boolean }): Promise<TokenResponse>
   fetchProfile(accessToken: string): Promise<SocialProfile>
 }
 
@@ -286,8 +286,15 @@ export function createWeChatAdapter(appId: string, appSecret: string): ProviderA
       })
       return `https://open.weixin.qq.com/connect/oauth2/authorize?${params}#wechat_redirect`
     },
-    async exchangeCode({ code, redirectUri: _redirectUri }) {
-      const res = await fetch(`https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`)
+    async exchangeCode({ code, redirectUri: _redirectUri, isRefresh = false }) {
+      let url: string
+      if (isRefresh) {
+        // WeChat refresh_token 接口: grant_type=refresh_token, 不需要 redirect_uri
+        url = `https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=${appId}&grant_type=refresh_token&refresh_token=${code}`
+      } else {
+        url = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`
+      }
+      const res = await fetch(url)
       if (!res.ok) throw new Error(`WeChat token exchange failed: ${res.status}`)
       const data = await res.json() as {
         access_token: string

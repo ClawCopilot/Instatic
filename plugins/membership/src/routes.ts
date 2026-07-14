@@ -179,16 +179,16 @@ export async function handleStripeWebhook(
   req: Request,
   settings: MembershipSettings,
 ): Promise<Response> {
-  if (!settings.stripeSecretKey) return new Response('Not configured', { status: 503 })
-  // Stripe signature verification would go here. For brevity we trust the
-  // caller in this example; in production this MUST verify the Stripe-Signature
-  // header against the webhook secret.
-  let event: { type: string; data: { object: Record<string, unknown> } }
-  try {
-    event = await req.json() as typeof event
-  } catch {
-    return new Response('Invalid JSON', { status: 400 })
+  if (!settings.stripeWebhookSecret) {
+    return new Response('Webhook secret not configured', { status: 503 })
   }
+  // 验证 Stripe Webhook 签名，防止伪造请求
+  const parsed = await _verifyAndParseStripeWebhook(req, settings.stripeWebhookSecret)
+  if ('error' in parsed) {
+    api.log.warn(`Membership Stripe webhook signature verification failed: ${parsed.error}`)
+    return new Response('Invalid signature', { status: 400 })
+  }
+  const event = parsed.event
   switch (event.type) {
     case 'customer.subscription.updated':
     case 'customer.subscription.created': {

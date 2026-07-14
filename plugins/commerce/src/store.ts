@@ -297,3 +297,18 @@ export async function getProductInventory(
   `
   return rows[0]?.sum ?? 0
 }
+
+// ─── Cart 过期清理 ──────────────────────────────────────────────────────
+
+/**
+ * 清理过期购物车。删除超过指定天数未更新的购物车。
+ * 建议由 cron job 或 hooks 调度器定期调用。
+ */
+export async function expireOldCarts(db: DbClient, maxAgeDays = 30): Promise<number> {
+  const { rows } = await db`
+    delete from carts
+    where updated_at < now() - interval '${maxAgeDays} days'
+    returning id
+  `
+  return rows.length
+}

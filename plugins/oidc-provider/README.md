@@ -143,13 +143,13 @@ GET /oauth/logout?post_logout_redirect_uri=https://myapp.com/goodbye&state=xyz12
 }
 ```
 
-## Social login (TODO)
+## Social login
 
-This plugin does NOT include social login. Build a separate `plugin: social-login` that:
-1. Adds `/oauth/authorize/social/:provider` route
-2. Implements the OAuth flow with the external provider (Google/GitHub/etc.)
+Social login is provided by a separate `@instatic/plugin-social-login` plugin:
+1. Adds `/api/auth/social/:provider` route
+2. Implements the OAuth flow with external providers (Google/GitHub/Apple/WeChat)
 3. Auto-creates a `public_users` row on first social login
-4. Redirects back to this plugin's authorize flow
+4. Links social identity to existing public-auth account by email
 
 ## Database schema
 
@@ -223,7 +223,7 @@ create table oidc_consents (
 ## Security notes
 
 - **PKCE enforced** for public clients (and configurable for confidential)
-- **Refresh token rotation** — old token revoked on first use; replay = all-tokens-revoked (TODO: detect & respond)
+- **Refresh token rotation** — old token revoked on first use; replay detection logs to `oidc_token_replay_signals` and rate-limits the client (5+ replays/hour = 429)
 - **Single-use auth codes** — atomic UPDATE with `consumed_at IS NULL` predicate
 - **RS256 signing keys** — generated on first activate, persisted encrypted
 - **Constant-time client_secret comparison** via SHA-256 hash (defense in depth)

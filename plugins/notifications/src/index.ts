@@ -22,7 +22,7 @@
 
 import { definePlugin } from '@instatic/plugin-sdk'
 import migrations from './migrations'
-import { DEFAULT_TEMPLATES, deliver, handleAdminCreateWebhook, handleAdminListLog, handleAdminListTemplates, handleAdminUpsertTemplate } from './routes'
+import { DEFAULT_TEMPLATES, deliver, handleAdminCreateWebhook, handleAdminListLog, handleAdminListTemplates, handleAdminUpsertTemplate, handleWebhookInbound } from './routes'
 import { upsertTemplate } from './store'
 
 interface NotificationSettings {
@@ -147,6 +147,11 @@ for (const migration of migrations) {
     await api.cms.routes.register('GET', '/api/admin/notifications/log', 'users.manage', handleAdminListLog)
     await api.cms.routes.register('POST', '/api/admin/notifications/webhooks', 'users.manage', async (ctx, req) => {
       return handleAdminCreateWebhook(ctx, req)
+    })
+
+    // ─── 入站 Webhook 路由（公开，由外部系统回调） ──────────────────────
+    await api.cms.routes.register('POST', '/api/notifications/webhooks/:webhookId/inbound', 'public', async (ctx, req, params) => {
+      return handleWebhookInbound(ctx, req, params.webhookId)
     })
 
     api.log.info('notifications plugin activated')

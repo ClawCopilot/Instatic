@@ -20,6 +20,8 @@ import {
   handleAdminListOrders,
   handleAdminRefundOrder,
   handleAdminRestock,
+  handleAdminFulfillOrder,
+  handleAdminCancelOrder,
   handleCheckout,
   handleClearCart,
   handleGetCart,
@@ -152,6 +154,12 @@ export async function activate(api: any) {
     await api.cms.routes.register('POST', '/admin/api/commerce/products/:id/restock', 'content.manage', async (ctx, req, params) => {
       return handleAdminRestock(ctx, req, params.id)
     })
+    await api.cms.routes.register('POST', '/admin/api/commerce/orders/:id/fulfill', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminFulfillOrder(ctx, params.id)
+    })
+    await api.cms.routes.register('POST', '/admin/api/commerce/orders/:id/cancel', 'content.manage', async (ctx, _req, params) => {
+      return handleAdminCancelOrder(ctx, params.id)
+    })
 
     // ─── Coupon routes ────────────────────────────────────────────────────
     await api.cms.routes.register('POST', '/api/commerce/coupons/validate', 'authenticated', handleValidateCoupon)
@@ -235,10 +243,26 @@ export async function activate(api: any) {
       return { cartCount: rows[0]?.count ?? 0 }
     })
 
+    // ─── Cart expiration cron ──────────────────────────────────────────
+    // 每小时清理超过 30 天未更新的购物车
+    const cartExpiryInterval = setInterval(async () => {
+      try {
+        const expired = await (await import('./store')).expireOldCarts(api.db, 30)
+        if (expired > 0) api.log.info(`Expired ${expired} old carts`)
+      } catch (err) {
+        api.log.warn(`Cart expiry cron failed: ${err}`)
+      }
+    }, 3600_000)  // 每小时
+    // 存储引用以便 deactivate 时清理
+    ;(api as Record<string, unknown>)._commerceCartExpiryInterval = cartExpiryInterval
+
     api.log.info('commerce plugin activated')
 }
 
 export async function deactivate(api: any) {
-api.log.info('commerce plugin deactivated')
+  if ((api as Record<string, unknown>)._commerceCartExpiryInterval) {
+    clearInterval((api as Record<string, unknown>)._commerceCartExpiryInterval as ReturnType<typeof setInterval>)
+  }
+  api.log.info('commerce plugin deactivated')
 }
 

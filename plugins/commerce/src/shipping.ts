@@ -192,3 +192,75 @@ async function findBestShippingRate(
   `
   return rows[0] ? rowToRate(rows[0]) : null
 }
+
+/**
+ * 实时物流 API 适配器接口。
+ * 运营商实现此接口后注册到 carrierAdapters Map 中。
+ * calculateShipping 在找不到本地费率表匹配时，会逐一尝试已注册的运营商适配器。
+ */
+export interface CarrierAdapter {
+  id: string           // 如 'ups', 'fedex', 'usps'
+  name: string
+  /** 查询实时费率，返回从低到高排序的报价列表 */
+  getRates(input: {
+    origin: { country: string; region: string; postalCode: string }
+    destination: { country: string; region: string; postalCode: string }
+    weightGrams: number
+    packageDimensions?: { lengthCm: number; widthCm: number; heightCm: number }
+  }): Promise<Array<{
+    serviceLevel: string
+    costCents: number
+    currency: string
+    estimatedDaysMin: number
+    estimatedDaysMax: number
+  }>>
+}
+
+/** 已注册的运营商适配器 */
+export const carrierAdapters = new Map<string, CarrierAdapter>()
+
+/**
+ * 注册运营商适配器。插件或宿主在启动时调用。
+ * 示例: registerCarrierAdapter({ id: 'ups', name: 'UPS', getRates: async (input) => [...] })
+ */
+export function registerCarrierAdapter(adapter: CarrierAdapter): void {
+  carrierAdapters.set(adapter.id, adapter)
+}
+
+/**
+ * 通过运营商 API 查询实时费率。
+ * 依次尝试每个已注册的适配器，合并结果并按价格排序。
+ * 如果没有注册任何适配器，返回空数组。
+ */
+export async function queryCarrierRates(
+  input: CarrierAdapter['getRates'] extends (input: infer I) => Promise<Array<infer R>> ? I : never,
+): Promise<Array<{
+  serviceLevel: string
+  costCents: number
+  currency: string
+  estimatedDaysMin: number
+  estimatedDaysMax: number
+  carrierId: string
+}>> {
+  if (carrierAdapters.size === 0) return []
+  const allRates: Array<{
+    serviceLevel: string
+    costCents: number
+    currency: string
+    estimatedDaysMin: number
+    estimatedDaysMax: number
+    carrierId: string
+  }> = []
+  for (const [carrierId, adapter] of carrierAdapters) {
+    try {
+      const rates = await adapter.getRates(input as Parameters<CarrierAdapter['getRates']>[0])
+      for (const rate of rates) {
+        allRates.push({ ...rate, carrierId })
+      }
+    } catch (err) {
+      // 单个运营商失败不影响其他运营商
+      console.warn(`Carrier ${carrierId} rate query failed:`, err)
+    }
+  }
+  return allRates.sort((a, b) => a.costCents - b.costCents)
+}

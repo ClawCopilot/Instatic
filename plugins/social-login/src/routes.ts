@@ -119,7 +119,22 @@ export async function handleCallback(
     tokenExpiresAt: tokens.expiresIn ? new Date(Date.now() + tokens.expiresIn * 1000).toISOString() : null,
     rawProfile: profile.raw,
   })
-  await api.hooks.emit('public-auth.userLoggedIn', { userId, sessionId: nanoid(), provider: adapter.id })
+  // 微信 token 轮换：access_token 仅 2 小时有效，立即用 refresh_token 换取新的
+  if (adapter.id === 'wechat' && tokens.refreshToken) {
+    try {
+      const refreshed = await adapter.exchangeCode({ code: tokens.refreshToken, redirectUri: '__refresh__', isRefresh: true })
+      if (refreshed.accessToken) {
+        await (await import('./store')).updateIdentityTokens(api.db, userId, adapter.id, {
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken ?? tokens.refreshToken,
+          tokenExpiresAt: refreshed.expiresIn ? new Date(Date.now() + refreshed.expiresIn * 1000).toISOString() : null,
+        })
+      }
+    } catch (err) {
+      api.log.warn(`WeChat token refresh failed (non-fatal): ${err}`)
+    }
+  }
+  await api.hooks.emit('public-auth.userLoggedIn', { userId, sessionId: _nanoid(), provider: adapter.id })
   return Response.redirect(stateRow.redirectTo, 302)
 }
 

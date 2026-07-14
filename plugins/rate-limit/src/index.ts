@@ -122,6 +122,12 @@ for (const migration of migrations) {
         scope = 'ip'
       }
 
+      // 分片策略：bucketKey 天然按 (scope, ip/userId, path) 组合分片，
+      // 使得不同路径、不同用户的计数存储在不同的行中，避免单一热点。
+      // 数据库层面，checkAndRecord 通过 UPSERT 操作 rate_limit_counters 表，
+      // 每个 bucketKey 对应一行，按 bucket_key 索引快速定位。
+      // 高流量场景下，同一 IP 的大量请求集中在同一 bucketKey 上；
+      // 可通过将 windowSeconds 细分为更小的时间分片（子桶）来进一步分散写入压力。
       const bucketKey = buildBucketKey(scope, ip, userId ?? null, pathname)
       const result = await checkAndRecord(ctx.db, {
         bucketKey, windowSeconds, limit,
@@ -189,4 +195,29 @@ function extractIp(req: Request, trustProxy: boolean): string | null {
   const stamped = req.headers.get('x-instatic-client-ip')
   if (stamped) return stamped
   return null
+}
+
+/**
+ * 分片清理函数：删除已过期的计数器分片，释放存储空间。
+ *
+ * 分片策略说明：
+ *   rate_limit_counters 表中每个 bucketKey 对应一行计数记录。
+ *   高流量场景下，同一 IP 可能在不同时间窗口产生多个分片行。
+ *   此函数定期清理已超过窗口期的旧分片，避免表无限膨胀。
+ *
+ * 建议通过宿主的定时任务机制（如 setInterval 或 cron）每隔
+ * windowSeconds * 2 的间隔调用一次，以平衡清理频率与性能开销。
+ *
+ * @param db        数据库客户端
+ * @param maxAgeMs  最大保留时长（毫秒），超过此时间的分片将被删除
+ * @returns         被清理的分片行数
+ */
+export async function cleanupExpiredShards(db: { [key: string]: unknown }, maxAgeMs: number): Promise<number> {
+  const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
+  const result = await (db as any)`
+    delete from rate_limit_counters
+    where updated_at < ${cutoff}
+    returning id
+  `
+  return (result.rows as unknown[])?.length ?? 0
 }

@@ -74,7 +74,7 @@ export async function handleMfaSetup(
         updated_at = now()
     where id = ${userId}
   `
-  const issuer = 'Instatic'  // TODO: pull from settings
+  const issuer = await (api.settings as { get?: (key: string) => Promise<unknown> }).get?.('mfaIssuer') as string ?? 'Instatic'
   const otpauthUrl = buildOtpauthUrl(secret, rows[0].email, issuer)
   return Response.json({
     secret,

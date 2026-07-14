@@ -357,8 +357,7 @@ export function renderOidcClientsPage(): string {
 
       <script>
         async function loadOidc() {
-          const { ok, data } = await api('GET', '/api/admin/commerce/coupons')  // not used; placeholder
-          // Use the OIDC admin endpoint
+          // 加载 OIDC 客户端列表
           const r = await api('GET', '/admin/api/oidc/clients')
           if (!r.ok) { showAlert('oidc-alert', 'error', 'Failed to load clients'); return }
           const tb = document.getElementById('oidc-tbody')

@@ -157,3 +157,36 @@ export async function validateRefundAmount(
     },
   }
 }
+
+/**
+ * 记录手动退款（非 Stripe）。适用于银行转账退款、
+ * 商店积分或其他线下退款方式。
+ */
+export async function recordManualRefund(
+  db: DbClient,
+  id: string,
+  method: 'bank_transfer' | 'store_credit' | 'cash' | 'other',
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const { rows: refundRows } = await tx<{ order_id: string; amount_cents: number }>`
+      update order_refunds
+      set status = 'succeeded',
+          completed_at = now()
+      where id = ${id} and status = 'pending'
+      returning order_id, amount_cents
+    `
+    if (refundRows[0]) {
+      await tx`
+        update orders
+        set refunded_cents = refunded_cents + ${refundRows[0].amount_cents},
+            status = case
+              when refunded_cents + ${refundRows[0].amount_cents} >= total_cents then 'refunded'
+              when refunded_cents + ${refundRows[0].amount_cents} > 0 then 'partially_refunded'
+              else status
+            end,
+            updated_at = now()
+        where id = ${refundRows[0].order_id}
+      `
+    }
+  })
+}
