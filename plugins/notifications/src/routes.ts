@@ -252,5 +252,64 @@ export async function handleAdminCreateWebhook(
     description: String(body.description ?? ''),
     enabled: body.enabled !== false,
   })
+  // 将原始 secret 持久化到 plugin_secrets，供后续签名和入站验证使用
+  await (await import('./store')).setWebhookSecret(api, webhook.id, secret)
   return Response.json({ webhook, secret }, { status: 201 })
+}
+
+// ─── 入站 Webhook — HMAC 签名验证 ─────────────────────────────────────
+
+/**
+ * 接收外部系统发来的入站 Webhook，并验证其 HMAC-SHA256 签名。
+ *
+ * 路径: POST /api/notifications/webhooks/:webhookId/inbound
+ * 要求请求头包含 `X-Instatic-Signature: t=<unix>,v1=<hex>`，
+ * 其中 hex = HMAC-SHA256(secret, `${t}.${body}`)。
+ */
+export async function handleWebhookInbound(
+  api: ApiCallContext,
+  req: Request,
+  webhookId: string,
+): Promise<Response> {
+  const body = await req.text()
+  const signatureHeader = req.headers.get('x-instatic-signature')
+  if (!signatureHeader) {
+    return new Response('Missing X-Instatic-Signature header', { status: 401 })
+  }
+
+  // 查询该 webhook 的 secret
+  const { getWebhookSecret } = await import('./store')
+  const secret = await getWebhookSecret(api, webhookId)
+  if (!secret) {
+    return new Response('Unknown webhook', { status: 404 })
+  }
+
+  // 验证签名
+  const { verifyHmacSignature } = await import('@instatic/plugin-sdk/shared/hmacWebhook')
+  const verifyResult = verifyHmacSignature(body, signatureHeader, secret)
+  if (!verifyResult.ok) {
+    api.log.warn(`Inbound webhook signature verification failed: ${verifyResult.error}, webhookId=${webhookId}`)
+    return new Response(`Invalid signature: ${verifyResult.error}`, { status: 401 })
+  }
+
+  // 验证通过，记录投递日志
+  let payload: Record<string, unknown>
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    return new Response('Invalid JSON body', { status: 400 })
+  }
+
+  await recordWebhookDelivery(api.db, webhookId, true, 'inbound_ok')
+  api.log.info(`Inbound webhook received and verified: webhookId=${webhookId}, event=${payload.event}`)
+
+  // 触发内部 hook，让其他插件消费此事件
+  await api.hooks.emit('notifications.webhookReceived', {
+    webhookId,
+    event: payload.event,
+    payload,
+    receivedAt: new Date().toISOString(),
+  })
+
+  return Response.json({ received: true, webhookId })
 }

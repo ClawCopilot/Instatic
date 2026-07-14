@@ -348,3 +348,50 @@ export async function handleAdminRestock(
   await adjustInventory(api.db, productId, body.delta, 'manual_adjustment', null, body.notes ?? null)
   return Response.json({ adjusted: true })
 }
+
+// ─── Admin: 订单状态变更 ──────────────────────────────────────────────
+
+/**
+ * 管理员标记订单为"已发货"（fulfilled）。
+ * 仅允许将 status='paid' 的订单变更为 fulfilled。
+ */
+export async function handleAdminFulfillOrder(
+  api: ApiCallContext,
+  orderId: string,
+): Promise<Response> {
+  const { rows } = await api.db`
+    update orders
+    set status = 'fulfilled', fulfilled_at = now(), updated_at = now()
+    where id = ${orderId} and status = 'paid'
+    returning id
+  `
+  if (!rows[0]) return Response.json({ error: 'order_not_paid_or_not_found' }, { status: 400 })
+  await api.hooks.emit('commerce.orderFulfilled', { orderId })
+  return Response.json({ fulfilled: true })
+}
+
+/**
+ * 管理员取消订单。
+ * 仅允许将 status in ('pending', 'paid') 的订单变更为 canceled。
+ * 取消时会释放该订单相关的库存预留。
+ */
+export async function handleAdminCancelOrder(
+  api: ApiCallContext,
+  orderId: string,
+): Promise<Response> {
+  const { rows } = await api.db`
+    update orders
+    set status = 'canceled', canceled_at = now(), updated_at = now()
+    where id = ${orderId} and status in ('pending', 'paid')
+    returning id
+  `
+  if (!rows[0]) return Response.json({ error: 'order_not_cancellable' }, { status: 400 })
+  // 释放预留的库存（如果有）
+  await api.db`
+    update inventory_reservations
+    set released_at = now()
+    where order_id = ${orderId} and consumed_at is null and released_at is null
+  `
+  await api.hooks.emit('commerce.orderCanceled', { orderId })
+  return Response.json({ canceled: true })
+}

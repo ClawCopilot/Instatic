@@ -25,7 +25,7 @@
 
 import { randomBytes as _randomBytes } from 'node:crypto'
 import type { ApiCallContext } from '@instatic/plugin-sdk'
-import { anonymizeUser, exportUserData } from './gdpr'
+import { exportUserData } from './gdpr'
 
 export async function handleExport(
   api: ApiCallContext,
@@ -63,25 +63,45 @@ export async function handleDelete(
   // Generate the export first (user can download after deletion)
   const exportData = await exportUserData(api.db, userId)
 
-  // Anonymize + soft delete
-  const result = await anonymizeUser(api.db, userId)
+  // 使用冷静期模式调度删除（默认 7 天），而非立即删除
+  const { scheduleUserDeletion } = await import('./gdpr')
+  const { scheduledAt } = await scheduleUserDeletion(api.db, userId, 7)
 
   // Emit post-deletion hook (other plugins can clean up their data)
   await api.hooks.emit('public-auth.userDeleted', {
     userId,
-    anonymizedFields: result.anonymizedFields,
-    sessionRevokedCount: result.sessionRevokedCount,
+    anonymizedFields: [],
+    sessionRevokedCount: 0,
     exportedAt: exportData.exportedAt,
   })
 
   // Clear the auth cookie
   const response = Response.json({
     deleted: true,
-    anonymizedFields: result.anonymizedFields,
-    sessionRevokedCount: result.sessionRevokedCount,
+    scheduledAt,
+    anonymizedFields: [],
+    sessionRevokedCount: 0,
     exportAvailable: true,
     exportSize: JSON.stringify(exportData).length,
   })
   response.headers.append('set-cookie', 'public_auth_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')
   return response
+}
+
+export async function handleCancelDeletion(
+  api: ApiCallContext,
+  req: Request,
+): Promise<Response> {
+  let body: { cancelToken?: string }
+  try {
+    body = await req.json() as typeof body
+  } catch {
+    return Response.json({ error: 'invalid_json' }, { status: 400 })
+  }
+  if (!body.cancelToken) {
+    return Response.json({ error: 'cancelToken required' }, { status: 400 })
+  }
+  const result = await (await import('./gdpr')).cancelScheduledDeletion(api.db, body.cancelToken)
+  if (!result.ok) return Response.json({ error: result.reason }, { status: 400 })
+  return Response.json({ canceled: true })
 }

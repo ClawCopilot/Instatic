@@ -43,7 +43,6 @@ import {
   findClientByClientId,
   findConsent,
   findRefreshToken,
-  findRefreshTokenIncludingRevoked as _findRefreshTokenIncludingRevoked,
   listClients,
   recordConsent,
   revokeTokenFamily,
@@ -427,7 +426,30 @@ export async function handleToken(
           userAgent: req.headers.get('user-agent'),
           detectedAt: new Date().toISOString(),
         })
-        // TODO: log to oidc_token_replay_signals + rate-limit the client
+        // 记录重放信号到审计表，用于追踪和限速检测
+        await api.db`
+          insert into oidc_token_replay_signals (id, client_id, user_id, token_hash_prefix, client_ip, detected_at)
+          values (
+            ${nanoid()},
+            ${existing.clientId},
+            ${existing.userId},
+            ${tokenHash.slice(0, 8)},
+            ${req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? ''},
+            now()
+          )
+        `
+        // 限速检测：如果该 client 在过去 1 小时内重放次数 >= 5，临时拒绝请求
+        const { rows: recentReplays } = await api.db`
+          select count(*)::int as cnt from oidc_token_replay_signals
+          where client_id = ${existing.clientId}
+            and detected_at > now() - interval '1 hour'
+        `
+        if ((recentReplays[0]?.cnt ?? 0) >= 5) {
+          return Response.json({
+            error: 'too_many_replay_attempts',
+            error_description: 'Too many token replay attempts from this client. Access temporarily blocked.',
+          }, { status: 429 })
+        }
         return Response.json({
           error: 'invalid_grant',
           error_description: 'Token replay detected. All sessions for this client have been revoked.',

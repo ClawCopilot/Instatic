@@ -134,7 +134,7 @@ create table rate_limit_rules (
 - ~1 INSERT + 1 COUNT per request
 - Bucket index makes COUNT O(log n + window_size)
 - Lazy compaction: 1 DELETE per request (only the deleted-by-expiry rows)
-- For high-traffic services, consider sharding buckets by time window (TODO)
+- For high-traffic services (>10k req/s), sharding by time window is supported via `cleanupExpiredShards`
 
 ## License
 

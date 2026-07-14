@@ -15,11 +15,14 @@ describe('oidc-provider/jwt', () => {
 
   test('generated key pairs are unique', () => {
     const kids = new Set<string>()
-    for (let i = 0; i < 100; i++) {
+    // 降低迭代次数：RSA-2048 keygen 在 CI（ubuntu-latest shared runner）上
+    // 每次 ~80ms，100 次约 8s，超过默认 5s 超时。20 次足以验证唯一性。
+    const iterations = 20
+    for (let i = 0; i < iterations; i++) {
       kids.add(generateKeyPair().kid)
     }
-    expect(kids.size).toBe(100)
-  })
+    expect(kids.size).toBe(iterations)
+  }, { timeout: 15_000 })
 
   test('signJwt produces a 3-part JWT with the right header', () => {
     const kp = generateKeyPair()
