@@ -1,6 +1,15 @@
 # syntax=docker/dockerfile:1
 
 FROM oven/bun:1.3.14 AS build
+# `oven/bun:1.3.14` is a floating tag — the image may ship a different
+# 1.3.14 patch than the one that wrote the committed `bun.lock`, which
+# makes `bun install --frozen-lockfile` fail with "lockfile had
+# changes". Pin to the exact commit that wrote the lockfile
+# (0d9b296a) so lockfile writer and runtime agree.
+RUN curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v0d9b296a/bun-linux-x64.zip -o /tmp/bun.zip \
+ && unzip /tmp/bun.zip -d /usr/local/bun \
+ && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
+ && bun --version
 WORKDIR /app
 # vendor/pixel-art-icons is a `file:` dep — `bun install` needs it on disk to
 # resolve the dependency, so copy it alongside the manifest before installing.
@@ -11,6 +20,16 @@ COPY . .
 RUN bun run build
 
 FROM oven/bun:1.3.14 AS production-deps
+WORKDIR /app
+# Same pin: replace the image's bun with the exact commit that wrote
+# `bun.lock`, so `bun install --frozen-lockfile --production` agrees.
+RUN curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v0d9b296a/bun-linux-x64.zip -o /tmp/bun.zip \
+ && unzip /tmp/bun.zip -d /usr/local/bun \
+ && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
+ && bun --version
+COPY package.json bun.lock ./
+COPY vendor ./vendor
+RUN bun install --frozen-lockfile --production
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY vendor ./vendor
