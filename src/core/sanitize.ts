@@ -63,15 +63,26 @@ export function configureRichtextSanitizer(purifier: DOMPurifyRuntime | null): v
 }
 
 function getDOMPurify(): DOMPurifyRuntime | null {
-  const direct = activeDOMPurify ?? importedDOMPurify
-  if (typeof direct.sanitize === 'function') {
-    return installLinkHook(direct)
+  // Always prefer the explicitly-configured runtime.
+  if (activeDOMPurify && typeof activeDOMPurify.sanitize === 'function') {
+    return installLinkHook(activeDOMPurify)
   }
 
-  if (typeof window !== 'undefined' && typeof importedDOMPurify === 'function') {
-    activeDOMPurify = importedDOMPurify(window)
-    if (typeof activeDOMPurify.sanitize === 'function') {
-      return installLinkHook(activeDOMPurify)
+  // The module-level importedDOMPurify may have been created against the
+  // wrong window during module load (e.g. CI environments where Bun exposes
+  // a default window object before our test setup runs).  Instead of using
+  // it directly, treat it as a factory and create a fresh instance with the
+  // *current* window so we are guaranteed a runtime backed by the DOM we
+  // actually want (happy-dom in tests, real DOM in browser).
+  const win =
+    (globalThis as { __HAPPY_DOM_WINDOW__?: Window }).__HAPPY_DOM_WINDOW__ ??
+    (typeof window !== 'undefined' ? window : null)
+
+  if (win && typeof importedDOMPurify === 'function') {
+    const fresh = importedDOMPurify(win)
+    if (typeof fresh.sanitize === 'function') {
+      activeDOMPurify = fresh
+      return installLinkHook(fresh)
     }
   }
 

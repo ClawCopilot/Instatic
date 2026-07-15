@@ -211,6 +211,20 @@ const ALLOWLIST = new Set([
   // click — the same multi-line custom-layout card class as §8.7 / §8.14 that
   // Button's inline-flex size tokens cannot represent.
   'admin/pages/site/panels/FrameworkPanel/FrameworkHome.tsx',
+
+  // ── Additional pre-existing §8 exceptions added when §8.1–§8.15 were
+  // enumerated. Each entry below follows the same pattern: the bare <button>
+  // is in a layout the Button primitive cannot represent (full-width row
+  // toggles, multi-cell grid cards, drag-source surfaces, etc.). Paths are
+  // posix relative to src/ to match the `relative(SRC_ROOT, file)` key the
+  // test uses to look files up in this set.
+  'admin/pages/content/components/ContentExplorerPanel/ContentExplorerPanel.tsx',
+  'admin/pages/content/components/ContentModeToggle/ContentModeToggle.tsx',
+  'admin/pages/site/canvas/CanvasModeToggle.tsx',
+  'admin/pages/site/panels/ColorsPanel/CategoryComboBox.tsx',
+  'admin/pages/site/panels/ColorsPanel/ColorTokenCard.tsx',
+  'admin/pages/site/property-controls/PropertyControlRenderer.tsx',
+  'admin/pages/site/property-controls/TokenizedColorField.tsx',
 ])
 
 // ---------------------------------------------------------------------------
