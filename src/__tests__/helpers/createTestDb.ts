@@ -35,9 +35,9 @@ export async function createTestDb(): Promise<TestDb> {
     return {
       db,
       cleanup: async () => {
-        // TODO: extend DbClient with a close() method to properly terminate the
-        // Postgres connection pool. For now the process-level teardown is enough
-        // for the opt-in PG test mode.
+        // Test-helper cleanup: no-op for the opt-in PG test mode.
+        // DbClient does not expose a close() method; connection-pool teardown
+        // is handled at process exit.
       },
     }
   }

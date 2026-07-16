@@ -4,6 +4,8 @@
  * Coupon types:
  *   - percent: off X% of subtotal (or applicable items only)
  *   - fixed:   off $X (capped at subtotal)
+ *   - bogo: buy X get Y -- cheapest Y items are free
+ *   - free_shipping: no discount amount, handled by shipping module
  *
  * Constraints (all enforced at apply time):
  *   - enabled
@@ -16,8 +18,6 @@
  * Audit trail: every successful redemption is recorded in coupon_redemptions.
  * Race-safe: apply is a single SQL transaction that increments current_uses
  * atomically (won't exceed max_uses even under concurrent attempts).
- *
- * TODO: BOGO (buy X get Y) and free-shipping coupons.
  */
 
 import { randomBytes } from 'node:crypto'
@@ -199,7 +199,7 @@ export async function applyCoupon(
     userId: string
     orderId: string
     cartSubtotalCents: number
-    cartItems: Array<{ productId: string; productSlug: string; priceCents: number }>
+    cartItems: Array<{ productId: string; productSlug: string; priceCents: number; quantity?: number }>
   },
 ): Promise<CouponValidationResult> {
   const coupon = await findCouponByCode(db, args.code)
@@ -227,7 +227,7 @@ export async function applyCoupon(
   // Calculate the discount
   const applicableSubtotal = calculateApplicableSubtotal(coupon, args.cartItems, args.cartSubtotalCents)
   if (applicableSubtotal === 0) return { ok: false, coupon, reason: 'no_applicable_items' }
-  const discountCents = computeDiscount(coupon, applicableSubtotal)
+  const discountCents = computeDiscount(coupon, applicableSubtotal, args.cartItems)
   if (discountCents === 0) return { ok: false, coupon, reason: 'no_applicable_items' }
   return { ok: true, coupon, discountCents }
 }
@@ -247,17 +247,48 @@ export function calculateApplicableSubtotal(
   return cartItems.filter((i) => slugs.has(i.productSlug.split('/')[0] ?? '')).reduce((s, i) => s + i.priceCents, 0)
 }
 
-export function computeDiscount(coupon: Coupon, applicableSubtotalCents: number): number {
+export interface CartItemForDiscount {
+  productId: string
+  productSlug: string
+  priceCents: number
+  quantity: number
+}
+
+export function computeDiscount(
+  coupon: Coupon,
+  applicableSubtotalCents: number,
+  cartItems?: CartItemForDiscount[],
+): number {
   if (coupon.type === 'percent') {
     return Math.floor((applicableSubtotalCents * coupon.value) / 100)
   }
   if (coupon.type === 'fixed') {
     return Math.min(coupon.value, applicableSubtotalCents)
   }
-  // BOGO 和免运费类型不直接产生折扣金额
-  // BOGO: 标记为"可用"，checkout 层负责买一送一逻辑
-  // free_shipping: 标记为"可用"，shipping 模块负责免除运费
+  if (coupon.type === 'bogo') {
+    // coupon.value = free item count (Y in "buy X get Y")
+    // coupon.minOrderCents = minimum purchase quantity (X)
+    if (!cartItems || cartItems.length === 0) return 0
+    const totalApplicableItems = cartItems.reduce((sum, i) => sum + i.quantity, 0)
+    if (totalApplicableItems < coupon.minOrderCents) return 0
+    // Collect all unit prices, then pick the cheapest Y to be free
+    const unitPrices: number[] = []
+    for (const item of cartItems) {
+      for (let q = 0; q < item.quantity; q++) {
+        unitPrices.push(item.priceCents)
+      }
+    }
+    unitPrices.sort((a, b) => a - b)
+    const freeCount = Math.min(coupon.value, unitPrices.length)
+    const discountCents = unitPrices.slice(0, freeCount).reduce((sum, p) => sum + p, 0)
+    return Math.min(discountCents, applicableSubtotalCents)
+  }
+  // free_shipping: does not produce a discount amount
   return 0
+}
+
+export function isFreeShippingCoupon(coupon: Coupon): boolean {
+  return coupon.type === 'free_shipping'
 }
 
 /**

@@ -33,8 +33,6 @@ import styles from './DataSidebar.module.css'
 // ---------------------------------------------------------------------------
 
 interface DataSidebarProps {
-  // TODO: each table now carries `rowCount` — consider rendering a count chip
-  // next to the kind badge once the sidebar layout has a natural slot for it.
   tables: DataTableListItem[]
   loading: boolean
   error: string | null
@@ -140,6 +138,9 @@ export function DataSidebar({
             : table.kind === 'component' ? 'component'
             : 'data'}
         </span>
+        {table.rowCount > 0 && (
+          <span className={styles.rowCountBadge}>{table.rowCount}</span>
+        )}
       </Button>
     )
   }

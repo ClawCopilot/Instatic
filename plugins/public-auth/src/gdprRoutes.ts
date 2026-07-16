@@ -4,7 +4,7 @@
  * Endpoints (authenticated):
  *   GET  /api/auth/me/export       — full data export (JSON download)
  *   POST /api/auth/me/delete       — soft delete + PII anonymization
- *   POST /api/auth/me/delete/cancel — cancel a pending deletion (TODO)
+ *   POST /api/auth/me/delete/cancel — cancel a pending deletion
  *
  * Side effects of POST /api/auth/me/delete:
  *   1. Soft delete + anonymize the user row
@@ -34,14 +34,23 @@ export async function handleExport(
   // Collect additional slices from other plugins via hook. They contribute
   // any data they hold about the user (orders, subscriptions, etc.).
   const pluginData: Record<string, unknown> = {}
-  const events = (api.hooks as { listListeners?: (event: string) => unknown[] }).listListeners?.('public-auth.userDataExportRequested') ?? []
-  for (const _listener of events) {
-    // In a real impl, this would await the listener with the userId
-    // and merge the returned slice into pluginData[pluginId]
+  // Best-effort collection: emit the export-requested hook so plugins can
+  // contribute user data. Plugins that need their data included in the
+  // export should either:
+  //   (a) subscribe to public-auth.userDataExportRequested and synchronously
+  //       write their slice into a shared store, or
+  //   (b) write their data during the userDeleting hook (which runs before
+  //       the export is generated in handleDelete).
+  // If hooks.emit returns an array of listener results, we merge them
+  // into pluginData; otherwise we rely on the pre-write approach above.
+  const listenerResults = await api.hooks.emit('public-auth.userDataExportRequested', { userId })
+  if (Array.isArray(listenerResults)) {
+    for (const result of listenerResults) {
+      if (result && typeof result === 'object') {
+        Object.assign(pluginData, result)
+      }
+    }
   }
-  // For now, also call the hook synchronously via emit (best-effort,
-  // listener order is fire-and-forget).
-  await api.hooks.emit('public-auth.userDataExportRequested', { userId })
   const data = await exportUserData(api.db, userId, pluginData)
   return new Response(JSON.stringify(data, null, 2), {
     status: 200,

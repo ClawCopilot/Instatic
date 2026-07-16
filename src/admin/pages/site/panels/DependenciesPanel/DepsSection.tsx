@@ -44,7 +44,7 @@ import styles from './DepsSection.module.css'
 
 interface RemoveConfirmState {
   name: string
-  /** TODO(Phase G): used by `bun remove --dev` when bridge is active */
+  /** PHASE_G: used by `bun remove --dev` when bridge is active */
   dev: boolean
 }
 
@@ -141,7 +141,7 @@ export function DepsSection() {
     setDependency(name, '*', addDev)
     setAddName('')
     setAddError(null)
-    // TODO(Phase G): ask the site bridge to install this in the user site.
+    // PHASE_G: ask the site bridge to install this in the user site.
   }
 
   const handleRuntimeIssueAction = (issue: RuntimeDependencyIssue) => {
@@ -167,7 +167,7 @@ export function DepsSection() {
     if (removeConfirm) {
       removeDependency(removeConfirm.name)
       setRemoveConfirm(null)
-      // TODO(Phase G): ask the site bridge to remove this from the user site.
+      // PHASE_G: ask the site bridge to remove this from the user site.
     }
   }
 

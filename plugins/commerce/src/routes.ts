@@ -22,8 +22,9 @@
  *
  * Admin (requires content.manage):
  *   GET  /admin/api/commerce/orders           — all orders
- *   POST /admin/api/commerce/orders/:id/refund — issue refund
- *   POST /admin/api/commerce/products/:id/restock — adjust inventory
+ *   POST /admin/api/commerce/orders/:id/refund       — issue Stripe refund
+ *   POST /admin/api/commerce/orders/:id/refund/manual — issue non-Stripe manual refund
+ *   POST /admin/api/commerce/products/:id/restock     — adjust inventory
  */
 
 import type { ApiCallContext } from '@instatic/plugin-sdk'
@@ -37,6 +38,11 @@ import {
   markOrderPaid,
   updateCartLineItems,
 } from './store'
+import {
+  createRefund,
+  recordManualRefund,
+  validateRefundAmount,
+} from './refunds'
 import { verifyAndParseStripeWebhook } from '@instatic/plugin-sdk/shared/stripeWebhook'
 
 interface CommerceSettings {
@@ -394,4 +400,60 @@ export async function handleAdminCancelOrder(
   `
   await api.hooks.emit('commerce.orderCanceled', { orderId })
   return Response.json({ canceled: true })
+}
+
+// ─── Admin: Manual (non-Stripe) refund ────────────────────────────────────
+
+const VALID_MANUAL_REFUND_METHODS = new Set(['bank_transfer', 'store_credit', 'cash', 'other'])
+
+/**
+ * 管理员手动退款 handler（非 Stripe）。
+ * 适用于银行转账退款、商店积分、现金或其他线下退款方式。
+ */
+export async function handleAdminManualRefund(
+  api: ApiCallContext,
+  req: Request,
+  orderId: string,
+): Promise<Response> {
+  let body: {
+    amountCents?: number
+    reason?: string
+    method?: string
+    notes?: string
+  }
+  try {
+    body = await req.json() as typeof body
+  } catch {
+    return Response.json({ error: 'invalid_json' }, { status: 400 })
+  }
+  if (typeof body.amountCents !== 'number' || body.amountCents <= 0) {
+    return Response.json({ error: 'positive amountCents required' }, { status: 400 })
+  }
+  if (!body.reason || typeof body.reason !== 'string') {
+    return Response.json({ error: 'reason required' }, { status: 400 })
+  }
+  if (!body.method || !VALID_MANUAL_REFUND_METHODS.has(body.method)) {
+    return Response.json({ error: 'method must be one of: bank_transfer, store_credit, cash, other' }, { status: 400 })
+  }
+  // Validate refund amount against order
+  const validation = await validateRefundAmount(api.db, orderId, body.amountCents)
+  if (!validation.ok) {
+    return Response.json({ error: validation.reason }, { status: 400 })
+  }
+  // Create the pending refund record
+  const refund = await createRefund(api.db, {
+    orderId,
+    amountCents: body.amountCents,
+    currency: validation.order.currency,
+    reason: body.reason,
+    refundedByUserId: viewerUserId(api) ?? null,
+    notes: body.notes ?? null,
+  })
+  // Mark as succeeded via manual method
+  await recordManualRefund(
+    api.db,
+    refund.id,
+    body.method as 'bank_transfer' | 'store_credit' | 'cash' | 'other',
+  )
+  return Response.json({ refundCreated: true, refundId: refund.id })
 }

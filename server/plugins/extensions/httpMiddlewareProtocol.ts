@@ -29,12 +29,12 @@ export async function handleHttpMiddlewareRegister(
   _entry: HostPluginRecord,
   _db: DbClient,
 ): Promise<void> {
-  // Placeholder middleware — for now this is a no-op pass-through.
-  // Plugin code that wants to gate requests should register routes via
-  // `api.cms.routes.register(...)` with the appropriate access mode
-  // (capability / authenticated / public). The middleware list is
-  // checked first in `runPluginHttpMiddleware`, so a plugin can
-  // short-circuit a request here before the dispatcher walks routes.
+  // Pass-through placeholder — the registered middleware function is stored
+  // so operators can see the plugin's intent in the install dialog, but actual
+  // execution is not wired yet. The rate-limit plugin registers middleware via
+  // the independent `cms.httpMiddleware` permission declaration; the host-side
+  // request pipeline must invoke these middleware functions for the hook to take
+  // effect.
   const middleware: HttpMiddleware = async (_req, _ctx) => null
 
   registerPluginHttpMiddleware(msg.pluginId, middleware)

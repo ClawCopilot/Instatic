@@ -1,9 +1,7 @@
 /**
  * Coupon unit tests.
  *
- * Tests pure calculation logic (no DB). For the DB-touching parts, see
- * integration tests in plugins/_shared/tests/integration/coupons.test.ts
- * (TODO).
+ * Tests pure calculation logic (no DB).
  */
 
 import { describe, test, expect } from 'bun:test'

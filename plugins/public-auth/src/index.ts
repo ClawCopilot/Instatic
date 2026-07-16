@@ -30,7 +30,7 @@ import {
   handleVerifyEmail,
   resolveUserFromRequest,
 } from './routes'
-import { handleDelete, handleExport } from './gdprRoutes'
+import { handleDelete, handleExport, handleCancelDeletion } from './gdprRoutes'
 import {
   handleMfaDisable,
   handleMfaEnable,
@@ -136,6 +136,9 @@ export async function activate(api: any) {
       const userId = (ctx.userId ?? '') as string
       if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 })
       return handleDelete(ctx, userId, req)
+    })
+    await api.cms.routes.register('POST', '/api/auth/me/delete/cancel', 'public', async (ctx, req) => {
+      return handleCancelDeletion(ctx, req)
     })
 
     // ─── MFA / 2FA routes ───────────────────────────────────────────────────

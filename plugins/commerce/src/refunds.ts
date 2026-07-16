@@ -13,6 +13,8 @@
  *   - Only one pending refund per order at a time (to prevent double-issues)
  *
  * TODO: support non-Stripe refund methods (manual bank transfer, store credit).
+ * Status: recordManualRefund is implemented. Manual refund is accessible via
+ * POST /admin/api/commerce/orders/:id/refund/manual
  */
 
 import { randomBytes } from 'node:crypto'

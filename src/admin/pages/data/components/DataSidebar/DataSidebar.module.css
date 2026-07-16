@@ -72,6 +72,16 @@
     text-transform: lowercase;
 }
 
+.rowCountBadge {
+    font-size: var(--text-3xs);
+    color: var(--text-subtle);
+    background: var(--bg-surface-3);
+    padding: var(--space-px) var(--space-3xs);
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
 .errorText {
     margin: 0;
     padding: var(--space-s) var(--space-3xs);
