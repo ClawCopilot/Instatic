@@ -15,6 +15,7 @@ import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
 import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
 import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
 import { PackageSolidIcon } from 'pixel-art-icons/icons/package-solid'
+import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import { UsersSolidIcon } from 'pixel-art-icons/icons/users-solid'
 import { listCmsPlugins } from '@core/persistence/cmsPlugins'
 import type { CmsCurrentUser } from '@core/persistence'
@@ -173,6 +174,15 @@ export function AdminSectionNavigation({
       {canAccess('plugins') && (
         <PluginsNavLink
           active={section === 'plugins'}
+          onNavigateStart={onWorkspaceNavigateStart}
+        />
+      )}
+      {canAccess('skills') && (
+        <NavItem
+          to="/admin/skills"
+          icon={<SparklesSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          label="Skills"
+          active={section === 'skills'}
           onNavigateStart={onWorkspaceNavigateStart}
         />
       )}
