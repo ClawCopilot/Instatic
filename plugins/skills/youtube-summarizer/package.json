@@ -1,0 +1,45 @@
+{
+  "name": "@instatic/youtube-summarizer",
+  "version": "0.1.0",
+  "description": "Fetch and summarize YouTube video transcripts for content research and creation.",
+  "instaticManifest": {
+    "id": "instatic.youtube-summarizer",
+    "name": "YouTube Summarizer",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Fetch YouTube video transcripts and generate summaries, key points, and quotes for content research.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "www.youtube.com",
+      "youtubei.googleapis.com",
+      "returnyoutubedislikeapi.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "summaryLength",
+        "label": "Default Summary Length",
+        "type": "select",
+        "options": [
+          { "value": "brief", "label": "Brief (1-2 paragraphs)" },
+          { "value": "medium", "label": "Medium (3-5 paragraphs)" },
+          { "value": "detailed", "label": "Detailed (full breakdown)" }
+        ],
+        "default": "medium"
+      },
+      {
+        "id": "includeTimestamps",
+        "label": "Include Timestamps",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  }
+}
