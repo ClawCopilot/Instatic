@@ -1,0 +1,47 @@
+{
+  "name": "@instatic/code-helper",
+  "version": "0.1.0",
+  "description": "Code assistant skill — review, explain, and generate code snippets.",
+  "instaticManifest": {
+    "id": "instatic.code-helper",
+    "name": "Code Helper",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "AI-powered code assistant for reviewing, explaining, and generating code snippets.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "preferredLanguage",
+        "label": "Preferred Language",
+        "type": "select",
+        "options": [
+          { "value": "typescript", "label": "TypeScript" },
+          { "value": "javascript", "label": "JavaScript" },
+          { "value": "python", "label": "Python" },
+          { "value": "go", "label": "Go" },
+          { "value": "rust", "label": "Rust" },
+          { "value": "java", "label": "Java" }
+        ],
+        "default": "typescript"
+      },
+      {
+        "id": "strictness",
+        "label": "Review Strictness",
+        "type": "select",
+        "options": [
+          { "value": "lenient", "label": "Lenient" },
+          { "value": "balanced", "label": "Balanced" },
+          { "value": "strict", "label": "Strict" }
+        ],
+        "default": "balanced"
+      }
+    ]
+  }
+}
