@@ -1,57 +1,110 @@
-﻿{
-    "name":  "@instatic/web-research",
-    "version":  "0.1.0",
-    "description":  "Web research skill — search the web and summarize URLs for content creation.",
-    "instaticManifest":  {
-                             "id":  "instatic.web-research",
-                             "name":  "Web Research",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Search the web and summarize URLs to enrich CMS content with real-time information.",
-                             "permissions":  [
-                                                 "network.outbound",
-                                                 "cms.routes.public"
-                                             ],
-                             "networkAllowedHosts":  [
-                                                         "duckduckgo.com",
-                                                         "html.duckduckgo.com",
-                                                         "api.bing.microsoft.com"
-                                                     ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "searchEngine",
-                                                  "label":  "Search Engine",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "duckduckgo",
-                                                                      "label":  "DuckDuckGo"
-                                                                  },
-                                                                  {
-                                                                      "value":  "bing",
-                                                                      "label":  "Bing"
-                                                                  }
-                                                              ],
-                                                  "default":  "duckduckgo"
-                                              },
-                                              {
-                                                  "id":  "resultCount",
-                                                  "label":  "Results per search",
-                                                  "type":  "number",
-                                                  "min":  1,
-                                                  "max":  20,
-                                                  "default":  5
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/web-research",
+  "version": "0.1.0",
+  "description": "Web research skill — search the web and summarize URLs for content creation.",
+  "instaticManifest": {
+    "id": "instatic.web-research",
+    "name": "Web Research",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Search the web and summarize URLs to enrich CMS content with real-time information.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "duckduckgo.com",
+      "html.duckduckgo.com",
+      "api.bing.microsoft.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "searchEngine",
+        "label": "Search Engine",
+        "type": "select",
+        "options": [
+          {
+            "value": "duckduckgo",
+            "label": "DuckDuckGo"
+          },
+          {
+            "value": "bing",
+            "label": "Bing"
+          }
+        ],
+        "default": "duckduckgo"
+      },
+      {
+        "id": "resultCount",
+        "label": "Results per search",
+        "type": "number",
+        "min": 1,
+        "max": 20,
+        "default": 5
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "search_web",
+        "description": "Search the web using DuckDuckGo or Bing and return summarized results.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query"
+            },
+            "engine": {
+              "type": "string",
+              "enum": [
+                "duckduckgo",
+                "bing"
+              ],
+              "description": "Search engine to use",
+              "default": "duckduckgo"
+            },
+            "maxResults": {
+              "type": "integer",
+              "description": "Maximum results to return",
+              "default": 5,
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "summarize_url",
+        "description": "Fetch and summarize the content of a URL.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "The URL to summarize",
+              "format": "uri"
+            },
+            "maxLength": {
+              "type": "integer",
+              "description": "Maximum summary length",
+              "default": 500
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a web research assistant embedded in a CMS. You help users find information from the internet to enrich their website content. When searching, provide concise, relevant results. When summarizing URLs, extract key information and present it in a clear format. Always cite your sources. Respond in the language the user writes in."
+  }
 }

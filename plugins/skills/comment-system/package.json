@@ -1,63 +1,133 @@
-﻿{
-    "name":  "@instatic/comment-system",
-    "version":  "0.1.0",
-    "description":  "AI-enhanced comment and discussion system with spam filtering, sentiment analysis, and auto-moderation.",
-    "instaticManifest":  {
-                             "id":  "instatic.comment-system",
-                             "name":  "Comment System",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "AI-enhanced comment and discussion system with spam detection, sentiment analysis, auto-moderation, and threaded replies.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "moderationLevel",
-                                                  "label":  "Auto-Moderation Level",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "none",
-                                                                      "label":  "None (manual only)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "spam-only",
-                                                                      "label":  "Spam Filter Only"
-                                                                  },
-                                                                  {
-                                                                      "value":  "balanced",
-                                                                      "label":  "Balanced (spam + toxicity)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "strict",
-                                                                      "label":  "Strict (all content filtered)"
-                                                                  }
-                                                              ],
-                                                  "default":  "balanced"
-                                              },
-                                              {
-                                                  "id":  "sentimentDisplay",
-                                                  "label":  "Show Comment Sentiment",
-                                                  "type":  "toggle",
-                                                  "default":  false
-                                              },
-                                              {
-                                                  "id":  "threadedReplies",
-                                                  "label":  "Enable Threaded Replies",
-                                                  "type":  "toggle",
-                                                  "default":  true
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/comment-system",
+  "version": "0.1.0",
+  "description": "AI-enhanced comment and discussion system with spam filtering, sentiment analysis, and auto-moderation.",
+  "instaticManifest": {
+    "id": "instatic.comment-system",
+    "name": "Comment System",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "AI-enhanced comment and discussion system with spam detection, sentiment analysis, auto-moderation, and threaded replies.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "moderationLevel",
+        "label": "Auto-Moderation Level",
+        "type": "select",
+        "options": [
+          {
+            "value": "none",
+            "label": "None (manual only)"
+          },
+          {
+            "value": "spam-only",
+            "label": "Spam Filter Only"
+          },
+          {
+            "value": "balanced",
+            "label": "Balanced (spam + toxicity)"
+          },
+          {
+            "value": "strict",
+            "label": "Strict (all content filtered)"
+          }
+        ],
+        "default": "balanced"
+      },
+      {
+        "id": "sentimentDisplay",
+        "label": "Show Comment Sentiment",
+        "type": "toggle",
+        "default": false
+      },
+      {
+        "id": "threadedReplies",
+        "label": "Enable Threaded Replies",
+        "type": "toggle",
+        "default": true
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "moderate_comment",
+        "description": "Analyze and moderate a comment for spam, toxicity, and appropriateness.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "comment": {
+              "type": "string",
+              "description": "The comment text to moderate"
+            },
+            "level": {
+              "type": "string",
+              "enum": [
+                "none",
+                "spam-only",
+                "balanced",
+                "strict"
+              ],
+              "description": "Moderation strictness",
+              "default": "balanced"
+            },
+            "context": {
+              "type": "string",
+              "description": "Context of the discussion for better accuracy"
+            }
+          },
+          "required": [
+            "comment"
+          ]
+        }
+      },
+      {
+        "name": "analyze_sentiment",
+        "description": "Analyze the sentiment and emotional tone of a comment.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Text to analyze"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "generate_reply_suggestion",
+        "description": "Generate a suggested reply to a comment.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "originalComment": {
+              "type": "string",
+              "description": "The comment to reply to"
+            },
+            "tone": {
+              "type": "string",
+              "description": "Reply tone"
+            },
+            "context": {
+              "type": "string",
+              "description": "Discussion context"
+            }
+          },
+          "required": [
+            "originalComment"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are an AI-powered comment moderation assistant. You help maintain healthy discussions by detecting spam, toxicity, and inappropriate content. Be fair and unbiased in moderation decisions. For sentiment analysis, provide a clear score and explanation. For reply suggestions, match the tone and context of the original discussion. Respond in the language the user writes in."
+  }
 }

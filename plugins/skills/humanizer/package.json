@@ -1,71 +1,122 @@
-﻿{
-    "name":  "@instatic/humanizer",
-    "version":  "0.1.0",
-    "description":  "Remove signs of AI-generated writing from text. Makes content sound more natural and human.",
-    "instaticManifest":  {
-                             "id":  "instatic.humanizer",
-                             "name":  "Humanizer",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Remove signs of AI-generated writing from CMS content. Makes text sound more natural, personal, and human-written.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "style",
-                                                  "label":  "Humanization Style",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "natural",
-                                                                      "label":  "Natural \u0026 Casual"
-                                                                  },
-                                                                  {
-                                                                      "value":  "professional",
-                                                                      "label":  "Professional but Warm"
-                                                                  },
-                                                                  {
-                                                                      "value":  "storytelling",
-                                                                      "label":  "Storytelling"
-                                                                  },
-                                                                  {
-                                                                      "value":  "minimal",
-                                                                      "label":  "Minimal Changes"
-                                                                  }
-                                                              ],
-                                                  "default":  "natural"
-                                              },
-                                              {
-                                                  "id":  "intensity",
-                                                  "label":  "Humanization Intensity",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "light",
-                                                                      "label":  "Light (subtle tweaks)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "medium",
-                                                                      "label":  "Medium (balanced)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "heavy",
-                                                                      "label":  "Heavy (full rewrite)"
-                                                                  }
-                                                              ],
-                                                  "default":  "medium"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/humanizer",
+  "version": "0.1.0",
+  "description": "Remove signs of AI-generated writing from text. Makes content sound more natural and human.",
+  "instaticManifest": {
+    "id": "instatic.humanizer",
+    "name": "Humanizer",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Remove signs of AI-generated writing from CMS content. Makes text sound more natural, personal, and human-written.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "style",
+        "label": "Humanization Style",
+        "type": "select",
+        "options": [
+          {
+            "value": "natural",
+            "label": "Natural & Casual"
+          },
+          {
+            "value": "professional",
+            "label": "Professional but Warm"
+          },
+          {
+            "value": "storytelling",
+            "label": "Storytelling"
+          },
+          {
+            "value": "minimal",
+            "label": "Minimal Changes"
+          }
+        ],
+        "default": "natural"
+      },
+      {
+        "id": "intensity",
+        "label": "Humanization Intensity",
+        "type": "select",
+        "options": [
+          {
+            "value": "light",
+            "label": "Light (subtle tweaks)"
+          },
+          {
+            "value": "medium",
+            "label": "Medium (balanced)"
+          },
+          {
+            "value": "heavy",
+            "label": "Heavy (full rewrite)"
+          }
+        ],
+        "default": "medium"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "humanize_text",
+        "description": "Rewrite AI-generated text to sound more natural and human-written.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text to humanize"
+            },
+            "style": {
+              "type": "string",
+              "enum": [
+                "natural",
+                "professional-warm",
+                "storytelling",
+                "minimal"
+              ],
+              "description": "Humanization style"
+            },
+            "intensity": {
+              "type": "string",
+              "enum": [
+                "light",
+                "medium",
+                "heavy"
+              ],
+              "description": "How much to rewrite",
+              "default": "medium"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "analyze_text_tone",
+        "description": "Analyze text for signs of AI generation and provide a humanization score.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text to analyze"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a text humanization specialist. Your job is to make AI-generated text sound like it was written by a real person. Remove common AI patterns: overly formal transitions, repetitive sentence structures, excessive hedging, robotic perfectionism. Add natural imperfections: occasional contractions, varied sentence lengths, colloquial expressions where appropriate. For 'light' intensity, make minimal tweaks. For 'heavy', rewrite substantially while preserving the core meaning. Respond in the language the user writes in."
+  }
 }

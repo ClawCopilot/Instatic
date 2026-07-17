@@ -1,75 +1,157 @@
-﻿{
-    "name":  "@instatic/content-assistant",
-    "version":  "0.1.0",
-    "description":  "AI-powered content creation assistant — rewrite, expand, and SEO-optimize CMS content.",
-    "instaticManifest":  {
-                             "id":  "instatic.content-assistant",
-                             "name":  "Content Assistant",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "AI-powered content creation assistant for rewriting, expanding, and SEO-optimizing CMS content.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "tone",
-                                                  "label":  "Writing Tone",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "professional",
-                                                                      "label":  "Professional"
-                                                                  },
-                                                                  {
-                                                                      "value":  "casual",
-                                                                      "label":  "Casual"
-                                                                  },
-                                                                  {
-                                                                      "value":  "friendly",
-                                                                      "label":  "Friendly"
-                                                                  },
-                                                                  {
-                                                                      "value":  "academic",
-                                                                      "label":  "Academic"
-                                                                  }
-                                                              ],
-                                                  "default":  "professional"
-                                              },
-                                              {
-                                                  "id":  "targetLanguage",
-                                                  "label":  "Target Language",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "zh",
-                                                                      "label":  "Chinese"
-                                                                  },
-                                                                  {
-                                                                      "value":  "en",
-                                                                      "label":  "English"
-                                                                  },
-                                                                  {
-                                                                      "value":  "ja",
-                                                                      "label":  "Japanese"
-                                                                  },
-                                                                  {
-                                                                      "value":  "ko",
-                                                                      "label":  "Korean"
-                                                                  }
-                                                              ],
-                                                  "default":  "zh"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/content-assistant",
+  "version": "0.1.0",
+  "description": "AI-powered content creation assistant — rewrite, expand, and SEO-optimize CMS content.",
+  "instaticManifest": {
+    "id": "instatic.content-assistant",
+    "name": "Content Assistant",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "AI-powered content creation assistant for rewriting, expanding, and SEO-optimizing CMS content.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "tone",
+        "label": "Writing Tone",
+        "type": "select",
+        "options": [
+          {
+            "value": "professional",
+            "label": "Professional"
+          },
+          {
+            "value": "casual",
+            "label": "Casual"
+          },
+          {
+            "value": "friendly",
+            "label": "Friendly"
+          },
+          {
+            "value": "academic",
+            "label": "Academic"
+          }
+        ],
+        "default": "professional"
+      },
+      {
+        "id": "targetLanguage",
+        "label": "Target Language",
+        "type": "select",
+        "options": [
+          {
+            "value": "zh",
+            "label": "Chinese"
+          },
+          {
+            "value": "en",
+            "label": "English"
+          },
+          {
+            "value": "ja",
+            "label": "Japanese"
+          },
+          {
+            "value": "ko",
+            "label": "Korean"
+          }
+        ],
+        "default": "zh"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "rewrite_content",
+        "description": "Rewrite CMS content with a specified tone and style. Supports SEO optimization, length adjustment, and tone changes.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The content to rewrite"
+            },
+            "instruction": {
+              "type": "string",
+              "description": "What transformation to apply (e.g., 'make more professional', 'optimize for SEO', 'expand with examples')"
+            },
+            "tone": {
+              "type": "string",
+              "enum": [
+                "professional",
+                "casual",
+                "friendly",
+                "academic"
+              ],
+              "description": "Target writing tone"
+            },
+            "language": {
+              "type": "string",
+              "enum": [
+                "zh",
+                "en",
+                "ja",
+                "ko"
+              ],
+              "description": "Target language"
+            }
+          },
+          "required": [
+            "content",
+            "instruction"
+          ]
+        }
+      },
+      {
+        "name": "generate_excerpt",
+        "description": "Generate a short excerpt or meta description from longer content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The source content"
+            },
+            "maxLength": {
+              "type": "integer",
+              "description": "Maximum excerpt length in characters",
+              "default": 160
+            }
+          },
+          "required": [
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "generate_seo_keywords",
+        "description": "Extract and suggest SEO keywords from content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The content to analyze"
+            },
+            "maxKeywords": {
+              "type": "integer",
+              "description": "Maximum number of keywords to return",
+              "default": 10
+            }
+          },
+          "required": [
+            "content"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a professional content assistant embedded in a CMS. You help users create, rewrite, optimize, and manage their website content. When rewriting content, maintain the original meaning while applying the requested tone and style changes. For SEO tasks, follow best practices for meta descriptions (150-160 chars) and keyword density. Always respond in the language the user writes in."
+  }
 }

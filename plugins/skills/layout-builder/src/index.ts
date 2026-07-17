@@ -1,8 +1,8 @@
 /**
  * Layout Builder Skill
  *
- * AI-powered web design assistant for color palettes,
- * typography, spacing, and layout suggestions.
+ * AI-powered layout design assistant for suggesting page structures,
+ * responsive layouts, and generating semantic HTML/CSS sections.
  */
 
 export default {

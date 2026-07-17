@@ -1,8 +1,8 @@
 /**
  * Comment System Skill
  *
- * AI-powered web design assistant for color palettes,
- * typography, spacing, and layout suggestions.
+ * AI-powered comment moderation assistant for spam detection,
+ * sentiment analysis, and generating reply suggestions.
  */
 
 export default {

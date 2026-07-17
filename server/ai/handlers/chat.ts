@@ -50,6 +50,7 @@ import {
   type ContentSnapshot,
 } from '../tools/content'
 import { buildDataSystemPrompt } from '../tools/data'
+import { buildPluginSystemPrompt } from '../tools/plugin'
 import {
   createBridge,
   createConversationsPersister,
@@ -355,8 +356,11 @@ export function buildSystemPromptForScope(
   if (scope === 'data') {
     return buildDataSystemPrompt()
   }
-  // Other scopes don't have system prompts yet. The driver gets a minimal
-  // prompt so the conversation isn't completely contextless.
+  if (scope === 'plugin') {
+    // 从缓存读取所有 active skill 的 systemPrompt 片段
+    return buildPluginSystemPrompt()
+  }
+  // 不应到达此处，但保留兜底逻辑防止遗漏
   return [
     `You are an AI assistant embedded in the "${scope}" workspace of a CMS. ` +
     `No scope-specific tools are wired up yet — respond conversationally only.`,

@@ -1,79 +1,168 @@
-﻿{
-    "name":  "@instatic/code-helper",
-    "version":  "0.1.0",
-    "description":  "Code assistant skill — review, explain, and generate code snippets.",
-    "instaticManifest":  {
-                             "id":  "instatic.code-helper",
-                             "name":  "Code Helper",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "AI-powered code assistant for reviewing, explaining, and generating code snippets.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "preferredLanguage",
-                                                  "label":  "Preferred Language",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "typescript",
-                                                                      "label":  "TypeScript"
-                                                                  },
-                                                                  {
-                                                                      "value":  "javascript",
-                                                                      "label":  "JavaScript"
-                                                                  },
-                                                                  {
-                                                                      "value":  "python",
-                                                                      "label":  "Python"
-                                                                  },
-                                                                  {
-                                                                      "value":  "go",
-                                                                      "label":  "Go"
-                                                                  },
-                                                                  {
-                                                                      "value":  "rust",
-                                                                      "label":  "Rust"
-                                                                  },
-                                                                  {
-                                                                      "value":  "java",
-                                                                      "label":  "Java"
-                                                                  }
-                                                              ],
-                                                  "default":  "typescript"
-                                              },
-                                              {
-                                                  "id":  "strictness",
-                                                  "label":  "Review Strictness",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "lenient",
-                                                                      "label":  "Lenient"
-                                                                  },
-                                                                  {
-                                                                      "value":  "balanced",
-                                                                      "label":  "Balanced"
-                                                                  },
-                                                                  {
-                                                                      "value":  "strict",
-                                                                      "label":  "Strict"
-                                                                  }
-                                                              ],
-                                                  "default":  "balanced"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/code-helper",
+  "version": "0.1.0",
+  "description": "Code assistant skill — review, explain, and generate code snippets.",
+  "instaticManifest": {
+    "id": "instatic.code-helper",
+    "name": "Code Helper",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "AI-powered code assistant for reviewing, explaining, and generating code snippets.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "preferredLanguage",
+        "label": "Preferred Language",
+        "type": "select",
+        "options": [
+          {
+            "value": "typescript",
+            "label": "TypeScript"
+          },
+          {
+            "value": "javascript",
+            "label": "JavaScript"
+          },
+          {
+            "value": "python",
+            "label": "Python"
+          },
+          {
+            "value": "go",
+            "label": "Go"
+          },
+          {
+            "value": "rust",
+            "label": "Rust"
+          },
+          {
+            "value": "java",
+            "label": "Java"
+          }
+        ],
+        "default": "typescript"
+      },
+      {
+        "id": "strictness",
+        "label": "Review Strictness",
+        "type": "select",
+        "options": [
+          {
+            "value": "lenient",
+            "label": "Lenient"
+          },
+          {
+            "value": "balanced",
+            "label": "Balanced"
+          },
+          {
+            "value": "strict",
+            "label": "Strict"
+          }
+        ],
+        "default": "balanced"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "review_code",
+        "description": "Review code and provide feedback on quality, bugs, and improvements.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "The code to review"
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language",
+              "default": "typescript"
+            },
+            "focus": {
+              "type": "string",
+              "enum": [
+                "bugs",
+                "performance",
+                "style",
+                "security",
+                "all"
+              ],
+              "description": "Review focus area",
+              "default": "all"
+            }
+          },
+          "required": [
+            "code"
+          ]
+        }
+      },
+      {
+        "name": "explain_code",
+        "description": "Explain what a code snippet does in plain language.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "The code to explain"
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language",
+              "default": "typescript"
+            },
+            "detailLevel": {
+              "type": "string",
+              "enum": [
+                "brief",
+                "detailed",
+                "beginner-friendly"
+              ],
+              "description": "Level of explanation detail",
+              "default": "detailed"
+            }
+          },
+          "required": [
+            "code"
+          ]
+        }
+      },
+      {
+        "name": "generate_code",
+        "description": "Generate code based on a description.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "What the code should do"
+            },
+            "language": {
+              "type": "string",
+              "description": "Target programming language",
+              "default": "typescript"
+            },
+            "context": {
+              "type": "string",
+              "description": "Additional context or requirements"
+            }
+          },
+          "required": [
+            "description",
+            "language"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a code assistant embedded in a CMS. You help users review, understand, and generate code snippets. When reviewing code, be thorough but constructive — highlight issues with specific suggestions. When generating code, follow best practices and include brief explanations. Respond in the language the user writes in, but keep code in English with English comments."
+  }
 }

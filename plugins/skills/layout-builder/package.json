@@ -1,79 +1,141 @@
-﻿{
-    "name":  "@instatic/layout-builder",
-    "version":  "0.1.0",
-    "description":  "AI-powered page layout generator that creates responsive grid layouts, component arrangements, and page structures.",
-    "instaticManifest":  {
-                             "id":  "instatic.layout-builder",
-                             "name":  "Layout Builder",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Generate responsive page layouts, grid structures, and component arrangements using AI. Supports hero sections, feature grids, pricing tables, and more.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "layoutType",
-                                                  "label":  "Default Layout Type",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "landing",
-                                                                      "label":  "Landing Page"
-                                                                  },
-                                                                  {
-                                                                      "value":  "blog",
-                                                                      "label":  "Blog Layout"
-                                                                  },
-                                                                  {
-                                                                      "value":  "portfolio",
-                                                                      "label":  "Portfolio"
-                                                                  },
-                                                                  {
-                                                                      "value":  "docs",
-                                                                      "label":  "Documentation"
-                                                                  },
-                                                                  {
-                                                                      "value":  "ecommerce",
-                                                                      "label":  "E-commerce"
-                                                                  },
-                                                                  {
-                                                                      "value":  "dashboard",
-                                                                      "label":  "Dashboard"
-                                                                  }
-                                                              ],
-                                                  "default":  "landing"
-                                              },
-                                              {
-                                                  "id":  "responsiveMode",
-                                                  "label":  "Responsive Breakpoints",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "mobile-first",
-                                                                      "label":  "Mobile First"
-                                                                  },
-                                                                  {
-                                                                      "value":  "desktop-first",
-                                                                      "label":  "Desktop First"
-                                                                  },
-                                                                  {
-                                                                      "value":  "adaptive",
-                                                                      "label":  "Adaptive"
-                                                                  }
-                                                              ],
-                                                  "default":  "mobile-first"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/layout-builder",
+  "version": "0.1.0",
+  "description": "AI-powered page layout generator that creates responsive grid layouts, component arrangements, and page structures.",
+  "instaticManifest": {
+    "id": "instatic.layout-builder",
+    "name": "Layout Builder",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Generate responsive page layouts, grid structures, and component arrangements using AI. Supports hero sections, feature grids, pricing tables, and more.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "layoutType",
+        "label": "Default Layout Type",
+        "type": "select",
+        "options": [
+          {
+            "value": "landing",
+            "label": "Landing Page"
+          },
+          {
+            "value": "blog",
+            "label": "Blog Layout"
+          },
+          {
+            "value": "portfolio",
+            "label": "Portfolio"
+          },
+          {
+            "value": "docs",
+            "label": "Documentation"
+          },
+          {
+            "value": "ecommerce",
+            "label": "E-commerce"
+          },
+          {
+            "value": "dashboard",
+            "label": "Dashboard"
+          }
+        ],
+        "default": "landing"
+      },
+      {
+        "id": "responsiveMode",
+        "label": "Responsive Breakpoints",
+        "type": "select",
+        "options": [
+          {
+            "value": "mobile-first",
+            "label": "Mobile First"
+          },
+          {
+            "value": "desktop-first",
+            "label": "Desktop First"
+          },
+          {
+            "value": "adaptive",
+            "label": "Adaptive"
+          }
+        ],
+        "default": "mobile-first"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "suggest_layout",
+        "description": "Suggest a page layout structure for a specific page type.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "pageType": {
+              "type": "string",
+              "enum": [
+                "landing",
+                "blog",
+                "portfolio",
+                "documentation",
+                "ecommerce",
+                "dashboard"
+              ],
+              "description": "Type of page"
+            },
+            "sections": {
+              "type": "string",
+              "description": "Required sections (e.g., 'hero, features, pricing, testimonials, CTA')"
+            },
+            "responsiveMode": {
+              "type": "string",
+              "enum": [
+                "mobile-first",
+                "desktop-first",
+                "adaptive"
+              ],
+              "description": "Responsive approach",
+              "default": "mobile-first"
+            }
+          },
+          "required": [
+            "pageType"
+          ]
+        }
+      },
+      {
+        "name": "generate_html_section",
+        "description": "Generate HTML/CSS for a specific page section.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sectionType": {
+              "type": "string",
+              "description": "Type of section (e.g., 'hero', 'feature-grid', 'pricing-table', 'testimonials')"
+            },
+            "content": {
+              "type": "string",
+              "description": "Content for the section"
+            },
+            "style": {
+              "type": "string",
+              "description": "Style preferences"
+            }
+          },
+          "required": [
+            "sectionType",
+            "content"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a layout design assistant for CMS pages. You help users design responsive, well-structured page layouts. When suggesting layouts, describe the visual hierarchy, section ordering, and content flow. When generating HTML, use semantic elements and modern CSS (flexbox/grid). Keep HTML clean and minimal. Consider mobile-first responsive design. Respond in the language the user writes in, but HTML/CSS should use English class names."
+  }
 }
