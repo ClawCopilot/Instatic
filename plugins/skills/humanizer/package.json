@@ -1,0 +1,45 @@
+{
+  "name": "@instatic/humanizer",
+  "version": "0.1.0",
+  "description": "Remove signs of AI-generated writing from text. Makes content sound more natural and human.",
+  "instaticManifest": {
+    "id": "instatic.humanizer",
+    "name": "Humanizer",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Remove signs of AI-generated writing from CMS content. Makes text sound more natural, personal, and human-written.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "style",
+        "label": "Humanization Style",
+        "type": "select",
+        "options": [
+          { "value": "natural", "label": "Natural & Casual" },
+          { "value": "professional", "label": "Professional but Warm" },
+          { "value": "storytelling", "label": "Storytelling" },
+          { "value": "minimal", "label": "Minimal Changes" }
+        ],
+        "default": "natural"
+      },
+      {
+        "id": "intensity",
+        "label": "Humanization Intensity",
+        "type": "select",
+        "options": [
+          { "value": "light", "label": "Light (subtle tweaks)" },
+          { "value": "medium", "label": "Medium (balanced)" },
+          { "value": "heavy", "label": "Heavy (full rewrite)" }
+        ],
+        "default": "medium"
+      }
+    ]
+  }
+}
