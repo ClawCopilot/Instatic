@@ -248,6 +248,10 @@ const FrontendAssetAttrsSchema = Type.Record(
 
 const manifestSchema = Type.Object({
   id: Type.String({ pattern: PLUGIN_ID_PATTERN.source }),
+  kind: Type.Optional(Type.Union([
+    Type.Literal('plugin'),
+    Type.Literal('skill'),
+  ])),
   name: Type.String({ minLength: 1, maxLength: 80 }),
   version: Type.String({ pattern: SEMVERISH_PATTERN.source }),
   // Schema accepts any positive integer; the parser narrows to the
@@ -646,6 +650,7 @@ export function parsePluginManifest(input: unknown): PluginManifest {
 
   return {
     id: data.id,
+    kind: data.kind ?? 'plugin',
     name: data.name,
     version: data.version,
     apiVersion: data.apiVersion,

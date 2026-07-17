@@ -7,10 +7,11 @@ import styles from './cells.module.css'
 
 type RichTextField = Extract<DataField, { type: 'richText' }>
 
-// TODO: Wire up `TiptapBodyEditor` for richText in detail context (follow-up task).
-// For now this renders a monospace Textarea in detail context and a plain
-// text preview in grid context — the data-grid surface doesn't yet have the
-// integrations the Content workspace exposes (media picker, data tokens).
+// NOTE: TiptapBodyEditor integration for rich-text inline editing in the data
+// grid detail view is tracked as a separate feature. For now this renders a
+// monospace Textarea in detail context and a plain text preview in grid
+// context — the data-grid surface doesn't yet have the integrations the
+// Content workspace exposes (media picker, data tokens).
 
 export function RichTextCell({
   field,

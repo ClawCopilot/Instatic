@@ -4,14 +4,21 @@ E-commerce catalog, cart, checkout, and order management for Instatic. Products 
 
 ## Features
 
-- **Product catalog** — managed as a `products` data table (created on first activation)
-- **Shopping cart** — per-user, persists across sessions
-- **Stripe Checkout** — hosted payment page, PCI-compliant by default
-- **Order management** — full lifecycle: pending → paid → fulfilled → refunded
-- **Inventory tracking** — append-only ledger with restock and order deduction
-- **Webhook sync** — Stripe events keep order status accurate
-- **Refund API** — admin-initiated refunds via Stripe
-- **viewerContext.cartCount** — for "items in cart" badges in templates
+- **Product catalog** -- managed as a `products` data table (created on first activation)
+- **Product variants** -- size/color/etc. with independent stock tracking (admin CRUD + restock)
+- **Shopping cart** -- per-user, persists across sessions, with inventory reservation during checkout
+- **Stripe Checkout** -- hosted payment page, PCI-compliant by default
+- **Order management** -- full lifecycle: pending -> paid -> fulfilled -> refunded / canceled
+- **Order fulfillment** -- admin marks orders as fulfilled (status=paid -> fulfilled)
+- **Order cancellation** -- admin cancels pending/paid orders, releases reserved inventory
+- **Inventory tracking** -- append-only ledger with restock and order deduction
+- **Inventory reservations** -- `SELECT FOR UPDATE` + transaction to prevent overselling; automatic expiry GC
+- **Coupons** -- create/list/update/delete, apply with validation (percent, fixed, BOGO, free_shipping types), redemption tracking per coupon, per-user usage limits, date range, product/collection applicability
+- **Shipping** -- rate table per country/region, free-shipping threshold, flat-rate fallback, carrier adapter framework (register custom carriers via `registerCarrierAdapter`)
+- **Refunds** -- Stripe refund (API-initiated, confirmed via webhook) and manual refund (bank_transfer, store_credit, cash, other) with amount validation
+- **Cart expiration cleanup** -- `expireOldCarts` removes stale carts (configurable max age, default 30 days)
+- **Webhook sync** -- Stripe events keep order status accurate
+- **viewerContext.cartCount** -- for "items in cart" badges in templates
 
 ## Installation
 
@@ -62,6 +69,52 @@ POST /api/commerce/checkout
 
 ```http
 GET /api/commerce/orders
+```
+
+### Coupons (authenticated + admin)
+
+```http
+POST /api/commerce/cart/apply-coupon     { "code": "SAVE10" }        -- validate & apply
+POST /api/commerce/cart/remove-coupon                                -- remove applied coupon
+GET  /admin/.../admin/api/commerce/coupons                          -- list all
+POST /admin/.../admin/api/commerce/coupons          { code, type, value, ... }  -- create
+PATCH /admin/.../admin/api/commerce/coupons/:id     { ... }                     -- update
+DELETE /admin/.../admin/api/commerce/coupons/:id                             -- soft-delete
+GET  /admin/.../admin/api/commerce/coupons/:id/redemptions                -- redemption history
+```
+
+Coupon types: `percent`, `fixed`, `bogo`, `free_shipping`.
+
+### Shipping (authenticated + admin)
+
+```http
+POST /api/commerce/shipping/quote          { "countryCode": "US", "items": [...] }  -- real-time quote
+GET  /admin/.../admin/api/commerce/shipping-rates                               -- list rates
+POST /admin/.../admin/api/commerce/shipping-rates          { countryCode, ... }   -- upsert
+DELETE /admin/.../admin/api/commerce/shipping-rates/:id                         -- soft-delete
+```
+
+### Order fulfillment & cancellation (admin)
+
+```http
+POST /admin/.../admin/api/commerce/orders/:id/fulfill   -- paid -> fulfilled
+POST /admin/.../admin/api/commerce/orders/:id/cancel    -- pending/paid -> canceled (releases inventory)
+```
+
+### Refunds (admin)
+
+```http
+GET  /admin/.../admin/api/commerce/orders/:id/refunds                         -- list refunds
+POST /admin/.../admin/api/commerce/orders/:id/refund   { "amountCents", "reason", "method": "stripe"|"bank_transfer"|"store_credit"|"cash"|"other" }
+```
+
+### Product variants (admin)
+
+```http
+GET    /admin/.../admin/api/commerce/products/:id/variants
+POST   /admin/.../admin/api/commerce/products/:id/variants          -- sync variants from CMS data
+DELETE /admin/.../admin/api/commerce/variants/:id
+POST   /admin/.../admin/api/commerce/variants/:id/restock            { "delta": 10, "notes": "..." }
 ```
 
 ### Admin (requires `content.manage`)

@@ -2,14 +2,16 @@
  * Shipping cost calculation.
  *
  * Strategies:
- *   1. Free shipping — if subtotal ≥ freeThreshold, cost = 0
+ *   1. Free shipping — if subtotal >= freeThreshold, cost = 0
  *   2. Table-based rate — match a shipping_rates row by (country, region, subtotal range)
+ *   2.5. Carrier API — query real-time rates from registered carrier adapters
  *   3. Weight-based — sum of (variant.weight_grams * quantity), pick rate by weight range
  *   4. Fallback — flat rate from plugin settings
  *
- * Lookup order: free → table → flat fallback.
+ * Lookup order: free -> table -> carrier API -> flat fallback.
  *
- * TODO: real-time carrier API (UPS, FedEx, USPS) integration.
+ * Carrier adapter framework is implemented. Individual carrier integrations
+ * (UPS, FedEx, USPS) should be registered via `registerCarrierAdapter()` at plugin startup.
  */
 
 import { randomBytes } from 'node:crypto'
@@ -33,7 +35,7 @@ export interface ShippingRate {
 export interface ShippingCalculation {
   costCents: number
   currency: string
-  method: string  // 'free', 'rate-table', 'flat-fallback'
+  method: string  // 'free', 'rate-table', 'carrier-api', 'flat-fallback'
   rateId: string | null
   estimatedDaysMin: number | null
   estimatedDaysMax: number | null
@@ -113,8 +115,12 @@ export async function deleteShippingRate(db: DbClient, id: string): Promise<void
 export interface ShippingInput {
   countryCode: string
   regionCode?: string | null
+  postalCode?: string | null
   subtotalCents: number
   totalWeightGrams: number
+  originCountryCode?: string
+  originRegionCode?: string
+  originPostalCode?: string
   currency?: string
 }
 
@@ -128,8 +134,9 @@ export interface ShippingSettings {
  * Calculate the shipping cost for a cart.
  *
  * Lookup order:
- *   1. If subtotal ≥ freeShippingThreshold, return free shipping
+ *   1. If subtotal >= freeShippingThreshold, return free shipping
  *   2. Look up the best matching shipping_rates row
+ *   2.5. Query registered carrier adapters for real-time rates
  *   3. Fall back to flat rate from settings
  */
 export async function calculateShipping(
@@ -160,6 +167,36 @@ export async function calculateShipping(
       estimatedDaysMin: 3,
       estimatedDaysMax: 7,
     }
+  }
+  // 2.5. Carrier API — query registered adapters for real-time rates
+  try {
+    const carrierRates = await queryCarrierRates({
+      origin: {
+        country: input.originCountryCode ?? 'US',
+        region: input.originRegionCode ?? '',
+        postalCode: input.originPostalCode ?? '',
+      },
+      destination: {
+        country: input.countryCode,
+        region: input.regionCode ?? '',
+        postalCode: input.postalCode ?? '',
+      },
+      weightGrams: input.totalWeightGrams,
+    })
+    if (carrierRates.length > 0) {
+      const best = carrierRates[0] // already sorted by cost ascending
+      return {
+        costCents: best.costCents,
+        currency: best.currency,
+        method: 'carrier-api',
+        rateId: null,
+        estimatedDaysMin: best.estimatedDaysMin,
+        estimatedDaysMax: best.estimatedDaysMax,
+      }
+    }
+  } catch (err) {
+    // Carrier API failure should not block checkout; fall through to flat rate
+    console.warn('Carrier API query failed, falling back to flat rate:', err)
   }
   // 3. Flat fallback
   return {

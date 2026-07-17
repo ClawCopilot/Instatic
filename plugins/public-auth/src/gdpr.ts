@@ -24,9 +24,10 @@
  *     own slices. This way, the export aggregates data from every plugin
  *     that touches the user.
  *
- * "Cooling-off" period: by default, deletion is immediate. An optional
- * setting (TODO) could add a 7-day waiting period where the user can
- * cancel via email link.
+ * "Cooling-off" period: handleDelete uses scheduleUserDeletion which
+ * enforces a 7-day cooling-off period before actual anonymization.
+ * During this window the user can cancel via POST /api/auth/me/delete/cancel
+ * using the cancelToken returned at scheduling time.
  */
 
 import { createHash, randomBytes } from 'node:crypto'

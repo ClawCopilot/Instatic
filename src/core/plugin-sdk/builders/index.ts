@@ -18,6 +18,8 @@
 
 export { definePlugin } from './definePlugin'
 export type { DefinePluginConfig, PluginDefinition } from './definePlugin'
+export { defineSkill } from './defineSkill'
+export type { DefineSkillConfig, SkillDefinition } from './defineSkill'
 export {
   pluginSettingsDefaults,
   validatePluginSettingsRecord,

@@ -18,6 +18,7 @@ import migrations from './migrations'
 import {
   handleAddToCart,
   handleAdminListOrders,
+  handleAdminManualRefund,
   handleAdminRefundOrder,
   handleAdminRestock,
   handleAdminFulfillOrder,
@@ -150,6 +151,9 @@ export async function activate(api: any) {
     await api.cms.routes.register('GET', '/admin/api/commerce/orders', 'content.manage', handleAdminListOrders)
     await api.cms.routes.register('POST', '/admin/api/commerce/orders/:id/refund', 'content.manage', async (ctx, _req, params) => {
       return handleAdminRefundOrder(ctx, settings, params.id)
+    })
+    await api.cms.routes.register('POST', '/admin/api/commerce/orders/:id/refund/manual', 'content.manage', async (ctx, req, params) => {
+      return handleAdminManualRefund(ctx, req, params.id)
     })
     await api.cms.routes.register('POST', '/admin/api/commerce/products/:id/restock', 'content.manage', async (ctx, req, params) => {
       return handleAdminRestock(ctx, req, params.id)

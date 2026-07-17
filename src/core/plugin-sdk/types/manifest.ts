@@ -7,6 +7,13 @@ import type { ContentAccessEntry } from '../contentSchemas'
 import type { PluginSettingDefinition } from '../builders/settings'
 
 // ---------------------------------------------------------------------------
+// Plugin kind — discriminator between full plugins and lightweight
+// AI-focused skills. Defaults to 'plugin' for backward compatibility.
+// ---------------------------------------------------------------------------
+
+export type PluginKind = 'plugin' | 'skill'
+
+// ---------------------------------------------------------------------------
 // Manifest building blocks
 // ---------------------------------------------------------------------------
 
@@ -41,6 +48,12 @@ export interface PluginAuthorMetadata {
 
 export interface PluginManifest {
   id: string
+  /**
+   * Discriminator: 'plugin' (default, full plugin runtime) or 'skill'
+   * (lightweight AI-focused extension). Defaults to 'plugin' — existing
+   * manifests without `kind` are treated as plugins.
+   */
+  kind?: PluginKind
   name: string
   version: string
   /**

@@ -1,0 +1,46 @@
+{
+  "name": "@instatic/web-research",
+  "version": "0.1.0",
+  "description": "Web research skill — search the web and summarize URLs for content creation.",
+  "instaticManifest": {
+    "id": "instatic.web-research",
+    "name": "Web Research",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Search the web and summarize URLs to enrich CMS content with real-time information.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "duckduckgo.com",
+      "html.duckduckgo.com",
+      "api.bing.microsoft.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "searchEngine",
+        "label": "Search Engine",
+        "type": "select",
+        "options": [
+          { "value": "duckduckgo", "label": "DuckDuckGo" },
+          { "value": "bing", "label": "Bing" }
+        ],
+        "default": "duckduckgo"
+      },
+      {
+        "id": "resultCount",
+        "label": "Results per search",
+        "type": "number",
+        "min": 1,
+        "max": 20,
+        "default": 5
+      }
+    ]
+  }
+}

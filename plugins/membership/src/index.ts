@@ -45,11 +45,10 @@ interface MembershipSettings {
 }
 
 export default definePlugin({
-id: 'instatic.membership',
+  id: 'instatic.membership',
   name: 'Membership & Paywalls',
   version: '0.1.0',
   permissions: ['cms.migrations', 'cms.routes', 'cms.routes.public', 'cms.publicRoutes'],
-  version: '0.1.0'
 })
 
 export async function install(api: any) {

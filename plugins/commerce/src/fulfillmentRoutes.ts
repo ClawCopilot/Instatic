@@ -49,7 +49,7 @@ export async function handleShippingQuote(
   req: Request,
   settings: ShippingSettings,
 ): Promise<Response> {
-  let body: { countryCode?: string; regionCode?: string; subtotalCents?: number; weightGrams?: number; currency?: string }
+  let body: { countryCode?: string; regionCode?: string; postalCode?: string; subtotalCents?: number; weightGrams?: number; currency?: string; originCountryCode?: string; originRegionCode?: string; originPostalCode?: string }
   try {
     body = await req.json() as typeof body
   } catch {
@@ -61,9 +61,13 @@ export async function handleShippingQuote(
   const result = await calculateShipping(api.db, {
     countryCode: body.countryCode,
     regionCode: body.regionCode,
+    postalCode: body.postalCode,
     subtotalCents: body.subtotalCents,
     totalWeightGrams: body.weightGrams ?? 0,
     currency: body.currency,
+    originCountryCode: body.originCountryCode,
+    originRegionCode: body.originRegionCode,
+    originPostalCode: body.originPostalCode,
   }, settings)
   return Response.json(result)
 }
