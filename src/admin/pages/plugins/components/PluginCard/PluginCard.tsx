@@ -174,6 +174,9 @@ export function PluginCard(props: PluginCardProps) {
             >
               v{plugin.version}
             </span>
+            <span className={styles.pluginKindPill} data-kind={plugin.manifest.kind ?? 'plugin'}>
+              {(plugin.manifest.kind ?? 'plugin') === 'skill' ? 'Skill' : 'Plugin'}
+            </span>
             <span className={styles.pluginStatusPill} data-status={status.status}>
               {status.label}
             </span>

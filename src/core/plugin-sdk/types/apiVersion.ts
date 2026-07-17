@@ -19,6 +19,10 @@ export const PLUGIN_API_VERSION = 1
 export const MIN_SUPPORTED_PLUGIN_API_VERSION = 1
 export type PluginApiVersion = number
 
+export const SKILL_API_VERSION = 1
+export const MIN_SUPPORTED_SKILL_API_VERSION = 1
+export type SkillApiVersion = number
+
 /**
  * Decide whether a manifest's `apiVersion` is compatible with this host. The
  * manifest validator wires this in so the rejection happens at the ingress

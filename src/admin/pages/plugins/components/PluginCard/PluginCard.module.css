@@ -179,6 +179,30 @@ a.pluginAttributionItem:hover {
     font-weight: 600;
 }
 
+.pluginKindPill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+}
+
+.pluginKindPill[data-kind="skill"] {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+
+.pluginKindPill[data-kind="plugin"] {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+}
+
 .pluginBody p {
     color: var(--text-subtle);
 }

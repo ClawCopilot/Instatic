@@ -46,9 +46,9 @@ export function PluginsPage() {
   return (
     <AdminPageLayout
       workspace="plugins"
-      title="Plugins"
+      title="Plugins & Skills"
       titleId="plugins-title"
-      description="Install admin extensions and control what they add to the CMS."
+      description="Install admin extensions, AI skills, and control what they add to the CMS."
       actions={canInstall ? (
         <>
           <Button
