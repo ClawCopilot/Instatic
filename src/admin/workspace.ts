@@ -25,6 +25,7 @@ export type AdminWorkspace =
   | 'data'
   | 'media'
   | 'plugins'
+  | 'skills'
   | 'users'
   | 'ai'
   | 'pluginPage'

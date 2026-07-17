@@ -1,5 +1,4 @@
 import { Button } from '@ui/components/Button'
-import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginCard } from './components/PluginCard/PluginCard'
 import { PluginRemoveDialog } from './components/PluginRemoveDialog/PluginRemoveDialog'
@@ -17,12 +16,10 @@ import {
 import styles from './PluginsPage.module.css'
 
 // Number of skeleton plugin cards rendered while the installed-plugin
-// list is loading. Three matches a typical fresh-install showing
-// (e.g. host plugins + Analytics). PluginCard's `loading` prop owns
-// the actual skeleton markup — page-level code only decides count.
+// list is loading.
 const SKELETON_CARD_COUNT = 3
 
-export function PluginsPage() {
+export function SkillsPage() {
   const currentUser = useAuthenticatedAdminUser()
   const canConfigure = canConfigurePlugins(currentUser)
   const canInstall = canInstallPlugins(currentUser)
@@ -43,35 +40,19 @@ export function PluginsPage() {
     removeFailure,
   } = vm
 
+  // Filter to only show skills
+  const skills = loading
+    ? []
+    : payload.plugins.filter((p) => (p.manifest.kind ?? 'plugin') === 'skill')
+
   return (
     <AdminPageLayout
-      workspace="plugins"
-      title="Plugins"
-      titleId="plugins-title"
-      description="Install admin extensions and control what they add to the CMS."
-      actions={canInstall ? (
-        <>
-          <Button
-            variant="primary"
-            size="md"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <UploadIcon size={15} aria-hidden="true" />
-            <span>{uploading ? 'Uploading' : 'Upload Plugin'}</span>
-          </Button>
-          <input
-            ref={fileInputRef}
-            className={styles.fileInput}
-            aria-label="Plugin file"
-            type="file"
-            accept="application/json,.json,.plugin.json,.pbplugin,.zip,application/zip"
-            onChange={(event) => void vm.handleUpload(event)}
-          />
-        </>
-      ) : null}
+      workspace="skills"
+      title="Skills"
+      titleId="skills-title"
+      description="Manage AI-powered skills that extend your CMS with intelligent capabilities."
     >
-      <div className={styles.pluginsBody} data-testid="plugins-admin-canvas">
+      <div className={styles.pluginsBody} data-testid="skills-admin-canvas">
         {error && (
           <div role="alert">
             <p className={styles.error}>{error}</p>
@@ -85,7 +66,7 @@ export function PluginsPage() {
                 >
                   sandbox documentation
                 </a>
-                {' '}for what's allowed inside plugin code.
+                {' '}for what's allowed inside skill code.
               </p>
             )}
           </div>
@@ -95,7 +76,7 @@ export function PluginsPage() {
           <div role="alert" className={styles.removeFailure}>
             <p className={styles.error}>{removeFailure.message}</p>
             <p className={styles.errorHint}>
-              Removing anyway skips the plugin&rsquo;s cleanup code — external
+              Removing anyway skips the skill&rsquo;s cleanup code — external
               resources it created (webhooks, third-party registrations) may
               remain.
             </p>
@@ -132,23 +113,27 @@ export function PluginsPage() {
 
         <div
           className={styles.pluginsList}
-          aria-label="Installed plugins"
+          aria-label="Installed skills"
           aria-busy={loading || undefined}
         >
           {loading ? (
-            // Render N skeleton cards while the plugins payload is in
-            // flight. PluginCard renders its own universal skeleton
-            // body when `loading` is set — no per-page skeleton markup,
-            // no mock data.
             Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
               <PluginCard key={i} loading />
             ))
-          ) : payload.plugins.filter((p) => (p.manifest.kind ?? 'plugin') !== 'skill').length === 0 ? (
-            <p className={styles.emptyState}>No plugins installed yet.</p>
+          ) : skills.length === 0 ? (
+            <p className={styles.emptyState}>
+              No skills installed yet. Install skills from the{' '}
+              <a
+                href="https://clawhub.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                ClawHub marketplace
+              </a>{' '}
+              or add them via the Plugins page.
+            </p>
           ) : (
-            payload.plugins
-              .filter((p) => (p.manifest.kind ?? 'plugin') !== 'skill')
-              .map((plugin) => (
+            skills.map((plugin) => (
               <PluginCard
                 key={plugin.id}
                 plugin={plugin}

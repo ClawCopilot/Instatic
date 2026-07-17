@@ -1,0 +1,53 @@
+{
+  "name": "@instatic/social-media",
+  "version": "0.1.0",
+  "description": "Social media integration skill for cross-posting, scheduling, and social preview optimization.",
+  "instaticManifest": {
+    "id": "instatic.social-media",
+    "name": "Social Media Hub",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Cross-post CMS content to social platforms, optimize social media previews (OG images, meta descriptions), and track engagement.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "api.x.com",
+      "graph.facebook.com",
+      "api.linkedin.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "defaultPlatform",
+        "label": "Primary Platform",
+        "type": "select",
+        "options": [
+          { "value": "twitter", "label": "X (Twitter)" },
+          { "value": "facebook", "label": "Facebook" },
+          { "value": "linkedin", "label": "LinkedIn" },
+          { "value": "weibo", "label": "Weibo" },
+          { "value": "wechat", "label": "WeChat" }
+        ],
+        "default": "twitter"
+      },
+      {
+        "id": "autoGeneratePreview",
+        "label": "Auto-Generate Social Preview",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "id": "hashtagsEnabled",
+        "label": "Smart Hashtag Suggestions",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  }
+}

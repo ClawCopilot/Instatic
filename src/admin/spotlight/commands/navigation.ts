@@ -117,6 +117,20 @@ export function getNavigationCommands(): Command[] {
       },
     },
     {
+      id: 'navigation.goToSkills',
+      title: 'Go to Skills',
+      subtitle: 'Manage AI-powered skills',
+      group: 'navigation',
+      iconName: 'sparkles-solid',
+      keywords: ['skills', 'ai', 'automation', 'intelligence'],
+      workspaces: ['any'],
+      capability: PLUGINS_ACCESS_CAPABILITIES,
+      run: (ctx) => {
+        ctx.navigate('/admin/skills')
+        ctx.closeSpotlight()
+      },
+    },
+    {
       id: 'navigation.goToUsers',
       title: 'Go to Users',
       subtitle: 'Manage users and roles',

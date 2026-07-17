@@ -283,6 +283,7 @@ export function canAccessWorkspace(user: CmsCurrentUser | null, workspace: Admin
     case 'media':
       return canReadMedia(user)
     case 'plugins':
+    case 'skills':
     case 'pluginPage':
       return canAccessPluginsWorkspace(user)
     case 'users':
@@ -300,7 +301,7 @@ export function firstAccessibleWorkspace(user: CmsCurrentUser | null): AdminWork
   // Dashboard comes first — it's the canonical admin home. Falls through to
   // the next accessible workspace for users whose role doesn't grant
   // `dashboard.read` (rare; only happens with hand-edited custom roles).
-  const order: AdminWorkspace[] = ['dashboard', 'site', 'content', 'data', 'media', 'plugins', 'users', 'ai']
+  const order: AdminWorkspace[] = ['dashboard', 'site', 'content', 'data', 'media', 'plugins', 'skills', 'users', 'ai']
   return order.find((workspace) => canAccessWorkspace(user, workspace)) ?? null
 }
 
@@ -318,6 +319,8 @@ export function workspacePath(workspace: AdminWorkspace): string {
       return '/admin/media'
     case 'plugins':
       return '/admin/plugins'
+    case 'skills':
+      return '/admin/skills'
     case 'users':
       return '/admin/users'
     case 'ai':
