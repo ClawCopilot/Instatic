@@ -1,52 +1,81 @@
-{
-  "name": "@instatic/graphic-designer",
-  "version": "0.1.0",
-  "description": "AI graphic design assistant for creating banners, thumbnails, social media images, and marketing visuals.",
-  "instaticManifest": {
-    "id": "instatic.graphic-designer",
-    "name": "Graphic Designer",
-    "version": "0.1.0",
-    "apiVersion": 1,
-    "description": "AI graphic design assistant for creating banners, thumbnails, social media images, and marketing visuals for CMS content.",
-    "permissions": [
-      "network.outbound",
-      "cms.routes.public"
-    ],
-    "networkAllowedHosts": [
-      "api.minimaxi.com",
-      "api.openai.com",
-      "api.stability.ai"
-    ],
-    "entrypoints": {
-      "server": "dist/index.js"
-    },
-    "resources": [],
-    "adminPages": [],
-    "settings": [
-      {
-        "id": "defaultFormat",
-        "label": "Default Image Format",
-        "type": "select",
-        "options": [
-          { "value": "og-image", "label": "OG Image (1200x630)" },
-          { "value": "banner", "label": "Banner (1920x600)" },
-          { "value": "thumbnail", "label": "Thumbnail (1280x720)" },
-          { "value": "square", "label": "Square (1080x1080)" },
-          { "value": "story", "label": "Story (1080x1920)" }
-        ],
-        "default": "og-image"
-      },
-      {
-        "id": "brandConsistency",
-        "label": "Brand Consistency Level",
-        "type": "select",
-        "options": [
-          { "value": "strict", "label": "Strict (match brand colors/fonts)" },
-          { "value": "flexible", "label": "Flexible (inspired by brand)" },
-          { "value": "creative", "label": "Creative (free interpretation)" }
-        ],
-        "default": "flexible"
-      }
-    ]
-  }
+﻿{
+    "name":  "@instatic/graphic-designer",
+    "version":  "0.1.0",
+    "description":  "AI graphic design assistant for creating banners, thumbnails, social media images, and marketing visuals.",
+    "instaticManifest":  {
+                             "id":  "instatic.graphic-designer",
+                             "name":  "Graphic Designer",
+                             "version":  "0.1.0",
+                             "apiVersion":  1,
+                             "description":  "AI graphic design assistant for creating banners, thumbnails, social media images, and marketing visuals for CMS content.",
+                             "permissions":  [
+                                                 "network.outbound",
+                                                 "cms.routes.public"
+                                             ],
+                             "networkAllowedHosts":  [
+                                                         "api.minimaxi.com",
+                                                         "api.openai.com",
+                                                         "api.stability.ai"
+                                                     ],
+                             "entrypoints":  {
+                                                 "server":  "dist/index.js"
+                                             },
+                             "resources":  [
+
+                                           ],
+                             "adminPages":  [
+
+                                            ],
+                             "settings":  [
+                                              {
+                                                  "id":  "defaultFormat",
+                                                  "label":  "Default Image Format",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "og-image",
+                                                                      "label":  "OG Image (1200x630)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "banner",
+                                                                      "label":  "Banner (1920x600)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "thumbnail",
+                                                                      "label":  "Thumbnail (1280x720)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "square",
+                                                                      "label":  "Square (1080x1080)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "story",
+                                                                      "label":  "Story (1080x1920)"
+                                                                  }
+                                                              ],
+                                                  "default":  "og-image"
+                                              },
+                                              {
+                                                  "id":  "brandConsistency",
+                                                  "label":  "Brand Consistency Level",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "strict",
+                                                                      "label":  "Strict (match brand colors/fonts)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "flexible",
+                                                                      "label":  "Flexible (inspired by brand)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "creative",
+                                                                      "label":  "Creative (free interpretation)"
+                                                                  }
+                                                              ],
+                                                  "default":  "flexible"
+                                              }
+                                          ],
+                             "kind":  "skill"
+                         }
 }

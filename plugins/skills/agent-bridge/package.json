@@ -1,47 +1,64 @@
-{
-  "name": "@instatic/agent-bridge",
-  "version": "0.1.0",
-  "description": "MCP-compatible bridge for OpenClaw agents to deeply interact with site building, content management, and design.",
-  "instaticManifest": {
-    "id": "instatic.agent-bridge",
-    "name": "Agent Bridge",
-    "version": "0.1.0",
-    "apiVersion": 1,
-    "description": "MCP-compatible bridge that allows OpenClaw agents and other AI assistants to deeply control the site: edit pages, manage content, adjust styles, and deploy changes through natural language.",
-    "permissions": [
-      "cms.routes.public"
-    ],
-    "entrypoints": {
-      "server": "dist/index.js"
-    },
-    "resources": [],
-    "adminPages": [],
-    "settings": [
-      {
-        "id": "bridgeToken",
-        "label": "Bridge Auth Token",
-        "type": "password",
-        "secret": true,
-        "description": "Authentication token for the agent bridge endpoint."
-      },
-      {
-        "id": "allowedTools",
-        "label": "Allowed Agent Tools",
-        "type": "select",
-        "options": [
-          { "value": "all", "label": "All Tools" },
-          { "value": "content-only", "label": "Content Only (read/write)" },
-          { "value": "design-only", "label": "Design Only (style/layout)" },
-          { "value": "read-only", "label": "Read Only" }
-        ],
-        "default": "content-only"
-      },
-      {
-        "id": "autoDeploy",
-        "label": "Auto-Deploy on Change",
-        "type": "toggle",
-        "default": false
-      }
-    ]
-  }
+﻿{
+    "name":  "@instatic/agent-bridge",
+    "version":  "0.1.0",
+    "description":  "MCP-compatible bridge for OpenClaw agents to deeply interact with site building, content management, and design.",
+    "instaticManifest":  {
+                             "id":  "instatic.agent-bridge",
+                             "name":  "Agent Bridge",
+                             "version":  "0.1.0",
+                             "apiVersion":  1,
+                             "description":  "MCP-compatible bridge that allows OpenClaw agents and other AI assistants to deeply control the site: edit pages, manage content, adjust styles, and deploy changes through natural language.",
+                             "permissions":  [
+                                                 "cms.routes.public"
+                                             ],
+                             "entrypoints":  {
+                                                 "server":  "dist/index.js"
+                                             },
+                             "resources":  [
+
+                                           ],
+                             "adminPages":  [
+
+                                            ],
+                             "settings":  [
+                                              {
+                                                  "id":  "bridgeToken",
+                                                  "label":  "Bridge Auth Token",
+                                                  "type":  "password",
+                                                  "secret":  true,
+                                                  "description":  "Authentication token for the agent bridge endpoint."
+                                              },
+                                              {
+                                                  "id":  "allowedTools",
+                                                  "label":  "Allowed Agent Tools",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "all",
+                                                                      "label":  "All Tools"
+                                                                  },
+                                                                  {
+                                                                      "value":  "content-only",
+                                                                      "label":  "Content Only (read/write)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "design-only",
+                                                                      "label":  "Design Only (style/layout)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "read-only",
+                                                                      "label":  "Read Only"
+                                                                  }
+                                                              ],
+                                                  "default":  "content-only"
+                                              },
+                                              {
+                                                  "id":  "autoDeploy",
+                                                  "label":  "Auto-Deploy on Change",
+                                                  "type":  "toggle",
+                                                  "default":  false
+                                              }
+                                          ],
+                             "kind":  "skill"
+                         }
 }

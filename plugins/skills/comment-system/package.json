@@ -1,46 +1,63 @@
-{
-  "name": "@instatic/comment-system",
-  "version": "0.1.0",
-  "description": "AI-enhanced comment and discussion system with spam filtering, sentiment analysis, and auto-moderation.",
-  "instaticManifest": {
-    "id": "instatic.comment-system",
-    "name": "Comment System",
-    "version": "0.1.0",
-    "apiVersion": 1,
-    "description": "AI-enhanced comment and discussion system with spam detection, sentiment analysis, auto-moderation, and threaded replies.",
-    "permissions": [
-      "cms.routes.public"
-    ],
-    "entrypoints": {
-      "server": "dist/index.js"
-    },
-    "resources": [],
-    "adminPages": [],
-    "settings": [
-      {
-        "id": "moderationLevel",
-        "label": "Auto-Moderation Level",
-        "type": "select",
-        "options": [
-          { "value": "none", "label": "None (manual only)" },
-          { "value": "spam-only", "label": "Spam Filter Only" },
-          { "value": "balanced", "label": "Balanced (spam + toxicity)" },
-          { "value": "strict", "label": "Strict (all content filtered)" }
-        ],
-        "default": "balanced"
-      },
-      {
-        "id": "sentimentDisplay",
-        "label": "Show Comment Sentiment",
-        "type": "toggle",
-        "default": false
-      },
-      {
-        "id": "threadedReplies",
-        "label": "Enable Threaded Replies",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  }
+﻿{
+    "name":  "@instatic/comment-system",
+    "version":  "0.1.0",
+    "description":  "AI-enhanced comment and discussion system with spam filtering, sentiment analysis, and auto-moderation.",
+    "instaticManifest":  {
+                             "id":  "instatic.comment-system",
+                             "name":  "Comment System",
+                             "version":  "0.1.0",
+                             "apiVersion":  1,
+                             "description":  "AI-enhanced comment and discussion system with spam detection, sentiment analysis, auto-moderation, and threaded replies.",
+                             "permissions":  [
+                                                 "cms.routes.public"
+                                             ],
+                             "entrypoints":  {
+                                                 "server":  "dist/index.js"
+                                             },
+                             "resources":  [
+
+                                           ],
+                             "adminPages":  [
+
+                                            ],
+                             "settings":  [
+                                              {
+                                                  "id":  "moderationLevel",
+                                                  "label":  "Auto-Moderation Level",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "none",
+                                                                      "label":  "None (manual only)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "spam-only",
+                                                                      "label":  "Spam Filter Only"
+                                                                  },
+                                                                  {
+                                                                      "value":  "balanced",
+                                                                      "label":  "Balanced (spam + toxicity)"
+                                                                  },
+                                                                  {
+                                                                      "value":  "strict",
+                                                                      "label":  "Strict (all content filtered)"
+                                                                  }
+                                                              ],
+                                                  "default":  "balanced"
+                                              },
+                                              {
+                                                  "id":  "sentimentDisplay",
+                                                  "label":  "Show Comment Sentiment",
+                                                  "type":  "toggle",
+                                                  "default":  false
+                                              },
+                                              {
+                                                  "id":  "threadedReplies",
+                                                  "label":  "Enable Threaded Replies",
+                                                  "type":  "toggle",
+                                                  "default":  true
+                                              }
+                                          ],
+                             "kind":  "skill"
+                         }
 }
