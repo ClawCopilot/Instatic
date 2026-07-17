@@ -1,47 +1,79 @@
-{
-  "name": "@instatic/layout-builder",
-  "version": "0.1.0",
-  "description": "AI-powered page layout generator that creates responsive grid layouts, component arrangements, and page structures.",
-  "instaticManifest": {
-    "id": "instatic.layout-builder",
-    "name": "Layout Builder",
-    "version": "0.1.0",
-    "apiVersion": 1,
-    "description": "Generate responsive page layouts, grid structures, and component arrangements using AI. Supports hero sections, feature grids, pricing tables, and more.",
-    "permissions": [
-      "cms.routes.public"
-    ],
-    "entrypoints": {
-      "server": "dist/index.js"
-    },
-    "resources": [],
-    "adminPages": [],
-    "settings": [
-      {
-        "id": "layoutType",
-        "label": "Default Layout Type",
-        "type": "select",
-        "options": [
-          { "value": "landing", "label": "Landing Page" },
-          { "value": "blog", "label": "Blog Layout" },
-          { "value": "portfolio", "label": "Portfolio" },
-          { "value": "docs", "label": "Documentation" },
-          { "value": "ecommerce", "label": "E-commerce" },
-          { "value": "dashboard", "label": "Dashboard" }
-        ],
-        "default": "landing"
-      },
-      {
-        "id": "responsiveMode",
-        "label": "Responsive Breakpoints",
-        "type": "select",
-        "options": [
-          { "value": "mobile-first", "label": "Mobile First" },
-          { "value": "desktop-first", "label": "Desktop First" },
-          { "value": "adaptive", "label": "Adaptive" }
-        ],
-        "default": "mobile-first"
-      }
-    ]
-  }
+﻿{
+    "name":  "@instatic/layout-builder",
+    "version":  "0.1.0",
+    "description":  "AI-powered page layout generator that creates responsive grid layouts, component arrangements, and page structures.",
+    "instaticManifest":  {
+                             "id":  "instatic.layout-builder",
+                             "name":  "Layout Builder",
+                             "version":  "0.1.0",
+                             "apiVersion":  1,
+                             "description":  "Generate responsive page layouts, grid structures, and component arrangements using AI. Supports hero sections, feature grids, pricing tables, and more.",
+                             "permissions":  [
+                                                 "cms.routes.public"
+                                             ],
+                             "entrypoints":  {
+                                                 "server":  "dist/index.js"
+                                             },
+                             "resources":  [
+
+                                           ],
+                             "adminPages":  [
+
+                                            ],
+                             "settings":  [
+                                              {
+                                                  "id":  "layoutType",
+                                                  "label":  "Default Layout Type",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "landing",
+                                                                      "label":  "Landing Page"
+                                                                  },
+                                                                  {
+                                                                      "value":  "blog",
+                                                                      "label":  "Blog Layout"
+                                                                  },
+                                                                  {
+                                                                      "value":  "portfolio",
+                                                                      "label":  "Portfolio"
+                                                                  },
+                                                                  {
+                                                                      "value":  "docs",
+                                                                      "label":  "Documentation"
+                                                                  },
+                                                                  {
+                                                                      "value":  "ecommerce",
+                                                                      "label":  "E-commerce"
+                                                                  },
+                                                                  {
+                                                                      "value":  "dashboard",
+                                                                      "label":  "Dashboard"
+                                                                  }
+                                                              ],
+                                                  "default":  "landing"
+                                              },
+                                              {
+                                                  "id":  "responsiveMode",
+                                                  "label":  "Responsive Breakpoints",
+                                                  "type":  "select",
+                                                  "options":  [
+                                                                  {
+                                                                      "value":  "mobile-first",
+                                                                      "label":  "Mobile First"
+                                                                  },
+                                                                  {
+                                                                      "value":  "desktop-first",
+                                                                      "label":  "Desktop First"
+                                                                  },
+                                                                  {
+                                                                      "value":  "adaptive",
+                                                                      "label":  "Adaptive"
+                                                                  }
+                                                              ],
+                                                  "default":  "mobile-first"
+                                              }
+                                          ],
+                             "kind":  "skill"
+                         }
 }
