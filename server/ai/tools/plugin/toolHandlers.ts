@@ -29,6 +29,40 @@
  */
 
 // ===========================================================================
+// Proxy-aware fetch helper
+// ===========================================================================
+
+/**
+ * 从环境变量读取 HTTP 代理地址。
+ * 支持的变量（优先级从高到低）：HTTPS_PROXY, HTTP_PROXY, https_proxy, http_proxy
+ */
+function getHttpProxy(): string | undefined {
+  for (const env of ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy']) {
+    const val = process.env[env]
+    if (val && val.startsWith('http')) return val
+  }
+  return undefined
+}
+
+/** 创建代理选项对象，仅在代理配置存在时包含 proxy 字段。 */
+function proxyOpts(): RequestInit {
+  const proxy = getHttpProxy()
+  return proxy ? { proxy } : {}
+}
+
+/**
+ * 发起 HTTP 请求，自动注入代理（如果配置了 HTTP_PROXY/HTTPS_PROXY）。
+ * Bun 原生 fetch 支持 proxy 选项。
+ */
+async function proxyFetch(url: string, init?: RequestInit): Promise<Response> {
+  const proxy = getHttpProxy()
+  return fetch(url, {
+    ...init,
+    ...(proxy ? { proxy } as RequestInit : {}),
+  })
+}
+
+// ===========================================================================
 // Weather handlers — based on ClawHub steipete/weather
 //
 // Strategy: wttr.in (primary, no API key) → Open-Meteo (fallback, no API key).
@@ -111,7 +145,7 @@ export async function handleWeatherGet(input: unknown): Promise<unknown> {
   // 1. wttr.in (primary) — free, no API key, returns rich JSON.
   try {
     const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`
-    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    const res = await proxyFetch(url, { headers: { Accept: 'application/json' } })
     if (res.ok) {
       const data = (await res.json()) as WttrResponse
       const current = data.current_condition?.[0]
@@ -161,7 +195,7 @@ export async function handleWeatherForecast(input: unknown): Promise<unknown> {
   // 1. wttr.in (primary) — parse `weather[]` for daily summaries.
   try {
     const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`
-    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    const res = await proxyFetch(url, { headers: { Accept: 'application/json' } })
     if (res.ok) {
       const data = (await res.json()) as WttrResponse
       if (data.weather && data.weather.length > 0) {
@@ -203,7 +237,7 @@ async function fetchCurrentFromOpenMeteo(
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}` +
       `&longitude=${geo.longitude}&current_weather=true&temperature_unit=${unitParam}`
-    const res = await fetch(url)
+    const res = await proxyFetch(url)
     if (!res.ok) {
       return { ok: false, error: `Open-Meteo request failed: ${res.status} ${res.statusText}` }
     }
@@ -246,15 +280,15 @@ async function fetchForecastFromOpenMeteo(
       `&longitude=${geo.longitude}` +
       `&daily=temperature_2m_max,temperature_2m_min,weathercode,windspeed_10m_max` +
       `&forecast_days=${days}&temperature_unit=${unitParam}`
-    const res = await fetch(url)
+    const res = await proxyFetch(url)
     if (!res.ok) {
-      return { ok: false, error: `Open-Meteo request failed: ${res.status} ${res.statusText}` }
+      return { ok: false, error: `Open-Meteo forecast failed: ${res.status} ${res.statusText}` }
     }
-    const data = (await res.json()) as OpenMeteoForecastResponse
-    if (!data.daily) {
+    const forecastData = (await res.json()) as OpenMeteoForecastResponse
+    if (!forecastData.daily) {
       return { ok: false, error: 'Open-Meteo returned no daily forecast data' }
     }
-    const d = data.daily
+    const d = forecastData.daily
     const forecast = d.time.map((date, i) => ({
       date,
       maxTemp: `${d.temperature_2m_max[i] ?? ''}${useF ? '°F' : '°C'}`,
@@ -301,7 +335,7 @@ async function geocodeOpenMeteo(
     }
   }
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`
-  const res = await fetch(url)
+  const res = await proxyFetch(url)
   if (!res.ok) return null
   const data = (await res.json()) as OpenMeteoGeoResponse
   return data.results?.[0] ?? null
@@ -400,7 +434,7 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
   }
 
   try {
-    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const pageRes = await proxyFetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -424,7 +458,7 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
 
     // Pick the first track (usually the primary language of the video).
     const track = tracks[0]
-    const transcriptRes = await fetch(track.baseUrl)
+    const transcriptRes = await proxyFetch(track.baseUrl)
     if (!transcriptRes.ok) {
       return {
         ok: false,
