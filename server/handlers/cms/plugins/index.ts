@@ -8,6 +8,8 @@
  *   POST   /admin/api/cms/plugins                                   — install from a manifest JSON body
  *   POST   /admin/api/cms/plugins/inspect-package                   — read a plugin .zip without installing
  *   POST   /admin/api/cms/plugins/package                           — install (or upgrade) from a .zip
+ *   GET    /admin/api/cms/plugins/templates                         — list available scaffold templates
+ *   POST   /admin/api/cms/plugins/scaffold[?format=zip]             — generate a project from a template
  *   PATCH  /admin/api/cms/plugins/:id                               — enable / disable an installed plugin
  *   DELETE /admin/api/cms/plugins/:id[?force=true]                  — uninstall + delete on-disk assets
  *                                                                     (`force` skips lifecycle hooks)
@@ -64,6 +66,7 @@ import {
   handlePluginScheduleRunNow,
   handlePluginSchedulesList,
 } from './schedules'
+import { handleListTemplates, handleScaffold } from './scaffold'
 
 // ---------------------------------------------------------------------------
 // Route patterns
@@ -84,6 +87,8 @@ const PLUGIN_SCHEDULE_RUN_NOW_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]
 const PLUGIN_SCHEDULE_PAUSE_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/pause$/
 const PLUGIN_SCHEDULE_RESUME_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/resume$/
 const PLUGIN_EVENTS_PATH = '/admin/api/cms/plugins/events'
+const PLUGIN_TEMPLATES_PATH = '/admin/api/cms/plugins/templates'
+const PLUGIN_SCAFFOLD_PATH = '/admin/api/cms/plugins/scaffold'
 
 // The bare `/plugins/:id` route must NOT claim the reserved single-segment
 // children of `/plugins` (`events`, `package`, `inspect-package`) — those are
@@ -92,7 +97,7 @@ const PLUGIN_EVENTS_PATH = '/admin/api/cms/plugins/events'
 // path still resolves its original gate before 405ing — exactly as the old
 // exact-match-first dispatcher did.
 const PLUGIN_ITEM_DISPATCH_PATTERN =
-  /^\/admin\/api\/cms\/plugins\/(?<id>(?!(?:events|package|inspect-package)$)[^/]+)$/
+  /^\/admin\/api\/cms\/plugins\/(?<id>(?!(?:events|package|inspect-package|templates|scaffold)$)[^/]+)$/
 
 // ---------------------------------------------------------------------------
 // Per-route capability + step-up policy
@@ -125,6 +130,18 @@ function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoute
     // Read-only — inspect a .zip before deciding to install. Same audience
     // as the install endpoint (someone deciding whether to run untrusted
     // code), but the operation itself never touches the host.
+    return { capability: 'plugins.install', stepUp: false }
+  }
+  // Template listing — read-only metadata for the scaffold wizard. Anyone
+  // who can read plugin state can see what templates are available.
+  if (method === 'GET' && pathname === '/admin/api/cms/plugins/templates') {
+    return { capability: 'plugins.read', stepUp: false }
+  }
+  // Scaffold — generates source code from a template. Same risk class as
+  // inspect-package: it produces files but never executes them on the host.
+  // The generated zip must still go through the package install endpoint
+  // (with its own step-up gate) before any plugin code runs.
+  if (method === 'POST' && pathname === '/admin/api/cms/plugins/scaffold') {
     return { capability: 'plugins.install', stepUp: false }
   }
   // Pack install — re-syncs a plugin's bundled modules/loops/VCs into the
@@ -210,6 +227,8 @@ const PLUGIN_ROUTES: readonly Route<[CmsHandlerOptions, AuthUser]>[] = [
   { method: 'POST', pattern: PLUGIN_SCHEDULE_RESUME_PATTERN, handler: (req, db, p) => handlePluginScheduleResume(req, db, p.id, p.sid) },
   { method: 'GET', pattern: PLUGIN_SCHEDULES_PATTERN, handler: (req, db, p) => handlePluginSchedulesList(req, db, p.id) },
   { method: 'GET', pattern: PLUGIN_EVENTS_PATH, handler: async (req) => handlePluginEventsStream(req) },
+  { method: 'GET', pattern: PLUGIN_TEMPLATES_PATH, handler: (req) => handleListTemplates(req) },
+  { method: 'POST', pattern: PLUGIN_SCAFFOLD_PATH, handler: (req) => handleScaffold(req) },
   { method: 'PATCH', pattern: PLUGIN_RECORD_ITEM_PATTERN, handler: (req, db, p) => handlePluginRecordItem(req, db, p.id, p.rid, p.rec) },
   { method: 'DELETE', pattern: PLUGIN_RECORD_ITEM_PATTERN, handler: (req, db, p) => handlePluginRecordItem(req, db, p.id, p.rid, p.rec) },
   { method: 'GET', pattern: PLUGIN_RECORDS_PATTERN, handler: (req, db, p) => handlePluginRecordsCollection(req, db, p.id, p.rid) },
@@ -274,5 +293,7 @@ function isPluginAdminPath(pathname: string): boolean {
   if (pathname === '/admin/api/cms/plugins') return true
   if (pathname === '/admin/api/cms/plugins/inspect-package') return true
   if (pathname === '/admin/api/cms/plugins/package') return true
+  if (pathname === '/admin/api/cms/plugins/templates') return true
+  if (pathname === '/admin/api/cms/plugins/scaffold') return true
   return pathname.startsWith('/admin/api/cms/plugins/')
 }

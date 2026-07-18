@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { Button } from '@ui/components/Button'
 import { UploadIcon } from 'pixel-art-icons/icons/upload'
+import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginCard } from './components/PluginCard/PluginCard'
 import { PluginRemoveDialog } from './components/PluginRemoveDialog/PluginRemoveDialog'
 import { PermissionReviewSection } from './components/PermissionReviewSection'
 import { PluginSettingsDialog } from './components/PluginSettingsDialog/PluginSettingsDialog'
 import { PluginSchedulesDialog } from './components/PluginSchedulesDialog/PluginSchedulesDialog'
+import { CreateFromTemplateDialog } from './components/CreateFromTemplateDialog/CreateFromTemplateDialog'
 import { isSandboxRelatedError, usePluginsWorkspace } from './hooks/usePluginsWorkspace'
 import { notifyCmsPluginsChanged } from './utils/pluginEvents'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
@@ -28,6 +31,7 @@ export function PluginsPage() {
   const canInstall = canInstallPlugins(currentUser)
   const canManageLifecycle = canManagePluginLifecycle(currentUser)
   const vm = usePluginsWorkspace()
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false)
   const {
     fileInputRef,
     payload,
@@ -51,6 +55,14 @@ export function PluginsPage() {
       description="Install admin extensions and control what they add to the CMS."
       actions={canInstall ? (
         <>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setCreateTemplateOpen(true)}
+          >
+            <SparklesSolidIcon size={15} aria-hidden="true" />
+            <span>Create from Template</span>
+          </Button>
           <Button
             variant="primary"
             size="md"
@@ -207,6 +219,13 @@ export function PluginsPage() {
               vm.setPendingRemove(null)
               await vm.executeRemovePlugin(target.plugin, target.force)
             }}
+          />
+        )}
+
+        {createTemplateOpen && (
+          <CreateFromTemplateDialog
+            kind="plugin"
+            onClose={() => setCreateTemplateOpen(false)}
           />
         )}
       </div>

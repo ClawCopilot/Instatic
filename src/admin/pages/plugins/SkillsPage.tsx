@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Button } from '@ui/components/Button'
+import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginCard } from './components/PluginCard/PluginCard'
 import { PluginRemoveDialog } from './components/PluginRemoveDialog/PluginRemoveDialog'
 import { PermissionReviewSection } from './components/PermissionReviewSection'
 import { PluginSettingsDialog } from './components/PluginSettingsDialog/PluginSettingsDialog'
 import { PluginSchedulesDialog } from './components/PluginSchedulesDialog/PluginSchedulesDialog'
+import { CreateFromTemplateDialog } from './components/CreateFromTemplateDialog/CreateFromTemplateDialog'
 import { isSandboxRelatedError, usePluginsWorkspace } from './hooks/usePluginsWorkspace'
 import { notifyCmsPluginsChanged } from './utils/pluginEvents'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
@@ -25,6 +28,7 @@ export function SkillsPage() {
   const canInstall = canInstallPlugins(currentUser)
   const canManageLifecycle = canManagePluginLifecycle(currentUser)
   const vm = usePluginsWorkspace()
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false)
   const {
     fileInputRef,
     payload,
@@ -51,6 +55,16 @@ export function SkillsPage() {
       title="Skills"
       titleId="skills-title"
       description="Manage AI-powered skills that extend your CMS with intelligent capabilities."
+      actions={canInstall ? (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => setCreateTemplateOpen(true)}
+        >
+          <SparklesSolidIcon size={15} aria-hidden="true" />
+          <span>Create from Template</span>
+        </Button>
+      ) : null}
     >
       <div className={styles.pluginsBody} data-testid="skills-admin-canvas">
         {error && (
@@ -192,6 +206,13 @@ export function SkillsPage() {
               vm.setPendingRemove(null)
               await vm.executeRemovePlugin(target.plugin, target.force)
             }}
+          />
+        )}
+
+        {createTemplateOpen && (
+          <CreateFromTemplateDialog
+            kind="skill"
+            onClose={() => setCreateTemplateOpen(false)}
           />
         )}
       </div>
