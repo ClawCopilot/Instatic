@@ -284,11 +284,11 @@ async function fetchForecastFromOpenMeteo(
     if (!res.ok) {
       return { ok: false, error: `Open-Meteo forecast failed: ${res.status} ${res.statusText}` }
     }
-    const forecast = (await res.json()) as OpenMeteoForecastResponse
-    if (!data.daily) {
+    const forecastData = (await res.json()) as OpenMeteoForecastResponse
+    if (!forecastData.daily) {
       return { ok: false, error: 'Open-Meteo returned no daily forecast data' }
     }
-    const d = data.daily
+    const d = forecastData.daily
     const forecast = d.time.map((date, i) => ({
       date,
       maxTemp: `${d.temperature_2m_max[i] ?? ''}${useF ? '°F' : '°C'}`,
