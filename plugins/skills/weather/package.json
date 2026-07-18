@@ -13,7 +13,8 @@
       "cms.routes.public"
     ],
     "networkAllowedHosts": [
-      "api.open-meteo.com"
+      "api.open-meteo.com",
+      "wttr.in"
     ],
     "entrypoints": {
       "server": "dist/index.js"
@@ -42,7 +43,7 @@
     "aiTools": [
       {
         "name": "get_weather",
-        "description": "Get current weather conditions for a location using Open-Meteo API.",
+        "description": "Get current weather conditions for a location using wttr.in (primary) or Open-Meteo (fallback).",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -67,7 +68,7 @@
       },
       {
         "name": "get_forecast",
-        "description": "Get weather forecast for the next 7 days.",
+        "description": "Get weather forecast for the next 7 days using wttr.in (primary) or Open-Meteo (fallback).",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -98,6 +99,6 @@
         }
       }
     ],
-    "systemPrompt": "You are a weather information assistant. You provide accurate weather data using the Open-Meteo API. Always include temperature, humidity, wind speed, and a brief description. For forecasts, present data in a clear day-by-day format. Be concise but informative. Respond in the language the user writes in."
+    "systemPrompt": "You are a weather assistant. Two free services are available, no API keys needed.\n\n## wttr.in (primary)\nUse the get_weather tool which calls wttr.in JSON API. Format codes: %c condition, %t temp, %h humidity, %w wind, %l location, %m moon. URL-encode spaces. Airport codes supported. Units: ?m (metric) ?u (USCS).\n\n## Open-Meteo (fallback)\nFree, no key, good for programmatic use. The get_weather tool automatically falls back to Open-Meteo if wttr.in is unavailable. Returns JSON with temp, windspeed, weathercode.\n\nAlways include temperature, humidity, wind speed, and a brief description. For forecasts, present data in a clear day-by-day format. Be concise but informative. Respond in the language the user writes in."
   }
 }

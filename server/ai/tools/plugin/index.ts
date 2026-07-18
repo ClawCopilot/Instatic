@@ -8,7 +8,9 @@
  *   - 启动时（以及每次热重载）从 DB 读取所有已安装且启用的 skill 插件
  *   - 将每个 skill 的 `SkillAiTool[]` 转换为 `AiTool[]`，缓存到内存
  *   - `scopeToolset('plugin')` 直接从缓存读取，保持同步调用
- *   - tool handler 通过 plugin worker RPC 调用 skill 的 server entrypoint
+ *   - tool handler 调用顺序：先查 `./toolHandlers` 中的本地 handler
+ *     （weather、youtube-summarizer 等需要外部 API 调用的 skill），
+ *     再回退到 plugin worker RPC（适用于已实现 server entrypoint 的 skill）
  *
  * 命名空间：所有 skill 工具名称前缀为 `skill_<pluginId>_<toolName>`，
  * 避免 skill 之间的工具名称冲突。
@@ -21,6 +23,7 @@ import { listInstalledPlugins } from '../../../repositories/plugins'
 import type { PluginManifest } from '@core/plugin-sdk'
 import type { SkillAiTool } from '@core/plugin-sdk/types/skillTypes'
 import type { AiTool, ToolContext } from '../types'
+import { lookupLocalHandler } from './toolHandlers'
 
 // ---------------------------------------------------------------------------
 // 内存缓存 — plugin scope 工具和系统提示
@@ -130,7 +133,10 @@ export function buildPluginSystemPrompt(): string[] {
  *   - scope: 设为 'plugin'
  *   - execution: 设为 'server'
  *   - inputSchema: 通过 Type.Unsafe 包装 JSON Schema 为 TypeBox TSchema
- *   - handler: 通过 plugin worker RPC 调用 skill 的 server entrypoint
+ *   - handler: 优先查找本地 handler（`./toolHandlers` 中注册的 weather、
+ *     youtube-summarizer 等需要外部 API 调用的 skill）。找不到时回退到
+ *     worker RPC 路径（`invokeSkillToolHandler`），后者适用于已实现 server
+ *     entrypoint 的 skill。
  */
 function buildAiToolFromSkillTool(
   skillTool: SkillAiTool,
@@ -149,6 +155,16 @@ function buildAiToolFromSkillTool(
     inputSchema: Type.Unsafe<TSchema>(skillTool.inputSchema),
     mutates: skillTool.mutates ?? false,
     handler: async (input: unknown, _ctx: ToolContext) => {
+      // 优先查找本地 handler —— weather、youtube-summarizer 等需要实际外部
+      // API 调用的 skill 在 `./toolHandlers` 中注册了 handler。本地 handler
+      // 直接在 server 进程中运行，无需 worker RPC 往返。
+      const localHandler = lookupLocalHandler(pluginId, skillTool.name)
+      if (localHandler) {
+        return await localHandler(input)
+      }
+      // Fallback：通过 plugin worker RPC 调用 skill 的 server entrypoint。
+      // 适用于已实现 server entrypoint 的 skill；若 skill 没有可用的 worker
+      // handler（如纯 AI 推理型 skill），调用将返回错误，模型可继续对话。
       return await invokeSkillToolHandler(pluginId, skillTool.name, input)
     },
   }
@@ -161,16 +177,41 @@ function buildAiToolFromSkillTool(
 /**
  * 调用 skill 的 server entrypoint 中对应的 tool handler。
  *
- * 如果 skill 没有加载到 worker 中（无 server entrypoint 或 worker 不可用），
- * 返回错误结果，让模型可以继续对话。
+ * 这是 `buildAiToolFromSkillTool` 的 fallback 路径：当 `lookupLocalHandler`
+ * 没有找到本地 handler 时调用。通过 plugin worker RPC 调用 skill 的 server
+ * entrypoint。
+ *
+ * 注意：`runAiToolInWorker` 目前尚未实现（`rpc.ts` 中未导出该函数）。
+ * 因此对于没有注册本地 handler 的 skill tool（如纯 AI 推理型 humanizer），
+ * 此函数会返回一个优雅的错误，让模型可以继续对话而不崩溃。当
+ * `runAiToolInWorker` 在未来实现后，此路径将自动可用。
  */
 async function invokeSkillToolHandler(
   pluginId: string,
   toolName: string,
   input: unknown,
 ): Promise<unknown> {
-  // 延迟导入 worker RPC 函数，避免循环依赖
-  const { runAiToolInWorker } = await import('../../../plugins/host/rpc')
+  // 延迟导入 worker RPC 模块，避免循环依赖
+  const rpc = (await import('../../../plugins/host/rpc')) as {
+    runAiToolInWorker?: (args: {
+      pluginId: string
+      toolName: string
+      input: unknown
+    }) => Promise<{ ok: boolean; error?: string; data?: unknown }>
+  }
+
+  // runAiToolInWorker 尚未实现 —— 如果不存在，返回优雅的错误让模型继续对话
+  const runAiToolInWorker = rpc.runAiToolInWorker
+  if (typeof runAiToolInWorker !== 'function') {
+    return {
+      ok: false,
+      error:
+        `Skill tool "${pluginId}.${toolName}" has no local handler and the worker RPC ` +
+        `(runAiToolInWorker) is not yet implemented. This tool cannot be invoked until ` +
+        `either a local handler is registered in toolHandlers.ts or runAiToolInWorker ` +
+        `is implemented in server/plugins/host/rpc.ts.`,
+    }
+  }
 
   const result = await runAiToolInWorker({
     pluginId,
