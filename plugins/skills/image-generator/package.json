@@ -1,73 +1,102 @@
-﻿{
-    "name":  "@instatic/image-generator",
-    "version":  "0.1.0",
-    "description":  "Generate and edit images with AI for CMS content. Uses MiniMax or other configured providers.",
-    "instaticManifest":  {
-                             "id":  "instatic.image-generator",
-                             "name":  "Image Generator",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Generate AI images for CMS content. Supports text-to-image, image variation, and style transfer.",
-                             "permissions":  [
-                                                 "network.outbound",
-                                                 "cms.routes.public"
-                                             ],
-                             "networkAllowedHosts":  [
-                                                         "api.minimaxi.com",
-                                                         "api.openai.com",
-                                                         "api.stability.ai"
-                                                     ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "provider",
-                                                  "label":  "Image Provider",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "minimax",
-                                                                      "label":  "MiniMax"
-                                                                  },
-                                                                  {
-                                                                      "value":  "openai",
-                                                                      "label":  "OpenAI DALL-E"
-                                                                  },
-                                                                  {
-                                                                      "value":  "stability",
-                                                                      "label":  "Stability AI"
-                                                                  }
-                                                              ],
-                                                  "default":  "minimax"
-                                              },
-                                              {
-                                                  "id":  "defaultSize",
-                                                  "label":  "Default Image Size",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "1024x1024",
-                                                                      "label":  "1024x1024 (Square)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "1024x1536",
-                                                                      "label":  "1024x1536 (Portrait)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "1536x1024",
-                                                                      "label":  "1536x1024 (Landscape)"
-                                                                  }
-                                                              ],
-                                                  "default":  "1024x1024"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/image-generator",
+  "version": "0.1.0",
+  "description": "Generate and edit images with AI for CMS content. Uses MiniMax or other configured providers.",
+  "instaticManifest": {
+    "id": "instatic.image-generator",
+    "name": "Image Generator",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Generate AI images for CMS content. Supports text-to-image, image variation, and style transfer.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "api.minimaxi.com",
+      "api.openai.com",
+      "api.stability.ai"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "provider",
+        "label": "Image Provider",
+        "type": "select",
+        "options": [
+          {
+            "value": "minimax",
+            "label": "MiniMax"
+          },
+          {
+            "value": "openai",
+            "label": "OpenAI DALL-E"
+          },
+          {
+            "value": "stability",
+            "label": "Stability AI"
+          }
+        ],
+        "default": "minimax"
+      },
+      {
+        "id": "defaultSize",
+        "label": "Default Image Size",
+        "type": "select",
+        "options": [
+          {
+            "value": "1024x1024",
+            "label": "1024x1024 (Square)"
+          },
+          {
+            "value": "1024x1536",
+            "label": "1024x1536 (Portrait)"
+          },
+          {
+            "value": "1536x1024",
+            "label": "1536x1024 (Landscape)"
+          }
+        ],
+        "default": "1024x1024"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "generate_image",
+        "description": "Generate an image from a text prompt using AI.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "Image description prompt"
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "1024x1024",
+                "1024x1536",
+                "1536x1024"
+              ],
+              "description": "Image dimensions",
+              "default": "1024x1024"
+            },
+            "style": {
+              "type": "string",
+              "description": "Optional style modifier (e.g., 'watercolor', 'photorealistic', 'minimalist')"
+            }
+          },
+          "required": [
+            "prompt"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are an AI image generation assistant. Help users create images for their CMS content. When users describe what they want, generate detailed, effective prompts for the image generation model. Enhance vague descriptions with specific artistic details. For CMS use cases, suggest appropriate dimensions based on content type (hero banners: 1536x1024, thumbnails: 1024x1024, social images: 1024x1536)."
+  }
 }

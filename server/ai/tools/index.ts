@@ -1,8 +1,8 @@
 /**
  * Tool registry root — selects the right toolset for a chat scope.
  *
- * Currently only the `site` scope has tools registered. Phase 4 will add
- * `content` + `data`; Phase 5 will add `plugin`.
+ * Scopes: `site`, `content`, `data` (static toolsets) and `plugin`
+ * (dynamic — built from installed skill plugins at boot/reload time).
  *
  * Adding a new scope:
  *   1. Create `server/ai/tools/<scope>/` with its tool files + index.ts.
@@ -10,6 +10,10 @@
  *   3. Add a switch arm in `scopeToolset`.
  *   4. The `ai-tools-typebox-only.test.ts` gate ensures every file under
  *      `server/ai/tools/**` uses TypeBox (not Zod) — covered automatically.
+ *
+ * Plugin scope 的工具来自已安装的 skill 插件，通过 `initPluginToolCache`
+ * 在服务器启动时（`activateInstalledServerPlugins`）从 DB 异步加载并缓存。
+ * `scopeToolset('plugin')` 同步读取缓存，避免在请求热路径上执行 DB 查询。
  *
  * Capability filtering: `selectToolsForScope` takes the caller's capability
  * set and filters through `toolAllowedForCapabilities` — write tools need
@@ -26,6 +30,7 @@ import type { AiTool, ToolScope } from './types'
 import { siteTools } from './site'
 import { contentTools } from './content'
 import { dataTools } from './data'
+import { getPluginTools } from './plugin'
 
 function scopeToolset(scope: ToolScope): AiTool[] {
   switch (scope) {
@@ -36,8 +41,8 @@ function scopeToolset(scope: ToolScope): AiTool[] {
     case 'data':
       return dataTools
     case 'plugin':
-      // Phase 5
-      return []
+      // 从缓存读取 skill 插件的工具，缓存由 initPluginToolCache 在启动时填充
+      return getPluginTools()
   }
 }
 

@@ -1,54 +1,124 @@
-﻿{
-    "name":  "@instatic/site-api",
-    "version":  "0.1.0",
-    "description":  "RESTful API skill that exposes site content, structure, and media for external agents and OpenClaw integration.",
-    "instaticManifest":  {
-                             "id":  "instatic.site-api",
-                             "name":  "Site API",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Expose CMS site content, structure, and media through a clean RESTful API. Enables OpenClaw agents and other AI tools to read, create, and update site content programmatically.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "apiKey",
-                                                  "label":  "API Access Key",
-                                                  "type":  "password",
-                                                  "secret":  true,
-                                                  "description":  "Bearer token for API authentication. Leave empty for open access."
-                                              },
-                                              {
-                                                  "id":  "rateLimit",
-                                                  "label":  "Rate Limit (requests/min)",
-                                                  "type":  "number",
-                                                  "min":  1,
-                                                  "max":  1000,
-                                                  "default":  60
-                                              },
-                                              {
-                                                  "id":  "allowedOrigins",
-                                                  "label":  "Allowed CORS Origins",
-                                                  "type":  "textarea",
-                                                  "description":  "One origin per line. Leave empty for all origins."
-                                              },
-                                              {
-                                                  "id":  "readOnly",
-                                                  "label":  "Read-Only Mode",
-                                                  "type":  "toggle",
-                                                  "default":  true
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/site-api",
+  "version": "0.1.0",
+  "description": "RESTful API skill that exposes site content, structure, and media for external agents and OpenClaw integration.",
+  "instaticManifest": {
+    "id": "instatic.site-api",
+    "name": "Site API",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Expose CMS site content, structure, and media through a clean RESTful API. Enables OpenClaw agents and other AI tools to read, create, and update site content programmatically.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "apiKey",
+        "label": "API Access Key",
+        "type": "password",
+        "secret": true,
+        "description": "Bearer token for API authentication. Leave empty for open access."
+      },
+      {
+        "id": "rateLimit",
+        "label": "Rate Limit (requests/min)",
+        "type": "number",
+        "min": 1,
+        "max": 1000,
+        "default": 60
+      },
+      {
+        "id": "allowedOrigins",
+        "label": "Allowed CORS Origins",
+        "type": "textarea",
+        "description": "One origin per line. Leave empty for all origins."
+      },
+      {
+        "id": "readOnly",
+        "label": "Read-Only Mode",
+        "type": "toggle",
+        "default": true
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "query_site_content",
+        "description": "Query the CMS site content, pages, and structure.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "queryType": {
+              "type": "string",
+              "enum": [
+                "pages",
+                "posts",
+                "media",
+                "site-info"
+              ],
+              "description": "Type of content to query"
+            },
+            "filter": {
+              "type": "string",
+              "description": "Optional filter (e.g., 'published', 'draft')"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results",
+              "default": 20
+            }
+          },
+          "required": [
+            "queryType"
+          ]
+        }
+      },
+      {
+        "name": "create_content",
+        "description": "Create new content in the CMS via API.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "page",
+                "post",
+                "component"
+              ],
+              "description": "Content type to create"
+            },
+            "title": {
+              "type": "string",
+              "description": "Content title"
+            },
+            "body": {
+              "type": "string",
+              "description": "Content body/HTML"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "published"
+              ],
+              "description": "Publish status",
+              "default": "draft"
+            }
+          },
+          "required": [
+            "type",
+            "title"
+          ]
+        },
+        "mutates": true
+      }
+    ],
+    "systemPrompt": "You are a CMS API assistant that helps AI agents interact with website content. You can query existing content (pages, posts, media, site info) and create new content. When querying, be specific about what information is needed. When creating content, use proper HTML structure and follow CMS conventions. Always respect read-only mode restrictions. Respond in the language the user writes in."
+  }
 }

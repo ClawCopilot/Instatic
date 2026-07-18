@@ -1,73 +1,134 @@
-﻿{
-    "name":  "@instatic/social-media",
-    "version":  "0.1.0",
-    "description":  "Social media integration skill for cross-posting, scheduling, and social preview optimization.",
-    "instaticManifest":  {
-                             "id":  "instatic.social-media",
-                             "name":  "Social Media Hub",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Cross-post CMS content to social platforms, optimize social media previews (OG images, meta descriptions), and track engagement.",
-                             "permissions":  [
-                                                 "network.outbound",
-                                                 "cms.routes.public"
-                                             ],
-                             "networkAllowedHosts":  [
-                                                         "api.x.com",
-                                                         "graph.facebook.com",
-                                                         "api.linkedin.com"
-                                                     ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "defaultPlatform",
-                                                  "label":  "Primary Platform",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "twitter",
-                                                                      "label":  "X (Twitter)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "facebook",
-                                                                      "label":  "Facebook"
-                                                                  },
-                                                                  {
-                                                                      "value":  "linkedin",
-                                                                      "label":  "LinkedIn"
-                                                                  },
-                                                                  {
-                                                                      "value":  "weibo",
-                                                                      "label":  "Weibo"
-                                                                  },
-                                                                  {
-                                                                      "value":  "wechat",
-                                                                      "label":  "WeChat"
-                                                                  }
-                                                              ],
-                                                  "default":  "twitter"
-                                              },
-                                              {
-                                                  "id":  "autoGeneratePreview",
-                                                  "label":  "Auto-Generate Social Preview",
-                                                  "type":  "toggle",
-                                                  "default":  true
-                                              },
-                                              {
-                                                  "id":  "hashtagsEnabled",
-                                                  "label":  "Smart Hashtag Suggestions",
-                                                  "type":  "toggle",
-                                                  "default":  true
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/social-media",
+  "version": "0.1.0",
+  "description": "Social media integration skill for cross-posting, scheduling, and social preview optimization.",
+  "instaticManifest": {
+    "id": "instatic.social-media",
+    "name": "Social Media Hub",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Cross-post CMS content to social platforms, optimize social media previews (OG images, meta descriptions), and track engagement.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "api.x.com",
+      "graph.facebook.com",
+      "api.linkedin.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "defaultPlatform",
+        "label": "Primary Platform",
+        "type": "select",
+        "options": [
+          {
+            "value": "twitter",
+            "label": "X (Twitter)"
+          },
+          {
+            "value": "facebook",
+            "label": "Facebook"
+          },
+          {
+            "value": "linkedin",
+            "label": "LinkedIn"
+          },
+          {
+            "value": "weibo",
+            "label": "Weibo"
+          },
+          {
+            "value": "wechat",
+            "label": "WeChat"
+          }
+        ],
+        "default": "twitter"
+      },
+      {
+        "id": "autoGeneratePreview",
+        "label": "Auto-Generate Social Preview",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "id": "hashtagsEnabled",
+        "label": "Smart Hashtag Suggestions",
+        "type": "toggle",
+        "default": true
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "generate_social_post",
+        "description": "Generate a social media post from CMS content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Source CMS content"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "twitter",
+                "facebook",
+                "linkedin",
+                "weibo",
+                "wechat"
+              ],
+              "description": "Target platform"
+            },
+            "includeHashtags": {
+              "type": "boolean",
+              "description": "Include relevant hashtags",
+              "default": true
+            },
+            "tone": {
+              "type": "string",
+              "description": "Desired tone"
+            }
+          },
+          "required": [
+            "content",
+            "platform"
+          ]
+        }
+      },
+      {
+        "name": "optimize_social_preview",
+        "description": "Optimize OG meta tags and social preview for CMS content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Page title"
+            },
+            "description": {
+              "type": "string",
+              "description": "Page description"
+            },
+            "imageUrl": {
+              "type": "string",
+              "description": "OG image URL"
+            }
+          },
+          "required": [
+            "title",
+            "description"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a social media optimization assistant. You help users adapt their CMS content for social media platforms. When generating posts, follow platform-specific best practices (Twitter: 280 chars, LinkedIn: professional tone, Weibo: mix of formal and casual). When optimizing previews, suggest compelling titles within character limits and effective meta descriptions. Respond in the language the user writes in."
+  }
 }

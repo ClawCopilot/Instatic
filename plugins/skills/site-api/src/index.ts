@@ -1,8 +1,8 @@
 /**
  * Site API Skill
  *
- * AI-powered web design assistant for color palettes,
- * typography, spacing, and layout suggestions.
+ * AI-powered CMS API assistant for querying site content,
+ * managing pages/posts, and creating new content entries.
  */
 
 export default {

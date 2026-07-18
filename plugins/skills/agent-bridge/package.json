@@ -1,64 +1,145 @@
-﻿{
-    "name":  "@instatic/agent-bridge",
-    "version":  "0.1.0",
-    "description":  "MCP-compatible bridge for OpenClaw agents to deeply interact with site building, content management, and design.",
-    "instaticManifest":  {
-                             "id":  "instatic.agent-bridge",
-                             "name":  "Agent Bridge",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "MCP-compatible bridge that allows OpenClaw agents and other AI assistants to deeply control the site: edit pages, manage content, adjust styles, and deploy changes through natural language.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "bridgeToken",
-                                                  "label":  "Bridge Auth Token",
-                                                  "type":  "password",
-                                                  "secret":  true,
-                                                  "description":  "Authentication token for the agent bridge endpoint."
-                                              },
-                                              {
-                                                  "id":  "allowedTools",
-                                                  "label":  "Allowed Agent Tools",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "all",
-                                                                      "label":  "All Tools"
-                                                                  },
-                                                                  {
-                                                                      "value":  "content-only",
-                                                                      "label":  "Content Only (read/write)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "design-only",
-                                                                      "label":  "Design Only (style/layout)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "read-only",
-                                                                      "label":  "Read Only"
-                                                                  }
-                                                              ],
-                                                  "default":  "content-only"
-                                              },
-                                              {
-                                                  "id":  "autoDeploy",
-                                                  "label":  "Auto-Deploy on Change",
-                                                  "type":  "toggle",
-                                                  "default":  false
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/agent-bridge",
+  "version": "0.1.0",
+  "description": "MCP-compatible bridge for OpenClaw agents to deeply interact with site building, content management, and design.",
+  "instaticManifest": {
+    "id": "instatic.agent-bridge",
+    "name": "Agent Bridge",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "MCP-compatible bridge that allows OpenClaw agents and other AI assistants to deeply control the site: edit pages, manage content, adjust styles, and deploy changes through natural language.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "bridgeToken",
+        "label": "Bridge Auth Token",
+        "type": "password",
+        "secret": true,
+        "description": "Authentication token for the agent bridge endpoint."
+      },
+      {
+        "id": "allowedTools",
+        "label": "Allowed Agent Tools",
+        "type": "select",
+        "options": [
+          {
+            "value": "all",
+            "label": "All Tools"
+          },
+          {
+            "value": "content-only",
+            "label": "Content Only (read/write)"
+          },
+          {
+            "value": "design-only",
+            "label": "Design Only (style/layout)"
+          },
+          {
+            "value": "read-only",
+            "label": "Read Only"
+          }
+        ],
+        "default": "content-only"
+      },
+      {
+        "id": "autoDeploy",
+        "label": "Auto-Deploy on Change",
+        "type": "toggle",
+        "default": false
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "agent_edit_page",
+        "description": "Allow an AI agent to edit a CMS page structure and content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "description": "ID of the page to edit"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "update-title",
+                "update-content",
+                "update-meta",
+                "add-section",
+                "remove-section"
+              ],
+              "description": "Edit action"
+            },
+            "data": {
+              "type": "string",
+              "description": "JSON string with the edit data"
+            }
+          },
+          "required": [
+            "pageId",
+            "action"
+          ]
+        },
+        "mutates": true
+      },
+      {
+        "name": "agent_manage_content",
+        "description": "Allow an AI agent to manage CMS content entries.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "list",
+                "create",
+                "update",
+                "delete",
+                "publish"
+              ],
+              "description": "Management action"
+            },
+            "contentType": {
+              "type": "string",
+              "description": "Content type (e.g., 'posts', 'pages')"
+            },
+            "data": {
+              "type": "string",
+              "description": "JSON data for the action"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "mutates": true
+      },
+      {
+        "name": "agent_deploy",
+        "description": "Trigger a site deployment via the agent bridge.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "confirm": {
+              "type": "boolean",
+              "description": "Confirmation flag to prevent accidental deploys"
+            }
+          },
+          "required": [
+            "confirm"
+          ]
+        },
+        "mutates": true
+      }
+    ],
+    "systemPrompt": "You are an agent bridge that allows AI assistants to control a CMS website through structured commands. You translate natural language requests into precise API operations. Always confirm destructive actions (delete, deploy) before executing. Provide clear feedback on operation results. Be precise with page IDs and content types. Respond in the language the user writes in."
+  }
 }

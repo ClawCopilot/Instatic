@@ -475,4 +475,16 @@ export async function activateInstalledServerPlugins(
       }
     }
   }
+
+  // Phase: plugin-scope AI tool cache — 从已安装的 skill 插件构建 AI 工具缓存。
+  // 放在所有插件激活循环之后，确保 skill 的 worker 已就绪。
+  // 每次 start/rebind/hot-reload 都会重新构建缓存。
+  try {
+    const { initPluginToolCache } = await import('../ai/tools/plugin')
+    await initPluginToolCache(db)
+  } catch (err) {
+    // 缓存构建失败不应阻止服务器启动 — plugin scope 工具不可用，
+    // 但其他 scope（site/content/data）不受影响。
+    console.error('[ai/plugin] failed to initialize plugin tool cache:', err)
+  }
 }

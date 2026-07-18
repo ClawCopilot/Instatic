@@ -1,79 +1,157 @@
-﻿{
-    "name":  "@instatic/design-advisor",
-    "version":  "0.1.0",
-    "description":  "AI-powered web design advisor for color palettes, typography, spacing, and layout suggestions.",
-    "instaticManifest":  {
-                             "id":  "instatic.design-advisor",
-                             "name":  "Design Advisor",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "AI design assistant that suggests color palettes, typography pairings, spacing systems, and visual hierarchy for CMS pages.",
-                             "permissions":  [
-                                                 "cms.routes.public"
-                                             ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "designStyle",
-                                                  "label":  "Preferred Design Style",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "modern-minimal",
-                                                                      "label":  "Modern Minimal"
-                                                                  },
-                                                                  {
-                                                                      "value":  "bold-vibrant",
-                                                                      "label":  "Bold \u0026 Vibrant"
-                                                                  },
-                                                                  {
-                                                                      "value":  "corporate-clean",
-                                                                      "label":  "Corporate Clean"
-                                                                  },
-                                                                  {
-                                                                      "value":  "playful-creative",
-                                                                      "label":  "Playful \u0026 Creative"
-                                                                  },
-                                                                  {
-                                                                      "value":  "luxury-elegant",
-                                                                      "label":  "Luxury \u0026 Elegant"
-                                                                  }
-                                                              ],
-                                                  "default":  "modern-minimal"
-                                              },
-                                              {
-                                                  "id":  "colorScheme",
-                                                  "label":  "Base Color Scheme",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "auto",
-                                                                      "label":  "Auto (AI decides)"
-                                                                  },
-                                                                  {
-                                                                      "value":  "light",
-                                                                      "label":  "Light Theme"
-                                                                  },
-                                                                  {
-                                                                      "value":  "dark",
-                                                                      "label":  "Dark Theme"
-                                                                  },
-                                                                  {
-                                                                      "value":  "adaptive",
-                                                                      "label":  "Adaptive (light + dark)"
-                                                                  }
-                                                              ],
-                                                  "default":  "auto"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/design-advisor",
+  "version": "0.1.0",
+  "description": "AI-powered web design advisor for color palettes, typography, spacing, and layout suggestions.",
+  "instaticManifest": {
+    "id": "instatic.design-advisor",
+    "name": "Design Advisor",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "AI design assistant that suggests color palettes, typography pairings, spacing systems, and visual hierarchy for CMS pages.",
+    "permissions": [
+      "cms.routes.public"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "designStyle",
+        "label": "Preferred Design Style",
+        "type": "select",
+        "options": [
+          {
+            "value": "modern-minimal",
+            "label": "Modern Minimal"
+          },
+          {
+            "value": "bold-vibrant",
+            "label": "Bold & Vibrant"
+          },
+          {
+            "value": "corporate-clean",
+            "label": "Corporate Clean"
+          },
+          {
+            "value": "playful-creative",
+            "label": "Playful & Creative"
+          },
+          {
+            "value": "luxury-elegant",
+            "label": "Luxury & Elegant"
+          }
+        ],
+        "default": "modern-minimal"
+      },
+      {
+        "id": "colorScheme",
+        "label": "Base Color Scheme",
+        "type": "select",
+        "options": [
+          {
+            "value": "auto",
+            "label": "Auto (AI decides)"
+          },
+          {
+            "value": "light",
+            "label": "Light Theme"
+          },
+          {
+            "value": "dark",
+            "label": "Dark Theme"
+          },
+          {
+            "value": "adaptive",
+            "label": "Adaptive (light + dark)"
+          }
+        ],
+        "default": "auto"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "suggest_color_palette",
+        "description": "Suggest a color palette based on a design style or brand description.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "Brand or design description"
+            },
+            "style": {
+              "type": "string",
+              "enum": [
+                "modern-minimal",
+                "bold-vibrant",
+                "corporate-clean",
+                "playful-creative",
+                "luxury-elegant"
+              ],
+              "description": "Design style preference"
+            },
+            "count": {
+              "type": "integer",
+              "description": "Number of colors (3-8)",
+              "default": 5
+            }
+          },
+          "required": [
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "suggest_typography",
+        "description": "Suggest font pairings for headings and body text.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": [
+                "modern-minimal",
+                "bold-vibrant",
+                "corporate-clean",
+                "playful-creative",
+                "luxury-elegant"
+              ],
+              "description": "Design style"
+            },
+            "useCase": {
+              "type": "string",
+              "description": "Where fonts will be used (e.g., 'blog', 'portfolio', 'e-commerce')"
+            }
+          },
+          "required": [
+            "style"
+          ]
+        }
+      },
+      {
+        "name": "review_design",
+        "description": "Provide design feedback on layout, spacing, and visual hierarchy.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "Description of the current design/layout"
+            },
+            "concerns": {
+              "type": "string",
+              "description": "Specific areas of concern"
+            }
+          },
+          "required": [
+            "description"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are an expert design advisor for CMS-based websites. You help users make informed design decisions about colors, typography, spacing, and visual hierarchy. Always provide specific, actionable suggestions with hex color codes (#RRGGBB) and font names. Consider accessibility (WCAG contrast ratios) in all recommendations. Tailor suggestions to the user's design style preference. Respond in the language the user writes in."
+  }
 }

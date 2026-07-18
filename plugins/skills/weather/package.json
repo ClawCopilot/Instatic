@@ -1,47 +1,103 @@
-﻿{
-    "name":  "@instatic/weather",
-    "version":  "0.1.0",
-    "description":  "Weather query skill — get current weather and forecasts for any location.",
-    "instaticManifest":  {
-                             "id":  "instatic.weather",
-                             "name":  "Weather",
-                             "version":  "0.1.0",
-                             "apiVersion":  1,
-                             "description":  "Get current weather conditions and forecasts for any location worldwide.",
-                             "permissions":  [
-                                                 "network.outbound",
-                                                 "cms.routes.public"
-                                             ],
-                             "networkAllowedHosts":  [
-                                                         "api.open-meteo.com"
-                                                     ],
-                             "entrypoints":  {
-                                                 "server":  "dist/index.js"
-                                             },
-                             "resources":  [
-
-                                           ],
-                             "adminPages":  [
-
-                                            ],
-                             "settings":  [
-                                              {
-                                                  "id":  "defaultUnit",
-                                                  "label":  "Temperature Unit",
-                                                  "type":  "select",
-                                                  "options":  [
-                                                                  {
-                                                                      "value":  "celsius",
-                                                                      "label":  "Celsius"
-                                                                  },
-                                                                  {
-                                                                      "value":  "fahrenheit",
-                                                                      "label":  "Fahrenheit"
-                                                                  }
-                                                              ],
-                                                  "default":  "celsius"
-                                              }
-                                          ],
-                             "kind":  "skill"
-                         }
+{
+  "name": "@instatic/weather",
+  "version": "0.1.0",
+  "description": "Weather query skill — get current weather and forecasts for any location.",
+  "instaticManifest": {
+    "id": "instatic.weather",
+    "name": "Weather",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Get current weather conditions and forecasts for any location worldwide.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "api.open-meteo.com"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "defaultUnit",
+        "label": "Temperature Unit",
+        "type": "select",
+        "options": [
+          {
+            "value": "celsius",
+            "label": "Celsius"
+          },
+          {
+            "value": "fahrenheit",
+            "label": "Fahrenheit"
+          }
+        ],
+        "default": "celsius"
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "get_weather",
+        "description": "Get current weather conditions for a location using Open-Meteo API.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City name or 'latitude,longitude'"
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "celsius",
+                "fahrenheit"
+              ],
+              "description": "Temperature unit",
+              "default": "celsius"
+            }
+          },
+          "required": [
+            "location"
+          ]
+        }
+      },
+      {
+        "name": "get_forecast",
+        "description": "Get weather forecast for the next 7 days.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City name or 'latitude,longitude'"
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "celsius",
+                "fahrenheit"
+              ],
+              "description": "Temperature unit",
+              "default": "celsius"
+            },
+            "days": {
+              "type": "integer",
+              "description": "Number of forecast days (1-7)",
+              "default": 7,
+              "minimum": 1,
+              "maximum": 7
+            }
+          },
+          "required": [
+            "location"
+          ]
+        }
+      }
+    ],
+    "systemPrompt": "You are a weather information assistant. You provide accurate weather data using the Open-Meteo API. Always include temperature, humidity, wind speed, and a brief description. For forecasts, present data in a clear day-by-day format. Be concise but informative. Respond in the language the user writes in."
+  }
 }
