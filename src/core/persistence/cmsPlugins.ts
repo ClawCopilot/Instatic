@@ -51,6 +51,21 @@ const PluginSettingsEnvelope = Type.Object(
   { additionalProperties: true },
 )
 
+const TemplatesListEnvelope = Type.Object(
+  { templates: Type.Optional(Type.Array(Type.Unknown())) },
+  { additionalProperties: true },
+)
+
+const ScaffoldEnvelope = Type.Object(
+  {
+    templateId: Type.Optional(Type.String()),
+    files: Type.Optional(Type.Record(Type.String(), Type.String())),
+    manifest: Type.Optional(Type.Unknown()),
+    warnings: Type.Optional(Type.Array(Type.String())),
+  },
+  { additionalProperties: true },
+)
+
 function emptyPayload(body: Partial<CmsPluginsPayload>): CmsPluginsPayload {
   return {
     plugins: Array.isArray(body.plugins) ? body.plugins : [],
@@ -264,6 +279,100 @@ export async function updateCmsPluginSettings(
     fallbackMessage: 'CMS plugin settings update failed',
   })
   return (body.settings as PluginSettingsRecord | undefined) ?? {}
+}
+
+// ---------------------------------------------------------------------------
+// Template scaffolding
+//
+// GET  /admin/api/cms/plugins/templates  — list available scaffold templates
+// POST /admin/api/cms/plugins/scaffold   — generate a project from a template
+//
+// The scaffold endpoint produces source files (and an optional zip archive)
+// that the user can download, review, and install via the normal package
+// install flow. It does NOT install anything on the host.
+// ---------------------------------------------------------------------------
+
+export interface CmsPluginTemplateParam {
+  id: string
+  label: string
+  type: 'string' | 'boolean' | 'select' | 'string[]' | 'textarea'
+  required?: boolean
+  default?: string | boolean | string[]
+  options?: Array<{ label: string; value: string }>
+  description?: string
+  placeholder?: string
+}
+
+export interface CmsPluginTemplateSummary {
+  id: string
+  kind: 'plugin' | 'skill'
+  label: string
+  description: string
+  params: CmsPluginTemplateParam[]
+}
+
+export interface CmsPluginScaffoldResult {
+  templateId: string
+  files: Record<string, string>
+  manifest: PluginManifest
+  warnings: string[]
+}
+
+export async function listCmsPluginTemplates(
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/admin/api/cms',
+): Promise<CmsPluginTemplateSummary[]> {
+  const body = await apiRequest(`${basePath}/plugins/templates`, {
+    schema: TemplatesListEnvelope,
+    fetchImpl,
+    fallbackMessage: 'CMS plugin templates request failed',
+  })
+  return (body.templates ?? []) as CmsPluginTemplateSummary[]
+}
+
+export async function scaffoldCmsPlugin(
+  templateId: string,
+  params: Record<string, unknown>,
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/admin/api/cms',
+): Promise<CmsPluginScaffoldResult> {
+  const body = await apiRequest(`${basePath}/plugins/scaffold`, {
+    method: 'POST',
+    body: { templateId, params },
+    schema: ScaffoldEnvelope,
+    fetchImpl,
+    fallbackMessage: 'CMS plugin scaffold failed',
+  })
+  return {
+    templateId: body.templateId ?? templateId,
+    files: (body.files ?? {}) as Record<string, string>,
+    manifest: body.manifest as PluginManifest,
+    warnings: body.warnings ?? [],
+  }
+}
+
+/**
+ * Generate a scaffold project as a downloadable ZIP blob. Uses a raw fetch
+ * (not `apiRequest`) because the response is binary, not JSON. Credentials
+ * are included to match the admin session.
+ */
+export async function scaffoldCmsPluginAsZip(
+  templateId: string,
+  params: Record<string, unknown>,
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/admin/api/cms',
+): Promise<Blob> {
+  const res = await fetchImpl(`${basePath}/plugins/scaffold?format=zip`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ templateId, params }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `Scaffold zip download failed (HTTP ${res.status})`)
+  }
+  return res.blob()
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,214 @@
+/**
+ * Create-from-template dialog styles.
+ *
+ * Body-only. Backdrop, dialog chrome, header, footer all live in
+ * @ui/components/Dialog — do not duplicate them here.
+ */
+
+/* ---- step indicator ---- */
+
+.stepIndicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-l);
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.stepDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-subtle);
+    transition: background 0.15s ease;
+}
+
+.stepDotActive {
+    background: var(--text);
+}
+
+.stepDotDone {
+    background: var(--primary);
+}
+
+.stepSeparator {
+    width: 16px;
+    height: 1px;
+    background: var(--border-subtle);
+}
+
+/* ---- template grid ---- */
+
+.templateGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+}
+
+.templateCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-m);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-m);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    width: 100%;
+}
+
+.templateCard:hover {
+    border-color: var(--primary);
+    background: var(--surface-hover);
+}
+
+.templateCardSelected {
+    border-color: var(--primary);
+    background: var(--surface-active);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.templateCardLabel {
+    font-size: var(--text-s);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+}
+
+.templateCardDesc {
+    font-size: var(--text-xs);
+    color: var(--text-subtle);
+    line-height: 1.4;
+}
+
+/* ---- form ---- */
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-l);
+}
+
+.formRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.formLabel {
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.formHint {
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+}
+
+.formError {
+    margin: 0;
+    color: var(--danger);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+}
+
+/* ---- preview ---- */
+
+.previewLayout {
+    display: flex;
+    gap: var(--space-m);
+    height: 360px;
+}
+
+.fileList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 180px;
+    max-width: 220px;
+    overflow-y: auto;
+    padding-right: var(--space-xs);
+    border-right: 1px solid var(--border);
+}
+
+.fileItem {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-s);
+    border: none;
+    border-radius: var(--radius-s);
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    line-height: 1.3;
+    text-align: left;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+
+.fileItem:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.fileItemActive {
+    background: var(--surface-active);
+    color: var(--text);
+    font-weight: 600;
+}
+
+.fileContent {
+    flex: 1;
+    overflow: auto;
+    margin: 0;
+    padding: var(--space-s);
+    background: var(--surface-inset);
+    border-radius: var(--radius-s);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text);
+    white-space: pre;
+    tab-size: 2;
+}
+
+.warnings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: var(--space-s);
+    padding: var(--space-s);
+    background: var(--warning-bg);
+    border-radius: var(--radius-s);
+    color: var(--warning-text);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+}
+
+.loadingState {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    color: var(--text-subtle);
+    font-size: var(--text-s);
+}
+
+.copyButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
