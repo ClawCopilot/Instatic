@@ -124,4 +124,16 @@ export interface PluginManifest {
    * over the eight supported field types.
    */
   settings?: ReadonlyArray<PluginSettingDefinition>
+  // --- Skill-specific fields (Phase 5) ---
+  /** AI tools contributed by this skill to the plugin scope. */
+  aiTools?: ReadonlyArray<{
+    name: string
+    description: string
+    inputSchema: Record<string, unknown>
+    mutates?: boolean
+  }>
+  /** System prompt injected into AI conversations when this skill is active. */
+  systemPrompt?: string
+  /** Conditions under which the system prompt is activated. */
+  triggers?: ReadonlyArray<{ kind: 'always' | 'on-demand' }>
 }
