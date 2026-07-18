@@ -362,6 +362,29 @@ const manifestSchema = Type.Object({
     path: Type.String({ pattern: SAFE_ASSET_PATH_PATTERN.source }),
   })),
   settings: Type.Optional(Type.Array(settingDefinitionSchema, { maxItems: 50 })),
+  // --- Skill-specific fields (Phase 5) ---
+  /** AI tools contributed by this skill to the plugin scope. */
+  aiTools: Type.Optional(Type.Array(
+    Type.Object({
+      name: Type.String({ minLength: 1, maxLength: 128 }),
+      description: Type.String({ minLength: 1, maxLength: 2000 }),
+      inputSchema: Type.Record(Type.String(), Type.Unknown()),
+      mutates: Type.Optional(Type.Boolean()),
+    }, { additionalProperties: false }),
+    { maxItems: 20 },
+  )),
+  /** System prompt injected into AI conversations when this skill is active. */
+  systemPrompt: Type.Optional(Type.String({ maxLength: 4000 })),
+  /** Conditions under which the system prompt is activated. */
+  triggers: Type.Optional(Type.Array(
+    Type.Object({
+      kind: Type.Union([
+        Type.Literal('always'),
+        Type.Literal('on-demand'),
+      ]),
+    }, { additionalProperties: false }),
+    { maxItems: 10 },
+  )),
 })
 
 type ManifestRaw = Static<typeof manifestSchema>
@@ -681,6 +704,10 @@ export function parsePluginManifest(input: unknown): PluginManifest {
     repository: data.repository,
     keywords: data.keywords ? [...data.keywords] : undefined,
     icon: data.icon,
+    // --- Skill-specific fields ---
+    aiTools: data.aiTools,
+    systemPrompt: data.systemPrompt,
+    triggers: data.triggers,
   }
 }
 
