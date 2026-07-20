@@ -6,10 +6,13 @@ FROM oven/bun:1.3.14 AS build
 # makes `bun install --frozen-lockfile` fail with "lockfile had
 # changes". Pin to the exact release that wrote the lockfile
 # (v1.3.14) so lockfile writer and runtime agree.
-RUN curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -o /tmp/bun.zip \
- && unzip /tmp/bun.zip -d /usr/local/bun \
- && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
- && bun --version
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -o /tmp/bun.zip \
+    && unzip /tmp/bun.zip -d /usr/local/bun \
+    && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
+    && bun --version
 WORKDIR /app
 # vendor/pixel-art-icons is a `file:` dep — `bun install` needs it on disk to
 # resolve the dependency, so copy it alongside the manifest before installing.
@@ -23,10 +26,13 @@ FROM oven/bun:1.3.14 AS production-deps
 WORKDIR /app
 # Same pin: replace the image's bun with the exact release that wrote
 # `bun.lock`, so `bun install --frozen-lockfile --production` agrees.
-RUN curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -o /tmp/bun.zip \
- && unzip /tmp/bun.zip -d /usr/local/bun \
- && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
- && bun --version
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -o /tmp/bun.zip \
+    && unzip /tmp/bun.zip -d /usr/local/bun \
+    && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
+    && bun --version
 COPY package.json bun.lock ./
 COPY vendor ./vendor
 RUN bun install --frozen-lockfile --production
