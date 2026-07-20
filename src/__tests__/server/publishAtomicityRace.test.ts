@@ -1,5 +1,5 @@
 /**
- * Atomicity race test for the two-slot symlink publish protocol.
+ * Atomicity race test for the two-slot publish protocol.
  *
  * Verifies the core safety property from the publishing-architecture spec:
  *
@@ -17,17 +17,14 @@
  * and symlink atomicity semantics are exercised.
  *
  * Platform note: the strict "never null" guarantee relies on POSIX `rename(2)`
- * atomically replacing a directory symlink. Win32 `MoveFile` cannot replace an
- * existing directory-symlink target, so `swapSlot` falls back to
- * remove-then-rename there — a sub-millisecond window where `current` is absent.
- * Production runs Linux/Docker (atomic branch), and on Windows that transient
- * Layer A miss is covered by the Layer B live-render path, so a visitor still
- * never sees a 404. The strict test is therefore POSIX-only; the coherence test
- * below (which tolerates null) runs on every platform.
+ * atomically replacing a directory symlink. On Windows (non-admin) symlinks
+ * are unavailable (`EPERM`), so `swapSlot` uses a plain text file instead.
+ * The strict test is therefore symlink-only; the coherence test below
+ * (which tolerates null) runs on every platform.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, symlink, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -36,6 +33,21 @@ import {
   swapSlot,
   writeArtefact,
 } from '../../../server/publish/staticArtefact'
+
+// Runtime detection: can we actually create symlinks? On Windows non-admin
+// `symlink()` throws EPERM. We probe once at module load to decide which
+// tests can run.
+const canSymlink = await (async (): Promise<boolean> => {
+  const probePath = join(tmpdir(), `symlink-probe-${process.pid}-${Date.now()}`)
+  const probeTarget = join(tmpdir(), `symlink-probe-target-${process.pid}-${Date.now()}`)
+  try {
+    await symlink(probeTarget, probePath)
+    await unlink(probePath)
+    return true
+  } catch {
+    return false
+  }
+})()
 
 const PUBLISH_CYCLES = 200
 const READS_PER_CYCLE = 10 // concurrent reads per write iteration = 2000 total reads
@@ -48,14 +60,18 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(uploadsDir, { recursive: true, force: true })
+  try {
+    await rm(uploadsDir, { recursive: true, force: true })
+  } catch {
+    // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+  }
 })
 
 describe('publishAtomicityRace', () => {
-  // POSIX-only: the never-null invariant depends on atomic symlink rename.
-  // On Windows swapSlot uses a non-atomic remove-then-rename fallback (Layer B
-  // covers the transient miss), so the strict assertion cannot hold there.
-  it.skipIf(process.platform === 'win32')(
+  // Symlink-only: the never-null invariant depends on atomic symlink rename.
+  // On Windows (non-admin) symlinks are unavailable, so swapSlot uses a plain
+  // text file and the strict assertion cannot hold there.
+  it.skipIf(!canSymlink)(
     'readArtefact never returns null for routes present in both slot generations',
     async () => {
       // ── Phase 0: Seed both slots with initial content ──────────────────────

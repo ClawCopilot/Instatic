@@ -164,7 +164,11 @@ describe('renderNotFoundResponse — Layer A baked artefact', () => {
   })
 
   afterEach(async () => {
-    await rm(uploadsDir, { recursive: true, force: true })
+    try {
+      await rm(uploadsDir, { recursive: true, force: true })
+    } catch {
+      // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+    }
   })
 
   it('serves the baked 404.html with status 404 without touching the DB', async () => {

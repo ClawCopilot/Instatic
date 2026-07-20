@@ -174,7 +174,11 @@ describe('site runtime build', () => {
       expect(result.diagnostics).toEqual([])
       expect(result.files.some((file) => file.content.includes('from-cache-package'))).toBe(true)
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 

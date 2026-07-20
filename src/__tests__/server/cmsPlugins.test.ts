@@ -791,7 +791,11 @@ describe('CMS plugin handlers', () => {
       expect(runtime.status).toBe(200)
       expect(await runtime.json()).toEqual({ ok: true })
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -890,7 +894,11 @@ describe('CMS plugin handlers', () => {
       expect(echo.headers.get('x-file-name')).toBe('pixel.png')
       expect(new Uint8Array(await echo.arrayBuffer())).toEqual(pngBytes)
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 

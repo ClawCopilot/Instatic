@@ -5,21 +5,27 @@
  * Layout on disk:
  *
  *   <uploadsDir>/published/
- *     current  -> a | b   (symlink; visitor router reads through this)
+ *     current  -> a | b   (symlink on POSIX; plain text file on Windows)
  *     a/                  (active or inactive slot)
  *       index.html        (for URL /)
  *       about.html        (for URL /about)
  *       posts/hello.html  (for URL /posts/hello)
  *     b/                  (the other slot — mirror structure)
  *
- * The two-slot symlink swap guarantees that `current` always points to a
- * COMPLETE, valid slot. Visitors see either the old generation or the new
- * generation — never a partial state, never a missing file.
+ * The two-slot swap guarantees that `current` always points to a COMPLETE,
+ * valid slot. Visitors see either the old generation or the new generation
+ * — never a partial state, never a missing file.
+ *
+ * On POSIX (Linux/Docker) `current` is a symlink and the swap uses atomic
+ * `rename(2)`. On Windows (non-admin) creating symlinks requires elevated
+ * privileges (`EPERM`), so `current` is a plain text file containing the
+ * slot name ('a' or 'b') and the swap uses tmp + rename. This is a dev-on-
+ * Windows affordance; production always runs Linux/Docker.
  *
  * Full publish protocol (e.g. `publishDraftSite`):
  *   1. `prepareInactiveSlot`  — wipe the inactive slot directory, recreate empty
  *   2. `writeArtefact` × N   — write each page's HTML into the inactive slot
- *   3. `swapSlot`             — atomic symlink rename; `current` now points to the new slot
+ *   3. `swapSlot`             — atomic symlink rename (POSIX) / plain file swap (Windows)
  *
  * Incremental publish protocol (e.g. `publishDataRow`):
  *   - `updateArtefactInPlace` — tmp + rename into the ACTIVE slot
@@ -173,25 +179,34 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
 
 /**
  * Return the currently-active slot (`'a'` or `'b'`) by reading the `current`
- * symlink target.
+ * symlink target (POSIX) or plain text file content (Windows).
  *
- * Returns `'a'` when the symlink does not exist (first-ever publish; the
- * inactive slot defaults to `'b'` in that case so the first
+ * Returns `'a'` when the symlink/file does not exist (first-ever publish;
+ * the inactive slot defaults to `'b'` in that case so the first
  * `prepareInactiveSlot` call writes into `b/` and swaps to it).
  */
 export async function getActiveSlot(uploadsDir: string): Promise<Slot> {
+  const currentPath = getCurrentSymlinkPath(uploadsDir)
   try {
-    const target = (await readlink(getCurrentSymlinkPath(uploadsDir))).trim()
+    // Try symlink first (Linux/Docker)
+    const target = (await readlink(currentPath)).trim()
     if (target === 'a' || target === 'b') return target
   } catch {
-    // Symlink doesn't exist — first ever publish
+    // Not a symlink — try plain file (Windows fallback)
+  }
+  try {
+    const content = await readFile(currentPath, 'utf-8')
+    const target = content.trim()
+    if (target === 'a' || target === 'b') return target
+  } catch {
+    // File doesn't exist — first ever publish
   }
   return 'a'
 }
 
 /**
  * Return the inactive slot — whichever of `'a'` and `'b'` the `current`
- * symlink does NOT point to. Defaults to `'b'` on first run (no symlink).
+ * symlink/file does NOT point to. Defaults to `'b'` on first run (no symlink/file).
  */
 export async function getInactiveSlot(uploadsDir: string): Promise<Slot> {
   const active = await getActiveSlot(uploadsDir)
@@ -203,7 +218,7 @@ export async function getInactiveSlot(uploadsDir: string): Promise<Slot> {
  * protocol.
  *
  * Safe because:
- *   - The `current` symlink still points to the ACTIVE slot during this step.
+ *   - The `current` symlink/file still points to the ACTIVE slot during this step.
  *   - No visitor request ever reads through the inactive slot.
  *   - In-flight readers that opened files in the old inactive slot (impossible
  *     in a correctly functioning publish cycle) would still hold valid fds.
@@ -253,23 +268,23 @@ export async function writeArtefact(
 }
 
 /**
- * Atomic symlink swap — step 3 (the final step) of the full publish protocol.
+ * Atomic slot swap — step 3 (the final step) of the full publish protocol.
  *
- * Writes a new `current.tmp` symlink pointing to `targetSlot`, then
- * `rename(2)`s it over `current`. `rename(2)` on a symlink is a single inode
- * swap and is atomic on all POSIX filesystems — there is no window where
- * `current` is missing or points to an incomplete slot.
+ * **POSIX (Linux/Docker):** writes a new `current.tmp` symlink pointing to
+ * `targetSlot`, then `rename(2)`s it over `current`. `rename(2)` on a
+ * symlink is a single inode swap and is atomic on all POSIX filesystems —
+ * there is no window where `current` is missing or points to an incomplete
+ * slot.
+ *
+ * **Windows (non-admin):** `symlink()` requires elevated privileges and
+ * throws `EPERM` under normal user accounts. Instead, writes the slot name
+ * ('a' or 'b') as a plain text file via tmp + rename. This is still atomic
+ * at the file-replace level; `getActiveSlot` and `readArtefact` both handle
+ * the plain-file format. Production runs Linux/Docker and always takes the
+ * symlink branch; the plain-file branch is a dev-on-Windows affordance only.
  *
  * Any leftover `current.tmp` from a previously-crashed publish is silently
  * removed before creating a new one.
- *
- * Windows note: `rename(2)` over an existing symlink is atomic on POSIX, but
- * Win32 `MoveFile` refuses to replace an existing target (`EEXIST`/`EPERM`),
- * leaving `current` stuck on the old slot and `current.tmp` orphaned. There we
- * fall back to unlink-then-rename — a sub-millisecond window where `current` is
- * absent, which `readArtefact` already treats as a miss and serves via the
- * Layer B live-render path. Production runs Linux/Docker and always takes the
- * atomic branch; the fallback is a dev-on-Windows affordance only.
  */
 export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<void> {
   const publishDir = getPublishedDir(uploadsDir)
@@ -279,28 +294,24 @@ export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<vo
   // Ensure the published/ directory exists (may be first ever publish)
   await mkdir(publishDir, { recursive: true })
 
-  // Remove any leftover tmp symlink from a previous crashed publish
+  // Remove any leftover tmp symlink/file from a previous crashed publish
   await removeSymlinkEntry(tmpPath)
 
-  // Create a new symlink at current.tmp pointing to the target slot name.
-  // symlink(target, path) creates a link at `path` that points to `target`.
-  await symlink(targetSlot, tmpPath)
-
-  // Atomically replace `current` with the new symlink.
-  try {
+  if (process.platform === 'win32') {
+    // Windows: use plain file instead of symlink (non-admin compatible)
+    await writeFile(tmpPath, targetSlot, 'utf-8')
+    await removeSymlinkEntry(currentPath) // Remove old file/symlink
     await rename(tmpPath, currentPath)
-  } catch (err) {
-    // Windows-only fallback. Win32 `MoveFile` won't replace an existing target
-    // (`EEXIST`/`EPERM`/`EISDIR`/`EACCES`): drop the old `current` link first,
-    // then rename into the now-free path. Sub-millisecond gap where `current` is
-    // absent → `readArtefact` treats it as a miss and serves via Layer B. On
-    // POSIX `rename(2)` replaces the symlink atomically, so any failure there is
-    // a real error — never run the destructive remove-then-rename off Windows.
-    if (process.platform !== 'win32') throw err
-    const code = (err as NodeJS.ErrnoException).code
-    if (code !== 'EEXIST' && code !== 'EPERM' && code !== 'EISDIR' && code !== 'EACCES') throw err
-    await removeSymlinkEntry(currentPath)
-    await rename(tmpPath, currentPath)
+  } else {
+    // POSIX: atomic symlink swap
+    await symlink(targetSlot, tmpPath)
+    try {
+      await rename(tmpPath, currentPath)
+    } catch (err) {
+      // Fallback for edge cases
+      await removeSymlinkEntry(currentPath)
+      await rename(tmpPath, currentPath)
+    }
   }
 }
 
@@ -331,12 +342,18 @@ async function removeSymlinkEntry(path: string): Promise<void> {
 /**
  * Read a static artefact from the currently-active slot.
  *
- * Opens the file through the `current` symlink path — for example
+ * **POSIX:** Opens the file through the `current` symlink path — for example
  * `<uploadsDir>/published/current/about.html` — and lets the OS follow the
  * symlink to the active slot directory atomically inside a single `open(2)`
  * syscall.  This is safer than a separate `readlink` + `readFile` pair:
  * the kernel resolves the symlink component and opens the target file in one
  * operation, so no user-space window exists between them.
+ *
+ * **Windows:** `current` is a plain text file (not a symlink), so the
+ * `published/current/<path>` path would hit ENOTDIR. Instead, we read the
+ * slot name from `current` via `getActiveSlot` (which handles both symlink
+ * and plain-file formats) and construct the path directly to the slot
+ * directory. The read is then a direct `readFile` into the slot dir.
  *
  * **Residual races and retry:** The Bun IO thread pool runs `readFile` and
  * the writer's rename/wipe operations as parallel OS threads, so two classes
@@ -359,7 +376,7 @@ async function removeSymlinkEntry(path: string): Promise<void> {
  * between each so that the writer's pending IO callbacks fire first.
  *
  * Returns `null` if:
- *   - The `current` symlink does not exist (no artefacts published yet).
+ *   - The `current` symlink/file does not exist (no artefacts published yet).
  *   - The file does not exist in the active slot (route not published to disk).
  *   - The URL path escapes the published root (path safety).
  *   - Any other IO error occurs (treated as a miss, never thrown).
@@ -377,11 +394,13 @@ export async function readArtefact(uploadsDir: string, urlPath: string): Promise
     return null
   }
 
-  // Open through `current/<path>` so the OS follows the symlink atomically
-  // inside open(2).  The same `filePath` value is used on every attempt —
-  // each call to readFile re-resolves the `current` symlink at the OS level,
-  // so after a swap the next attempt automatically reads from the new slot.
-  const filePath = join(getPublishedDir(uploadsDir), 'current', diskRelPath)
+  // On Windows `current` is a plain text file, not a directory symlink,
+  // so `published/current/<path>` would fail with ENOTDIR. Resolve the
+  // active slot name first and read directly from the slot directory.
+  const filePath =
+    process.platform === 'win32'
+      ? join(getSlotDir(uploadsDir, await getActiveSlot(uploadsDir)), diskRelPath)
+      : join(getPublishedDir(uploadsDir), 'current', diskRelPath)
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -495,10 +514,13 @@ export async function writeStaticAsset(
 }
 
 /**
- * Read a static asset from the active publish slot through the `current`
- * symlink. Returns the raw bytes, or `null` on any miss (no symlink, file
- * absent, unsafe path). Shares `readArtefact`'s retry loop so it survives the
- * brief slot-swap window on every OS.
+ * Read a static asset from the active publish slot. On POSIX this reads
+ * through the `current` symlink for atomic resolution. On Windows `current`
+ * is a plain text file, so the slot name is resolved first and the file is
+ * read directly from the slot directory. Returns the raw bytes, or `null`
+ * on any miss (no symlink/file, file absent, unsafe path). Shares
+ * `readArtefact`'s retry loop so it survives the brief slot-swap window
+ * on every OS.
  */
 export async function readStaticAsset(uploadsDir: string, publicPath: string): Promise<Uint8Array | null> {
   let relPath: string
@@ -509,7 +531,13 @@ export async function readStaticAsset(uploadsDir: string, publicPath: string): P
   }
   if (relPath === '' || relPath.endsWith('/')) return null
 
-  const filePath = join(getPublishedDir(uploadsDir), 'current', relPath)
+  // On Windows `current` is a plain text file, not a directory symlink,
+  // so `published/current/<path>` would fail with ENOTDIR. Resolve the
+  // active slot name first and read directly from the slot directory.
+  const filePath =
+    process.platform === 'win32'
+      ? join(getSlotDir(uploadsDir, await getActiveSlot(uploadsDir)), relPath)
+      : join(getPublishedDir(uploadsDir), 'current', relPath)
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {

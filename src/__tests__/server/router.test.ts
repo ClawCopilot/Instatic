@@ -88,7 +88,11 @@ describe('server router — Layer A disk artefact fast-path', () => {
   })
 
   afterEach(async () => {
-    await rm(uploadsDir, { recursive: true, force: true })
+    try {
+      await rm(uploadsDir, { recursive: true, force: true })
+    } catch {
+      // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+    }
   })
 
   it('serves a baked disk artefact without a DB snapshot lookup', async () => {

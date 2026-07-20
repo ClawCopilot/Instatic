@@ -169,7 +169,11 @@ describe('CMS dynamic template routes', () => {
       expect(res.headers.get('content-type')).toContain('text/html')
       expect(await res.text()).toContain('Baked template post')
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -274,7 +278,11 @@ describe('CMS dynamic template routes', () => {
       const body = await res.text()
       expect(body).not.toContain('>baked<')
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
