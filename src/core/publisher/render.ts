@@ -26,8 +26,8 @@ import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
 import { buildPageFrame, buildSiteFrame, buildRouteFrame } from '@core/templates/contextFrames'
 import { classNamesForClassIds } from '@core/page-tree'
 import {
-  isRenderableHtmlAttributeName,
   normalizeHtmlAttributeName,
+  sanitizeRenderableHtmlAttribute,
 } from '@core/htmlAttributes'
 import { bagToInlineStyle } from './classCss'
 import { collectClassCSS, sanitizeModuleCSS } from './cssCollector'
@@ -204,7 +204,7 @@ function buildStyleHead(
 
   const frameworkCss = buildSiteFrameworkCss(site)
   const moduleCss = Array.from(cssMap.values()).join('\n')
-  const classCss = collectClassCSS(site)
+  const classCss = collectClassCSS(site, { mediaAssets: options.mediaAssets })
   const userCss = collectUserStylesheetCss(site, page)
   // Same cascade order as the external-link path: user CSS comes last so it
   // wins specificity ties against the class registry. Neutralise `</style>` in
@@ -258,7 +258,11 @@ function composeTemplateContext(
  * element, so root-level classIds belong on `<body>` itself — clean HTML
  * with no freeloader `<div>`.
  */
-function computeBodyOpenTag(page: Page, site: SiteDocument): string {
+function computeBodyOpenTag(
+  page: Page,
+  site: SiteDocument,
+  mediaAssets?: Map<string, RenderResolvedMedia>,
+): string {
   const rootNode = page.nodes[page.rootNodeId]
   if (!rootNode) return '<body>'
 
@@ -267,7 +271,9 @@ function computeBodyOpenTag(page: Page, site: SiteDocument): string {
     : ''
   // base.body emits no wrapper, so the root node's inline styles also belong
   // on <body> itself (same reasoning as classIds above).
-  const styleAttr = rootNode.inlineStyles ? escapeHtml(bagToInlineStyle(rootNode.inlineStyles)) : ''
+  const styleAttr = rootNode.inlineStyles
+    ? escapeHtml(bagToInlineStyle(rootNode.inlineStyles, { mediaAssets }))
+    : ''
   const htmlAttrs = bodyHtmlAttributes(rootNode.props.htmlAttributes)
 
   const attrs =
@@ -281,9 +287,11 @@ function bodyHtmlAttributes(value: unknown): string {
   return Object.entries(value)
     .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([rawName, rawValue]) => {
+      if (typeof rawValue !== 'string') return ''
       const name = normalizeHtmlAttributeName(rawName)
-      if (!isRenderableHtmlAttributeName(name) || typeof rawValue !== 'string') return ''
-      return ` ${name}="${escapeHtml(rawValue)}"`
+      const safeValue = sanitizeRenderableHtmlAttribute(name, rawValue)
+      if (safeValue === null) return ''
+      return ` ${name}="${escapeHtml(safeValue)}"`
     })
     .join('')
 }
@@ -561,7 +569,7 @@ export function publishPage(
     importmapTag: runtime.importmapTag,
     headRuntimeScripts: runtime.headRuntimeScripts,
     holeRuntimeScript: runtime.holeRuntimeScript,
-    bodyOpenTag: computeBodyOpenTag(page, site),
+    bodyOpenTag: computeBodyOpenTag(page, site, options.mediaAssets),
     bodyHtml,
     bodyEndRuntimeScripts: runtime.bodyEndRuntimeScripts,
     loopRuntimeScript: runtime.loopRuntimeScript,

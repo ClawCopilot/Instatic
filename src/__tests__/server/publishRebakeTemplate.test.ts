@@ -104,7 +104,11 @@ describe('publishDraftSite — template re-bake', () => {
     uploadsDir = await mkdtemp(join(tmpdir(), 'publish-rebake-'))
   })
   afterEach(async () => {
-    await rm(uploadsDir, { recursive: true, force: true })
+    try {
+      await rm(uploadsDir, { recursive: true, force: true })
+    } catch {
+      // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+    }
   })
 
   it('wraps baked pages in the everywhere layout and never bakes the template at its own slug', async () => {

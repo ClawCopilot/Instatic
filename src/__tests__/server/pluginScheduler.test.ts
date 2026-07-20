@@ -122,7 +122,11 @@ async function setupDb(): Promise<{ db: DbClient; cleanup: () => Promise<void> }
   return {
     db,
     cleanup: async () => {
-      await rm(dir, { recursive: true, force: true })
+      try {
+        await rm(dir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     },
   }
 }

@@ -141,7 +141,11 @@ describe('runtime dependency resolution', () => {
       expect(sentinel.hash).toBe(cache.hash)
       expect(sentinel.packageCount).toBe(1)
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -173,7 +177,11 @@ describe('runtime dependency resolution', () => {
       expect(installCount).toBe(1)
       expect(second.workspaceDir).toBe(first.workspaceDir)
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -229,7 +237,11 @@ describe('runtime dependency resolution', () => {
         await readFile(join(workspaceDir, 'node_modules', 'canvas-confetti', 'package.json'), 'utf8'),
       ).toBe('{}')
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -257,7 +269,11 @@ describe('runtime dependency resolution', () => {
       // command should ever fire for an oversized lock.
       expect(installs).toBe(0)
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -299,7 +315,11 @@ describe('runtime dependency resolution', () => {
         }),
       ).rejects.toThrow()
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -336,7 +356,11 @@ describe('runtime dependency resolution', () => {
       expect(installCount).toBe(1)
       expect(a.workspaceDir).toBe(b.workspaceDir)
     } finally {
-      await rm(cacheRoot, { recursive: true, force: true })
+      try {
+        await rm(cacheRoot, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 })

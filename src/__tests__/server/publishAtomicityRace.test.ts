@@ -1,5 +1,5 @@
 /**
- * Atomicity race test for the two-slot symlink publish protocol.
+ * Atomicity race test for the two-slot publish protocol.
  *
  * Verifies the core safety property from the publishing-architecture spec:
  *
@@ -15,10 +15,16 @@
  *
  * We use real tmpdir filesystem operations — not mocks — so actual rename(2)
  * and symlink atomicity semantics are exercised.
+ *
+ * Platform note: the strict "never null" guarantee relies on POSIX `rename(2)`
+ * atomically replacing a directory symlink. On Windows (non-admin) symlinks
+ * are unavailable (`EPERM`), so `swapSlot` uses a plain text file instead.
+ * The strict test is therefore symlink-only; the coherence test below
+ * (which tolerates null) runs on every platform.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, symlink, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -27,6 +33,21 @@ import {
   swapSlot,
   writeArtefact,
 } from '../../../server/publish/staticArtefact'
+
+// Runtime detection: can we actually create symlinks? On Windows non-admin
+// `symlink()` throws EPERM. We probe once at module load to decide which
+// tests can run.
+const canSymlink = await (async (): Promise<boolean> => {
+  const probePath = join(tmpdir(), `symlink-probe-${process.pid}-${Date.now()}`)
+  const probeTarget = join(tmpdir(), `symlink-probe-target-${process.pid}-${Date.now()}`)
+  try {
+    await symlink(probeTarget, probePath)
+    await unlink(probePath)
+    return true
+  } catch {
+    return false
+  }
+})()
 
 const PUBLISH_CYCLES = 200
 const READS_PER_CYCLE = 10 // concurrent reads per write iteration = 2000 total reads
@@ -39,11 +60,18 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(uploadsDir, { recursive: true, force: true })
+  try {
+    await rm(uploadsDir, { recursive: true, force: true })
+  } catch {
+    // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+  }
 })
 
 describe('publishAtomicityRace', () => {
-  it(
+  // Symlink-only: the never-null invariant depends on atomic symlink rename.
+  // On Windows (non-admin) symlinks are unavailable, so swapSlot uses a plain
+  // text file and the strict assertion cannot hold there.
+  it.skipIf(!canSymlink)(
     'readArtefact never returns null for routes present in both slot generations',
     async () => {
       // ── Phase 0: Seed both slots with initial content ──────────────────────

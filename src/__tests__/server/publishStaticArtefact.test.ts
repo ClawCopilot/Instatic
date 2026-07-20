@@ -296,7 +296,11 @@ describe('publishDraftSite — Layer A static artefacts', () => {
 
   afterEach(async () => {
     loopSourceRegistry.unregister(REQUEST_DEPENDENT_SOURCE_ID)
-    await rm(uploadsDir, { recursive: true, force: true })
+    try {
+      await rm(uploadsDir, { recursive: true, force: true })
+    } catch {
+      // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+    }
   })
 
   it('writes a disk artefact for a fully-static page and flips the symlink', async () => {
@@ -450,7 +454,11 @@ describe('publicRouter — Layer A disk fast-path', () => {
   })
 
   afterEach(async () => {
-    await rm(uploadsDir, { recursive: true, force: true })
+    try {
+      await rm(uploadsDir, { recursive: true, force: true })
+    } catch {
+      // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+    }
   })
 
   it('serves a baked artefact without DB snapshot lookup when URL has no query string', async () => {

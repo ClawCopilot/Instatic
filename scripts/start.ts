@@ -4,7 +4,7 @@
  * `bun run start` does what a single deploy would do, but in your dev
  * tree against your dev data:
  *
- *   1. Builds the admin SPA (`tsc -b && vite build` → `./dist/`).
+ *   1. Builds the admin SPA (`bun run build` → `./dist/`).
  *   2. Frees port 3001 — if anything is already listening it prompts
  *      whether to kill the holder and take over (same UX as `bun run dev`).
  *   3. Spawns the server (`bun run server/index.ts`) — no `--watch`, no
@@ -19,6 +19,7 @@
  * Override any of these via env (`PORT=4000 bun run start`, etc.).
  */
 
+import { bunRunCommand } from './lib/bunCommand'
 import { ensurePortFree } from './lib/freePort'
 
 const CMS_PORT = Number(process.env.PORT ?? '3001')
@@ -41,11 +42,7 @@ function runStep(name: string, command: string[]): void {
 
 // --- build ---------------------------------------------------------------
 
-runStep('Building admin SPA (tsc -b && vite build)', [
-  'bun',
-  'run',
-  'build',
-])
+runStep('Building admin SPA (bun run build)', bunRunCommand('build'))
 
 // --- port pre-flight -----------------------------------------------------
 
@@ -57,7 +54,7 @@ log('')
 log(`Starting server on http://localhost:${CMS_PORT}`)
 log('')
 
-const child = Bun.spawn(['bun', 'run', 'server/index.ts'], {
+const child = Bun.spawn(bunRunCommand('server/index.ts'), {
   env: { ...process.env, PORT: String(CMS_PORT) },
   stdin: 'inherit',
   stdout: 'inherit',

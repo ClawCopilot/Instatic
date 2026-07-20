@@ -329,7 +329,11 @@ describe('server plugin runtime SDK', () => {
       expect(res.status).toBe(200)
       expect(await res.json()).toEqual({ ok: true, plugin: 'acme.workflow' })
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -359,7 +363,11 @@ describe('server plugin runtime SDK', () => {
       expect(body.plugin.lifecycleStatus).toBe('error')
       expect(body.plugin.lastError).toMatch(/requires permission "cms.routes"/)
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -397,7 +405,11 @@ describe('server plugin runtime SDK', () => {
       await waitForLoopSource(sourceId)
     } finally {
       if (loopSourceRegistry.has(sourceId)) loopSourceRegistry.unregister(sourceId)
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -443,7 +455,11 @@ describe('server plugin runtime SDK', () => {
       }])
     } finally {
       hookBus.unregisterPlugin('test')
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -498,7 +514,11 @@ describe('server plugin runtime SDK', () => {
       )
       expect(await after.json()).toEqual({ key: 'rotated' })
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -537,7 +557,11 @@ describe('server plugin runtime SDK', () => {
       expect(put.status).toBe(200)
       expect(await put.json()).toEqual({ settings: { apiKey: 'rotated' }, secretsNeedingReentry: [] })
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -589,7 +613,11 @@ describe('server plugin runtime SDK', () => {
       )
       expect(await res.json()).toEqual({ observed: 'rotated' })
     } finally {
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 
@@ -663,7 +691,11 @@ describe('server plugin runtime SDK', () => {
       ])
     } finally {
       hookBus.unregisterPlugin('test')
-      await rm(uploadsDir, { recursive: true, force: true })
+      try {
+        await rm(uploadsDir, { recursive: true, force: true })
+      } catch {
+        // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+      }
     }
   })
 

@@ -32,7 +32,11 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(uploadsDir, { recursive: true, force: true })
+  try {
+    await rm(uploadsDir, { recursive: true, force: true })
+  } catch {
+    // Windows: SQLite file still locked; OS cleans temp dirs on reboot.
+  }
 })
 
 // ---------------------------------------------------------------------------
