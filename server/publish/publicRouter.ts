@@ -329,7 +329,7 @@ export async function renderNotFoundResponse(
     const rendered = await renderPublishedNotFound(snapshot, { db, url: syntheticUrl, ...(req ? { req } : {}) })
     if (!rendered) return null
     const html = await applyPublishedHtmlPipeline(rendered, db)
-    return { body: html, headers: htmlHeaders, status: 200 }
+    return { body: html, headers: htmlHeaders, status: 404 }
   })
   if (!cached) return null
   return new Response(cached.body, { headers: cached.headers, status: cached.status })

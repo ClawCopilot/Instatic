@@ -12,13 +12,14 @@
  *     bare JSON 404 takes over), and nothing is cached.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DbClient, DbResult } from '../../../server/db'
 import type { PublishedPageSnapshot } from '../../../server/repositories/publish'
 import { renderNotFoundResponse } from '../../../server/publish/publicRouter'
 import { getStats, resetForTests } from '../../../server/publish/renderCache'
+import { swapSlot } from '../../../server/publish/staticArtefact'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -160,7 +161,7 @@ describe('renderNotFoundResponse — Layer A baked artefact', () => {
     const slotDir = join(uploadsDir, 'published', 'a')
     await mkdir(slotDir, { recursive: true })
     await writeFile(join(slotDir, '404.html'), '<!DOCTYPE html><h1>baked 404</h1>', 'utf-8')
-    await symlink('a', join(uploadsDir, 'published', 'current'))
+    await swapSlot(uploadsDir, 'a')
   })
 
   afterEach(async () => {

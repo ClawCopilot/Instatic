@@ -35,6 +35,16 @@ function makeFakeDb(counts: FakeDbCounts = { site: 0, owners: 0 }): DbClient {
   handle.transaction = async <T>(cb: (tx: DbClient) => Promise<T>): Promise<T> =>
     cb(handle as unknown as DbClient)
 
+  handle.unsafe = async <Row = Record<string, unknown>>(
+    sql: string,
+    ...values: unknown[]
+  ): Promise<DbResult<Row>> => {
+    if (sql.toLowerCase().includes('select 1')) {
+      return { rows: [{} as Row], rowCount: 1 }
+    }
+    return { rows: [], rowCount: 0 }
+  }
+
   return handle as DbClient
 }
 
