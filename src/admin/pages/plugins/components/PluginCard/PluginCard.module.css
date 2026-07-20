@@ -182,7 +182,7 @@ a.pluginAttributionItem:hover {
 .pluginKindPill {
     display: inline-flex;
     align-items: center;
-    padding: 1px 6px;
+    padding: var(--space-3xs) var(--space-xs);
     border-radius: 4px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: var(--text-xs);
@@ -192,15 +192,15 @@ a.pluginAttributionItem:hover {
 }
 
 .pluginKindPill[data-kind="skill"] {
-    background: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #a5d6a7;
+    background: var(--success-10);
+    color: var(--success);
+    border: 1px solid var(--success-30);
 }
 
 .pluginKindPill[data-kind="plugin"] {
-    background: #e3f2fd;
-    color: #1565c0;
-    border: 1px solid #90caf9;
+    background: var(--accent-3-10);
+    color: var(--accent-3);
+    border: 1px solid color-mix(in srgb, var(--accent-3) 30%, transparent);
 }
 
 .pluginBody p {

@@ -272,15 +272,17 @@ export function CreateFromTemplateDialog({ kind, onClose }: CreateFromTemplateDi
           ) : (
             <div className={styles.templateGrid}>
               {templates.map((tmpl) => (
-                <button
+                <Button
                   key={tmpl.id}
-                  type="button"
+                  variant="ghost"
+                  fullWidth
+                  align="start"
                   className={`${styles.templateCard} ${selectedTemplate?.id === tmpl.id ? styles.templateCardSelected : ''}`}
                   onClick={() => selectTemplate(tmpl)}
                 >
                   <span className={styles.templateCardLabel}>{tmpl.label}</span>
                   <span className={styles.templateCardDesc}>{tmpl.description}</span>
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -307,15 +309,17 @@ export function CreateFromTemplateDialog({ kind, onClose }: CreateFromTemplateDi
           <div className={styles.previewLayout}>
             <div className={styles.fileList}>
               {Object.keys(scaffoldResult.files).map((path) => (
-                <button
+                <Button
                   key={path}
-                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  align="start"
                   className={`${styles.fileItem} ${activeFile === path ? styles.fileItemActive : ''}`}
                   onClick={() => setActiveFile(path)}
-                  title={path}
+                  tooltip={path}
                 >
                   <span>{path}</span>
-                </button>
+                </Button>
               ))}
             </div>
             <pre className={styles.fileContent}>

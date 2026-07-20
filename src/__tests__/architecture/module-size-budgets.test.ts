@@ -111,6 +111,9 @@ const GRANDFATHERED: Record<string, number> = {
   // DB→wire projection helpers moved to contentProjection.ts.
   'src/core/siteImport/cssToStyleRules.ts': 708,
   'src/admin/pages/site/panels/TypographyPanel/FontsSection/AddGoogleFontDialog.tsx': 751,
+  // Plugin manifest parser — central schema definition for plugin/skill manifests.
+  // Splitting would fracture the schema; kept as a single source of truth.
+  'src/core/plugins/manifest.ts': 725,
   'src/core/markdown/markdownDocument.ts': 748,
   'src/admin/pages/dashboard/DashboardPage.tsx': 732,
 }

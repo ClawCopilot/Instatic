@@ -65,6 +65,9 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   ['importMediaValidation.ts', 'Validation/sanitisation helper called by import.ts + importArchive.ts (which gate via requireCapability); no handlers.'],
   ['mediaUploadDispatch.ts', 'Storage adapter dispatch called by gated parent handlers.'],
   ['mediaUploadExecutor.ts', 'Filesystem write helper called by gated parent handlers.'],
+  // Plugin scaffold — template listing + project generation. Auth gate lives
+  // in the parent plugins/index.ts dispatcher (resolveRoutePolicy → requireCapability).
+  ['plugins/scaffold.ts', 'Sub-handler invoked by plugins/index.ts which runs the auth gate.'],
   ['mediaVariants.ts', 'Variant generation helper called by gated parent handlers.'],
   ['mediaStorageReader.ts', 'Adapter read helper called by gated parent handlers.'],
   ['imageVariantProtocol.ts', 'Worker protocol type definitions; no handlers.'],
