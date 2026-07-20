@@ -149,7 +149,13 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
   // (or the component unmounts) before the timer fires.
   useEffect(() => {
     if (!isOpen) return
-    const id = setTimeout(() => inputRef.current?.focus(), 50)
+    const id = setTimeout(() => {
+      const input = inputRef.current
+      if (!input) return
+      const panel = input.closest('[data-panel]')
+      if (panel?.contains(document.activeElement)) return
+      input.focus()
+    }, 50)
     return () => clearTimeout(id)
   }, [isOpen])
 
