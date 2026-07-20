@@ -9,9 +9,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, extname } from 'path'
+import { fileURLToPath } from 'node:url'
 import { useEditorStore } from '@site/store/store'
 
-const SRC_ROOT = new URL('../../', import.meta.url).pathname.replace(/\/$/, '')
+const SRC_ROOT = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/$/, '')
 
 function collectSourceFiles(dir: string): string[] {
   const files: string[] = []

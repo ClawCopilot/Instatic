@@ -109,7 +109,7 @@ describe('Keybindings registry — single source of truth', () => {
     const violations: string[] = []
 
     for (const file of files) {
-      const rel = relative(SRC_ROOT, file)
+      const rel = relative(SRC_ROOT, file).replace(/\\/g, '/')
       if (ALLOWLIST.has(rel)) continue
 
       const rawSource = readFileSync(file, 'utf8')
@@ -159,7 +159,7 @@ describe('Keybindings registry — single source of truth', () => {
     for (const file of files) {
       if (!file.endsWith('.tsx')) continue
 
-      const rel = relative(SRC_ROOT, file)
+      const rel = relative(SRC_ROOT, file).replace(/\\/g, '/')
       if (ALLOWLIST.has(rel)) continue
 
       const lines = readFileSync(file, 'utf8').split('\n')

@@ -57,7 +57,7 @@ describe('dispatcher HTML pipeline', () => {
 
     const violations: string[] = []
     for (const file of walk(join(ROOT, 'server'))) {
-      const rel = file.slice(ROOT.length + 1)
+      const rel = file.slice(ROOT.length + 1).replace(/\\/g, '/')
       if (allowedOwners.has(rel)) continue
       const src = readFileSync(file, 'utf-8')
       // `hookBus.emit('publish.before'`, `hookBus.emit('publish.after'`,

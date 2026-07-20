@@ -12,7 +12,11 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   try {
     return await fn(dir)
   } finally {
-    await rm(dir, { recursive: true, force: true })
+    try {
+      await rm(dir, { recursive: true, force: true })
+    } catch {
+      // Ignore EBUSY or other filesystem errors on Windows during cleanup
+    }
   }
 }
 

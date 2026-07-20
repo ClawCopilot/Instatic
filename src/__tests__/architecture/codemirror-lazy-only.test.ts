@@ -103,7 +103,7 @@ describe('CodeMirror lazy-load enforcement', () => {
     const violations: { file: string; family: string }[] = []
 
     for (const file of allFiles) {
-      const rel = relative(SRC_ROOT, file)
+      const rel = relative(SRC_ROOT, file).replace(/\\/g, '/')
       if (rel === ALLOWED_CONSUMER) continue
 
       let source: string

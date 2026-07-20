@@ -24,6 +24,7 @@ import { describe, it, expect, beforeEach } from 'bun:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, render } from '@testing-library/react'
+import { fileURLToPath } from 'node:url'
 import { ZoomControls } from '@site/toolbar/ZoomControls'
 import { useEditorStore } from '@site/store/store'
 
@@ -546,7 +547,7 @@ describe('Toolbar — structural requirements', () => {
     // in that primitive's CSS module so every search bar in the editor uses
     // the same focus treatment. We assert on the primitive's stylesheet.
     const cssPath = new URL('../../ui/components/SearchBar/SearchBar.module.css', import.meta.url)
-    const cssSrc = existsSync(cssPath.pathname) ? readFileSync(cssPath, 'utf-8') : ''
+    const cssSrc = existsSync(fileURLToPath(cssPath)) ? readFileSync(fileURLToPath(cssPath), 'utf-8') : ''
     // Assert CSS module :focus / :focus-visible selector (no Tailwind).
     const hasCssModuleFocus = /:focus[-\s{]|:focus-visible/.test(cssSrc)
     expect(hasCssModuleFocus).toBe(true)
@@ -664,7 +665,7 @@ describe('Toolbar — structural requirements', () => {
     const { readFileSync, existsSync } = require('fs')
     // Read the shared Toolbar.module.css once — all Toolbar sub-components use it
     const cssUrl = new URL('../../admin/pages/site/toolbar/Toolbar.module.css', import.meta.url)
-    const sharedCss = existsSync(cssUrl.pathname) ? readFileSync(cssUrl, 'utf-8') : ''
+    const sharedCss = existsSync(fileURLToPath(cssUrl)) ? readFileSync(fileURLToPath(cssUrl), 'utf-8') : ''
     for (const file of files) {
       const tsx = readFileSync(
         new URL(`../../admin/pages/site/toolbar/${file}`, import.meta.url),
@@ -756,7 +757,7 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
   it('declares a triggerRef to capture the element that opened the modal', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url)),
       'utf-8',
     ) as string
     // The ref must be a nullable HTMLElement ref (so .focus() is available)
@@ -767,7 +768,7 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
   it('captures document.activeElement into triggerRef when modal opens', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url)),
       'utf-8',
     ) as string
     // Must guard with instanceof before assigning (avoids assigning non-focusable elements)
@@ -778,7 +779,7 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
   it('restores focus to trigger when modal closes (Guideline #225)', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url)),
       'utf-8',
     ) as string
     // The else branch (open → false) must focus the captured trigger
@@ -790,7 +791,7 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
   it('does not regress to a 36px touch target anywhere', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url)),
       'utf-8',
     ) as string
     expect(src).not.toMatch(/minHeight:\s*36/)
@@ -802,7 +803,7 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
     // There is no bespoke "Close settings" button (consistency pass).
     const { readFileSync } = require('fs')
     const tsx = readFileSync(
-      new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/modals/Settings/SettingsModal.tsx', import.meta.url)),
       'utf-8',
     ) as string
     expect(tsx).not.toContain('aria-label="Close settings"')
@@ -814,7 +815,7 @@ describe('SettingsButton — section ID matches a valid SectionId', () => {
   it("dispatches 'general' (a valid SectionId after dropping the Pages section)", () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/SettingsButton.tsx', import.meta.url).pathname,
+      fileURLToPath(new URL('../../admin/pages/site/toolbar/SettingsButton.tsx', import.meta.url)),
       'utf-8',
     ) as string
     // 'pages' / 'breakpoints' / 'conditions' were dropped from the modal —

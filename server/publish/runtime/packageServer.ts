@@ -31,7 +31,7 @@
  * can keep responses indefinitely.
  */
 import { existsSync } from 'node:fs'
-import { resolve as resolvePath } from 'node:path'
+import { resolve as resolvePath, sep } from 'node:path'
 import { nodeModulesDirForHash, sentinelPathForHash } from './dependencyCache'
 
 const RUNTIME_PACKAGE_PREFIX = '/_instatic/runtime/cache/'
@@ -77,7 +77,7 @@ function resolveCacheFilePath(pathname: string): { hash: string; absPath: string
 
   // Final containment check — the resolved path must live inside
   // node_modules/. Any escape attempt returns null.
-  if (!absPath.startsWith(`${nodeModulesDir}/`)) return null
+  if (!absPath.startsWith(`${nodeModulesDir}${sep}`)) return null
 
   return { hash, absPath }
 }

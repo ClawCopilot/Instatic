@@ -237,7 +237,7 @@ describe('BTN-3 — Button primitive usage gate', () => {
     const violations: string[] = []
 
     for (const file of files) {
-      const rel = relative(SRC_ROOT, file)
+      const rel = relative(SRC_ROOT, file).replace(/\\/g, '/')
 
       // Skip allowlisted files
       if (ALLOWLIST.has(rel)) continue

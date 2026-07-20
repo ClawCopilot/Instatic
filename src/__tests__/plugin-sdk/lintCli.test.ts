@@ -101,7 +101,7 @@ describe('instatic-plugin lint', () => {
     // one error is reported with the right scope and file pointer.
     expect(offenders.length).toBeGreaterThan(0)
     expect(offenders[0].severity).toBe('error')
-    expect(offenders[0].file).toContain('server/index.ts')
+    expect(offenders[0].file).toMatch(/server[/\\]index\.ts/)
   })
 
   it('errors on forbidden literals in a bundled dist artifact', async () => {

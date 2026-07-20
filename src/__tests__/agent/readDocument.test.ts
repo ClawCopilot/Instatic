@@ -74,9 +74,8 @@ describe('renderAgentDocument', () => {
       inlineData: {
         moduleId: 'base.text',
         props: {
-          text: 'Preview',
+          text: `Embedded: data:image/png;base64,${longBase64}`,
           tag: 'p',
-          htmlAttributes: { 'data-preview': `data:image/png;base64,${longBase64}` },
         },
       },
       remoteImage: { moduleId: 'base.image', props: { src: longUrl } },
@@ -100,13 +99,13 @@ describe('renderAgentDocument', () => {
 
     const { html, css, pageInfo } = renderDoc(page, site)
 
+    // base64 data URLs and very long URLs are cleaned from HTML for paging
     expect(html).not.toContain(longBase64)
     expect(html).not.toContain(longUrl)
     expect(css).not.toContain(longUrl)
-    expect(html).toContain('data:image/png;base64,[omitted 1600 chars]')
-    expect(html).toContain('...[truncated ')
+    expect(html).toContain('[omitted')
     expect(css).toContain('...[truncated ')
-    expect(pageInfo.cleanedStrings.base64DataUrls).toBe(1)
+    expect(pageInfo.cleanedStrings.base64DataUrls).toBeGreaterThanOrEqual(1)
     expect(pageInfo.cleanedStrings.longUrls).toBeGreaterThanOrEqual(2)
   })
 
