@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
+import { platform } from 'node:os'
 
 const ROOT = join(import.meta.dir, '../../..')
 
@@ -8,7 +9,11 @@ function decode(bytes: Uint8Array): string {
 }
 
 describe('Circular dependencies', () => {
-  it('keeps the tsconfig-aware source graph cycle-free', () => {
+  // madge hangs on Windows due to its dependency graph traversal;
+  // skip on Windows and rely on CI (Linux) for this check.
+  const skipOnWindows = platform() === 'win32' ? it.skip : it
+
+  skipOnWindows('keeps the tsconfig-aware source graph cycle-free', () => {
     const result = Bun.spawnSync({
       cmd: [
         process.execPath,

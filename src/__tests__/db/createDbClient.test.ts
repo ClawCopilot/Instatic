@@ -12,10 +12,16 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   try {
     return await fn(dir)
   } finally {
+    // Use a 3-second AbortSignal so fs.rm never hangs indefinitely on
+    // Windows when SQLite handles are still held (bun:sqlite has no close()).
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3000)
     try {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, signal: controller.signal })
     } catch {
       // Ignore EBUSY or other filesystem errors on Windows during cleanup
+    } finally {
+      clearTimeout(timer)
     }
   }
 }

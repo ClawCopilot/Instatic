@@ -55,11 +55,19 @@ export async function createTestDb(): Promise<TestDb> {
       // can be deleted while the handle is open. On Windows, the file lock
       // prevents deletion entirely — swallow EBUSY/EPERM and rely on the OS
       // temp-directory cleanup.
+      //
+      // Use a 3-second AbortSignal so fs.rm never hangs indefinitely on
+      // Windows when the SQLite handle is still held (bun:sqlite has no
+      // close() method).
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 3000)
       try {
-        await fs.rm(path.dirname(tmpFile), { recursive: true, force: true })
+        await fs.rm(path.dirname(tmpFile), { recursive: true, force: true, signal: controller.signal })
       } catch {
-        // Windows: SQLite file still locked by bun:sqlite handle.
-        // Harmless — the OS cleans temp dirs on reboot.
+        // Windows: SQLite file still locked by bun:sqlite handle, or abort
+        // timeout reached. Harmless — the OS cleans temp dirs on reboot.
+      } finally {
+        clearTimeout(timer)
       }
     },
   }
