@@ -408,12 +408,14 @@ function renderControl(
 
     case 'boolean':
       return (
-        <Checkbox
-          checked={value === true}
-          onCheckedChange={(checked) => onChange(checked)}
-        >
-          {param.placeholder ?? 'Enable'}
-        </Checkbox>
+        <label htmlFor={inputId} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-s)', cursor: 'pointer' }}>
+          <Checkbox
+            id={inputId}
+            checked={value === true}
+            onCheckedChange={(checked) => onChange(checked)}
+          />
+          <span className={styles.formHint}>{param.placeholder ?? 'Enable'}</span>
+        </label>
       )
 
     case 'select':
