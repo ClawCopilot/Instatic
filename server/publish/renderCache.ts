@@ -41,7 +41,7 @@ export interface RenderCacheKey {
 export interface CachedResponse {
   body: string
   headers: Record<string, string>
-  status: 200
+  status: number
 }
 
 interface CacheEntry {
