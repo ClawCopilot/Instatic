@@ -176,7 +176,7 @@ All repository functions are dialect-naive ANSI SQL. JSON columns end in `_json`
 | File                                          | Owns                                                                    |
 |-----------------------------------------------|-------------------------------------------------------------------------|
 | `server/handlers/cms/data/`                   | Generic `/admin/api/cms/data/tables[/:id]` + `/admin/api/cms/data/rows[/:id]` endpoints |
-| `server/handlers/cms/pages.ts`                | `pages`-specific endpoints (batch upsert of the page roster from the editor; uses an optimistic-concurrency `baselinePageIds` token so a saving client never deletes a page a sibling session created concurrently) |
+| `server/handlers/cms/pages.ts`                | `pages` read endpoint (raw DataRow list for the editor's loader). Writes go through the transactional site-document save (`server/handlers/cms/siteDocument.ts`) with explicit deleted-row ids — a saving client can never delete a page a sibling session created concurrently, because deletion-by-omission no longer exists |
 | `server/handlers/cms/components.ts`           | `components`-specific endpoints                                        |
 | `server/handlers/cms/publish.ts`              | Publish a row, write a version, emit `publish.before/.html/.after` hooks |
 
