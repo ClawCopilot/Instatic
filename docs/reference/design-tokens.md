@@ -29,6 +29,8 @@ If the admin UI needs broader character coverage, add a second `@font-face` bloc
 
 Admin UI font sizes use the Core Framework-style `--text-*` scale directly. These tokens are fluid across viewport width but intentionally narrow for dense admin chrome. Use the nearest semantic step instead of introducing one-off pixel sizes.
 
+Settings → Preferences can remap the scale through `data-editor-text-scale` on the document and layout roots. The `small`, `large`, and `extra-large` options shift the same token names down or up the base scale, so component CSS continues to say `font-size: var(--text-s)` rather than branching per preference.
+
 | Token        | Fluid range | Typical use                                      |
 |--------------|-------------|--------------------------------------------------|
 | `--text-3xs` | 8px → 9px   | Tiny badges, axis labels, micro metadata         |
@@ -84,16 +86,18 @@ These are admin tokens. The published-site Framework engine also emits short nam
 
 Six surface tones for depth. Lighter is higher in the stack.
 
+The default values below are the dark theme. `data-editor-theme="light"` on the document or layout root overrides the same token names in `globals.css`, so component CSS stays theme-agnostic.
+
 | Token                  | Hex       | Use                                                            |
 |------------------------|-----------|----------------------------------------------------------------|
 | `--bg-body`          | `#000000` | Page bottom — root, behind everything                          |
 | `--bg-surface`     | `#1b1b1b` | Darker parent of tile cards / sidebar fill                     |
 | `--bg-surface-2`   | `#282828` | Tile cards themselves, panel bodies                            |
-| `--bg-surface-3`   | `#323232` | Hover state, nested controls, chips, badges                    |
-| `--bg-surface-4`   | `#4a4a4a` | Active state                                                   |
-| `--bg-surface-5`   | `#605f5f` | Active + focused                                               |
+| `--bg-surface-3`   | `#323232` | Tile/card hover, nested structural surfaces                    |
+| `--bg-surface-4`   | `#4a4a4a` | Stronger nested structural surface                             |
+| `--bg-surface-5`   | `#605f5f` | Strongest nested structural surface                            |
 
-Hover and active states change **tone**, not border. Skip levels only with intent.
+Tile/card hovers change **tone**, not border. Compact interactive chrome — buttons, segmented controls, toolbar chips, selected rows, and pressed states — uses `--overlay-5/10/20/30` for state fills so light and dark themes keep the same visible hierarchy.
 
 ---
 
@@ -141,7 +145,7 @@ Scrollbars are admin chrome, not identity. Keep them achromatic so the panel rai
 
 ## Overlays and scrims
 
-White overlays are used for selected rows, pressed states, borders, and subtle surface lifts. Black scrims are used for shadows and modal backdrops. Suffixes are alpha x 100.
+Foreground overlays are used for selected rows, pressed states, borders, compact control tracks, and subtle surface lifts. The dark theme uses white overlays; the light theme swaps the same token names to dark overlays. Black scrims are used for shadows and modal backdrops. Suffixes are alpha x 100.
 
 ```css
 --overlay
@@ -187,7 +191,7 @@ Token-backed identity colors for widget categories, panel rails, sidebar icons, 
 | `--accent-9` | `#f0a6ff` | Secondary violet identity tint                                           |
 | `--accent-10` | `#ff9f9f` | Secondary red identity tint                                               |
 
-Each accent also has a standard 10% tint (`--accent-1-10` through `--accent-10-10`) for soft backgrounds. Used by `Widget` (`tint` prop), the rail accent helper (`src/ui/railAccent.ts`), `TagPill`, and the storage breakdown chart. Adding another identity color requires a new token — don't inline a color.
+Each accent also has a standard 10% tint (`--accent-1-10` through `--accent-10-10`) for soft backgrounds. Used by `Widget` (`tint` prop), the rail accent helper (`src/ui/railAccent.ts`), `TagPill`, and the storage breakdown chart. The light theme overrides the same accent token names with darker foreground-safe variants, so shared rail icons and badge text stay readable on white surfaces. Adding another identity color requires a new token — don't inline a color.
 
 ---
 

@@ -25,6 +25,8 @@ interface EditorBridgeEntry {
   destroy: () => void
 }
 
+const STREAM_LEASE_MS = 120_000
+
 const byUser = new Map<string, EditorBridgeEntry>()
 
 /** The live editor bridge for a user, or null when no editor is connected. */
@@ -81,6 +83,7 @@ export function createEditorBridgeStream(userId: string, signal: AbortSignal): R
         if (closed) return
         closed = true
         clearInterval(heartbeat)
+        if (lease) clearTimeout(lease)
         destroy()
         // Only evict if we're still the current bridge for this user.
         if (byUser.get(userId)?.bridgeId === bridgeId) byUser.delete(userId)
@@ -90,6 +93,11 @@ export function createEditorBridgeStream(userId: string, signal: AbortSignal): R
           /* already closed */
         }
       }
+
+      // Bound orphan lifetime when a proxy fails to propagate a closed
+      // downstream connection. The client reconnect loop restores the bridge.
+      const lease = setTimeout(cleanup, STREAM_LEASE_MS)
+
       signal.addEventListener('abort', cleanup, { once: true })
     },
   })
