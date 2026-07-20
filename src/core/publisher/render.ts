@@ -26,8 +26,8 @@ import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
 import { buildPageFrame, buildSiteFrame, buildRouteFrame } from '@core/templates/contextFrames'
 import { classNamesForClassIds } from '@core/page-tree'
 import {
-  isRenderableHtmlAttributeName,
   normalizeHtmlAttributeName,
+  sanitizeRenderableHtmlAttribute,
 } from '@core/htmlAttributes'
 import { bagToInlineStyle } from './classCss'
 import { collectClassCSS, sanitizeModuleCSS } from './cssCollector'
@@ -281,9 +281,11 @@ function bodyHtmlAttributes(value: unknown): string {
   return Object.entries(value)
     .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([rawName, rawValue]) => {
+      if (typeof rawValue !== 'string') return ''
       const name = normalizeHtmlAttributeName(rawName)
-      if (!isRenderableHtmlAttributeName(name) || typeof rawValue !== 'string') return ''
-      return ` ${name}="${escapeHtml(rawValue)}"`
+      const safeValue = sanitizeRenderableHtmlAttribute(name, rawValue)
+      if (safeValue === null) return ''
+      return ` ${name}="${escapeHtml(safeValue)}"`
     })
     .join('')
 }
