@@ -16,9 +16,9 @@ RUN apt-get update \
 WORKDIR /app
 # vendor/pixel-art-icons is a `file:` dep — `bun install` needs it on disk to
 # resolve the dependency, so copy it alongside the manifest before installing.
-COPY package.json bun.lock ./
+COPY package.json ./
 COPY vendor ./vendor
-RUN bun install --no-frozen-lockfile
+RUN bun install
 COPY . .
 RUN bun run build
 
@@ -33,9 +33,9 @@ RUN apt-get update \
     && unzip /tmp/bun.zip -d /usr/local/bun \
     && ln -sf /usr/local/bun/bun-linux-x64/bun /usr/local/bin/bun \
     && bun --version
-COPY package.json bun.lock ./
+COPY package.json ./
 COPY vendor ./vendor
-RUN bun install --production --no-frozen-lockfile
+RUN bun install --production
 
 # ---- cloudflared download layer (cached separately) ----
 # 核心功能: Cloudflare Tunnel 将 Instatic 托管到公网，无需开放服务器端口
