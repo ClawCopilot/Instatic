@@ -153,13 +153,7 @@ An admin cannot grant a capability they do not hold (enforced in `handlers/conne
 
 ## Tests
 
-<<<<<<< HEAD
 - `server/ai/mcp/connectors/{token,store}.test.ts` — token hashing + store CRUD.
-- `server/ai/content/treeService.test.ts` — headless load/mutate/persist.
-- `server/ai/mcp/{registry,auth,server,transports/http}.test.ts` — capability filtering, bearer auth + 401, full MCP round-trip (list/read/mutate), HTTP handshake.
-=======
-- `server/ai/mcp/connectors/{token,store}.test.ts` — token hashing, expiry, and store CRUD.
 - `server/ai/mcp/{registry,auth,server,transports/http}.test.ts` and `server/ai/mcp/tools/documentTools.test.ts` — capability filtering, headless document listing, bearer auth + 401, full MCP round-trip (list/read/mutate), HTTP handshake.
->>>>>>> d697742e (fix(mcp): serve site_list_documents headlessly over MCP (#186))
 - `src/__tests__/ai/mcpConnectorsHandler.test.ts` — CRUD, privilege floor, capability gating.
 - `src/__tests__/architecture/ai-mcp-connectors-never-leak.test.ts` — token never serialized.

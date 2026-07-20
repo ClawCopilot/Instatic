@@ -44,17 +44,10 @@ import { documentMcpTools } from './tools/documentTools'
 const MCP_EXCLUDED_TOOLS = new Set<string>(['site_list_tokens'])
 
 function allMcpTools(): AiTool[] {
-<<<<<<< HEAD
-  // De-dup by tool name. Order matters: the headless style + content tools win
-  // over the site toolset for any shared name (e.g. `list_documents`), so the
-  // version that works without an open editor is the one exposed.
-  const ordered = [...contextMcpTools, ...styleMcpTools, ...contentTools, ...dataTools, ...siteTools]
-=======
   // De-dup by tool name. Order matters: the headless MCP-specific + content
   // tools win over the site toolset for shared names, so the version that works
   // without an open editor is the one exposed.
   const ordered = [...contextMcpTools, ...styleMcpTools, ...documentMcpTools, ...contentTools, ...siteTools]
->>>>>>> d697742e (fix(mcp): serve site_list_documents headlessly over MCP (#186))
   const byName = new Map<string, AiTool>()
   for (const tool of ordered) {
     if (MCP_EXCLUDED_TOOLS.has(tool.name)) continue
