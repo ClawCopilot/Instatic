@@ -70,8 +70,6 @@ export function createEditorBridgeStream(userId: string, signal: AbortSignal): R
 
       // Heartbeat blank line keeps proxies from idling the connection;
       // `readNdjsonStream` skips empty lines.
-      let lease: ReturnType<typeof setTimeout> | null = null
-
       const heartbeat = setInterval(() => {
         if (closed) return
         try {
@@ -80,10 +78,6 @@ export function createEditorBridgeStream(userId: string, signal: AbortSignal): R
           closed = true
         }
       }, 25_000)
-
-      // Bound orphan lifetime when a proxy fails to propagate a closed
-      // downstream connection. The client reconnect loop restores the bridge.
-      lease = setTimeout(cleanup, STREAM_LEASE_MS)
 
       const cleanup = () => {
         if (closed) return
@@ -100,9 +94,11 @@ export function createEditorBridgeStream(userId: string, signal: AbortSignal): R
         }
       }
 
+      let lease: ReturnType<typeof setTimeout> | null = null
+
       // Bound orphan lifetime when a proxy fails to propagate a closed
       // downstream connection. The client reconnect loop restores the bridge.
-      const lease = setTimeout(cleanup, STREAM_LEASE_MS)
+      lease = setTimeout(cleanup, STREAM_LEASE_MS)
 
       signal.addEventListener('abort', cleanup, { once: true })
     },
