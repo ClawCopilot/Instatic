@@ -9,6 +9,7 @@ const FILE_EXTENSION_RE = /\.[a-zA-Z0-9]+$/
 
 function isEditorAppPath(pathname: string): boolean {
   return (
+    pathname === '/' ||
     pathname === '/admin' ||
     pathname.startsWith('/admin/') ||
     pathname === '/index.html' ||
