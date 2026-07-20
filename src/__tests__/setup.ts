@@ -35,7 +35,7 @@ const happyWindow = new GlobalWindow({
 // so our happy-dom window always wins.
 try {
   delete (globalThis as Record<string, unknown>).window
-} catch {}
+} catch { /* no-op */ }
 
 // Assign the window and document globals first — other globals are derived from these
 ;(globalThis as Record<string, unknown>).window = happyWindow
@@ -339,7 +339,7 @@ if (typeof (globalThis as { EventSource?: unknown }).EventSource === 'undefined'
 
     function walk(node: Node, config?: unknown): string {
       if (node.nodeType === 3) {
-        return escapeHtml((node as any).textContent ?? '')
+        return escapeHtml((node as { textContent?: string }).textContent ?? '')
       }
       if (node.nodeType === 1) {
         const el = node as Element
@@ -407,7 +407,7 @@ if (typeof (globalThis as { EventSource?: unknown }).EventSource === 'undefined'
   }
 
   // Stash the happy-dom window so sanitize.ts can use it directly if needed.
-  ;(globalThis as any).__HAPPY_DOM_WINDOW__ = happyWindow
+  ;(globalThis as Record<string, unknown>).__HAPPY_DOM_WINDOW__ = happyWindow
 }
 
 // ---------------------------------------------------------------------------

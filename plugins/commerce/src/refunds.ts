@@ -167,7 +167,7 @@ export async function validateRefundAmount(
 export async function recordManualRefund(
   db: DbClient,
   id: string,
-  method: 'bank_transfer' | 'store_credit' | 'cash' | 'other',
+  _method: 'bank_transfer' | 'store_credit' | 'cash' | 'other',
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const { rows: refundRows } = await tx<{ order_id: string; amount_cents: number }>`

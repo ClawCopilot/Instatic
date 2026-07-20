@@ -39,7 +39,7 @@ interface CapturedState {
   errors: string[]
 }
 
-function makeMockContext(db: Database, _settings: Record<string, unknown> = {}): { api: any; state: CapturedState } {
+function makeMockContext(db: Database, settings: Record<string, unknown> = {}): { api: any; state: CapturedState } {
   const state: CapturedState = {
     migrations: [],
     routes: [],

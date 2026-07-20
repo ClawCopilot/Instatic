@@ -307,7 +307,7 @@ export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<vo
     await symlink(targetSlot, tmpPath)
     try {
       await rename(tmpPath, currentPath)
-    } catch (err) {
+    } catch (_err) {
       // Fallback for edge cases
       await removeSymlinkEntry(currentPath)
       await rename(tmpPath, currentPath)

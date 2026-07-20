@@ -51,7 +51,6 @@ export function UndoRedoButtons() {
         // ⌘⇧Z is the canonical binding, but handled here for convenience.
         e.preventDefault()
         redo()
-        // eslint-disable-next-line keybindings-registry-single-source/keybindings
       }
     }
     document.addEventListener('keydown', onKeyDown)

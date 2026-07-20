@@ -744,7 +744,7 @@ describe('CMS plugin handlers', () => {
       const formData = new FormData()
       formData.set('file', pluginZip({
         'plugin.json': JSON.stringify(manifest),
-        'server/index.js': 'export function activate(api) { api.cms.routes.get("/ping", "plugins.read", () => ({ ok: true })) }',
+        'server/index.js': 'export function activate(api) { return api.cms.routes.get("/ping", "plugins.read", () => ({ ok: true })) }',
         'admin/dashboard.js': 'export function render({ root }) { root.textContent = "Workflow" }',
       }))
       formData.set('grantedPermissions', JSON.stringify(manifest.permissions))
@@ -823,7 +823,7 @@ describe('CMS plugin handlers', () => {
       formData.set('file', pluginZip({
         'plugin.json': JSON.stringify(manifest),
         'server/index.js': `export function activate(api) {
-          api.cms.routes.post('/echo', 'plugins.read', async (ctx) => {
+          return api.cms.routes.post('/echo', 'plugins.read', async (ctx) => {
             const file = ctx.body.file
             const bytes = new Uint8Array(await file.arrayBuffer())
             return {
@@ -955,7 +955,7 @@ describe('CMS plugin handlers', () => {
       }
       export async function activate(api) {
         await mark(api, 'activate')
-        api.cms.routes.get('/ping', 'plugins.read', () => ({ ok: true, plugin: api.plugin.id }))
+        return api.cms.routes.get('/ping', 'plugins.read', () => ({ ok: true, plugin: api.plugin.id }))
       }
       export async function deactivate(api) { await mark(api, 'deactivate') }
       export async function uninstall(api) { await mark(api, 'uninstall') }
@@ -1692,7 +1692,7 @@ describe('CMS plugin handlers', () => {
         'plugin.json': JSON.stringify(manifestFor('acme.good')),
         'server/index.js': `
           export function activate(api) {
-            api.cms.routes.get('/ping', 'plugins.read', () => ({ ok: true, who: 'good' }))
+            return api.cms.routes.get('/ping', 'plugins.read', () => ({ ok: true, who: 'good' }))
           }
         `,
       }))
@@ -1715,7 +1715,7 @@ describe('CMS plugin handlers', () => {
         'plugin.json': JSON.stringify(manifestFor('acme.bad')),
         'server/index.js': `
           export function activate(api) {
-            api.cms.routes.get('/boom', 'plugins.read', () => {
+            return api.cms.routes.get('/boom', 'plugins.read', () => {
               throw new Error('plugin boom')
             })
           }

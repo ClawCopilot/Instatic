@@ -148,7 +148,7 @@ export async function activate(api: any) {
     })
 
     // ─── Key rotation ────────────────────────────────────────────────────
-    await api.cms.routes.register('POST', '/admin/api/oidc/rotate-keys', 'users.manage', async (ctx) => {
+    await api.cms.routes.register('POST', '/admin/api/oidc/rotate-keys', 'users.manage', async (_ctx) => {
       const newKeyPair = generateKeyPair()
       // 保留旧密钥供当前 token 验证使用（双密钥过渡期 1 小时）
       const oldKeyJson = JSON.stringify(keyPair!)

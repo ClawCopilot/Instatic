@@ -26,7 +26,7 @@ import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../runtime/types'
 import { toolAllowedForCapabilities } from '../tools/capabilityGate'
 import { contentTools } from '../tools/content'
-import { dataTools } from '../tools/data'
+
 import { siteTools } from '../tools/site'
 import { styleMcpTools } from './tools/styleTools'
 import { contextMcpTools } from './tools/contextTool'

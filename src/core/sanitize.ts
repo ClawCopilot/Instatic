@@ -199,7 +199,7 @@ export function sanitizeRichtext(
     return config._plainText ? stripped.trim() : stripped
   }
 
-  const sanitized = String(purifier.sanitize(str, config))
+  let sanitized = String(purifier.sanitize(str, config))
 
   // When plain-text mode is requested, apply a post-strip pass.
   // DOMPurify's ALLOWED_TAGS:[] covers most cases but certain browsers / DOM
@@ -208,6 +208,15 @@ export function sanitizeRichtext(
   if (config._plainText) {
     return stripHtmlFallback(sanitized).trim()
   }
+
+  // After sanitization, ensure all links have rel="noopener noreferrer"
+  // as a defense-in-depth measure (happy-dom on Linux may not fire hooks).
+  sanitized = sanitized.replace(/<a\s([^>]*)>/gi, (_, attrs) => {
+    if (!/rel\s*=\s*["']/i.test(attrs)) {
+      return `<a rel="noopener noreferrer" ${attrs}>`
+    }
+    return `<a ${attrs}>`
+  })
 
   return sanitized
 }
@@ -266,5 +275,11 @@ export function sanitizeSvg(value: unknown): string {
     return ''
   }
 
-  return String(purifier.sanitize(str, SVG_CONFIG))
+  let sanitized = String(purifier.sanitize(str, SVG_CONFIG))
+
+  // Strip <foreignObject> as defense-in-depth (happy-dom on Linux may not
+  // enforce FORBID_TAGS).
+  sanitized = sanitized.replace(/<foreignObject[\s>][\s\S]*?<\/foreignObject>/gi, '')
+
+  return sanitized
 }

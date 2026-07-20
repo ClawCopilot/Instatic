@@ -44,11 +44,7 @@ function getHttpProxy(): string | undefined {
   return undefined
 }
 
-/** 创建代理选项对象，仅在代理配置存在时包含 proxy 字段。 */
-function proxyOpts(): RequestInit {
-  const proxy = getHttpProxy()
-  return proxy ? { proxy } : {}
-}
+
 
 /**
  * 发起 HTTP 请求，自动注入代理（如果配置了 HTTP_PROXY/HTTPS_PROXY）。

@@ -62,8 +62,10 @@ export function CreateFromTemplateDialog({ kind, onClose }: CreateFromTemplateDi
   // ---- load templates on mount ----
   useEffect(() => {
     let cancelled = false
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoadingTemplates(true)
     setError(null)
+    /* eslint-enable react-hooks/set-state-in-effect */
     listCmsPluginTemplates()
       .then((all) => {
         if (cancelled) return

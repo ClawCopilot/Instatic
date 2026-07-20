@@ -345,7 +345,6 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
       if (c) zoomOut(c.x, c.y)
       else zoomOut()
     } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-      // eslint-disable-next-line keybindings-registry-single-source/keybindings
       e.preventDefault()
       resetCanvasView()
     } else if (e.key === '1' && e.shiftKey) {

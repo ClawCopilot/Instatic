@@ -88,6 +88,7 @@ export function defineSkill(config: DefineSkillConfig): SkillDefinition {
 
   // Validate settings
   if (config.settings && config.settings.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- avoid circular dependency
     const { validatePluginSettingsDefinitions } = require('./settings')
     validatePluginSettingsDefinitions(config.id, config.settings)
   }

@@ -270,7 +270,7 @@ export function registerCarrierAdapter(adapter: CarrierAdapter): void {
  * 如果没有注册任何适配器，返回空数组。
  */
 export async function queryCarrierRates(
-  input: CarrierAdapter['getRates'] extends (input: infer I) => Promise<Array<infer R>> ? I : never,
+  input: CarrierAdapter['getRates'] extends (input: infer I) => Promise<Array<infer _R>> ? I : never,
 ): Promise<Array<{
   serviceLevel: string
   costCents: number
