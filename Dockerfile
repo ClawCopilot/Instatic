@@ -18,7 +18,7 @@ WORKDIR /app
 # resolve the dependency, so copy it alongside the manifest before installing.
 COPY package.json bun.lock ./
 COPY vendor ./vendor
-RUN bun install --frozen-lockfile
+RUN bun install
 COPY . .
 RUN bun run build
 
@@ -35,7 +35,7 @@ RUN apt-get update \
     && bun --version
 COPY package.json bun.lock ./
 COPY vendor ./vendor
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 # ---- cloudflared download layer (cached separately) ----
 # 核心功能: Cloudflare Tunnel 将 Instatic 托管到公网，无需开放服务器端口
