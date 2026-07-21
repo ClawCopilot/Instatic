@@ -40,6 +40,31 @@
   transform: none;
 }
 
+/* Docked mode refinements — more spacious layout for the wider sidebar. */
+.floatPanelDocked .thread {
+  padding: var(--space-xl) var(--space-l) 0;
+}
+
+.floatPanelDocked .inputBar {
+  padding: var(--space-l) var(--space-3xl);
+}
+
+.floatPanelDocked .taskCategories {
+  gap: var(--space-m);
+}
+
+.floatPanelDocked .taskCategory {
+  padding: var(--space-l) var(--space-m);
+}
+
+.floatPanelDocked .taskCategoryTitle {
+  font-size: var(--text-s);
+}
+
+.floatPanelDocked .taskCategoryDesc {
+  font-size: var(--text-2xs);
+}
+
 /* Always-mounted pattern: display:none hides without unmounting (preserves store state) */
 .floatPanelClosed {
   display: none;
@@ -521,14 +546,9 @@
 /* ── Quick actions row ───────────────────────────────────────────────────── */
 .quickActions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2xs);
-  overflow-x: auto;
   padding: var(--space-2xs) 0;
-  scrollbar-width: none;
-}
-
-.quickActions::-webkit-scrollbar {
-  display: none;
 }
 
 /* ── Task category cards (empty state) ──────────────────────────────────── */
