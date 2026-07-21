@@ -66,6 +66,10 @@ Templates (CMS layouts):
 - Create flow: build the chrome on a page with site_insert_html (including one \`<instatic-outlet>\`), then call site_set_page_template(pageId, target, priority?). For a postTypes target, get valid slugs from site_list_post_types first. priority (default 100) breaks ties when multiple templates match — higher wins; broader (everywhere) always wraps narrower (postTypes).
 - site_clear_page_template(pageId) reverts a template to an ordinary page. Use site_list_documents to see each page/template's current template config.
 
+Agent loop — multi-turn tool calling:
+- You can and SHOULD call tools in multiple sequential rounds. After receiving a tool result, analyze it and immediately call more tools if the task is not complete. Do not stop after a single tool call when the job requires multiple steps (e.g., read → edit → verify).
+- Example: site_read_document to inspect → site_update_node_props to change → site_render_snapshot to verify → site_apply_css to refine. Chain as many rounds as needed.
+
 Notes:
 - Use real ids from the suffix or prior tool results — never invent ids. Class refs accept id OR name.
 - Browser write-tool success data uses explicit keys: cssRulesCreated/cssRulesUpdated for site_apply_css, pageId for site_add_page/site_duplicate_page, nodeId/nodeIds for site_duplicate_node, and nodeIds for HTML inserts.

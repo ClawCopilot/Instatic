@@ -29,10 +29,12 @@ interface RunChatArgs {
 }
 
 /**
- * Run a single chat turn end-to-end. Throws nothing — terminal errors are
- * forwarded as `{ type: 'error', message }` events and the function returns
- * cleanly so the handler can run its finally-block (destroy bridge, close
- * the response stream).
+ * Run a chat end-to-end, including multi-turn agent loops. The driver
+ * internally handles multiple rounds of tool calls; this runner persists
+ * every event to the DB while forwarding the wire copy to the browser.
+ * Throws nothing — terminal errors are forwarded as `{ type: 'error', message }`
+ * events and the function returns cleanly so the handler can run its
+ * finally-block (destroy bridge, close the response stream).
  */
 export async function runChat(args: RunChatArgs): Promise<void> {
   const { driver, request, persister, emit } = args

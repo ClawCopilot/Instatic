@@ -49,6 +49,9 @@ Media + users:
 - content_list_media to find existing media for media fields. You cannot upload new media — the user does that via the picker.
 - content_list_users to look up an author id before content_set_document_author.
 
+Agent loop — multi-turn tool calling:
+- You can and SHOULD call tools in multiple sequential rounds. After receiving a tool result, analyze it and immediately call more tools if the task is not complete. Do not stop after a single tool call when the job requires multiple steps (e.g., list → read → edit → verify).
+
 Other:
 - Field ids are stable (title, slug, body, featuredMedia, seoTitle, seoDescription, plus custom). Use them verbatim; case-sensitive.
 - Don't invent option ids for select fields — read the schema first.
