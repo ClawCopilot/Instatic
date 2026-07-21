@@ -10,6 +10,7 @@ import { memo, useCallback } from 'react'
 import { Button } from '@ui/components/Button'
 import { Copy2SolidIcon } from 'pixel-art-icons/icons/copy-2-solid'
 import { RedoIcon } from 'pixel-art-icons/icons/redo'
+import { FilesStack2SolidIcon } from 'pixel-art-icons/icons/files-stack-2-solid'
 import styles from './AgentPanel.module.css'
 
 export interface MessageActionsProps {
@@ -19,6 +20,8 @@ export interface MessageActionsProps {
   onRetry?: () => void
   /** Copy the prompt to clipboard */
   onCopyPrompt?: (text: string) => void
+  /** Fork handler — branch from this assistant turn */
+  onFork?: () => void
   /** Whether AI is currently streaming */
   isStreaming?: boolean
 }
@@ -27,6 +30,7 @@ export const MessageActions = memo(function MessageActions({
   userPrompt,
   onRetry,
   onCopyPrompt,
+  onFork,
   isStreaming,
 }: MessageActionsProps) {
   const handleCopy = useCallback(() => {
@@ -58,6 +62,18 @@ export const MessageActions = memo(function MessageActions({
         aria-label="Retry"
       >
         <RedoIcon size={12} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        iconOnly
+        onClick={onFork}
+        disabled={isStreaming}
+        tooltip="Fork from here"
+        aria-label="Fork from here"
+      >
+        <FilesStack2SolidIcon size={12} />
       </Button>
     </div>
   )

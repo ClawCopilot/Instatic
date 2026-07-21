@@ -202,9 +202,29 @@ export async function* runToolLoop<TMessage>(
     for (const call of turn.toolCalls) {
       const tool = toolsByName.get(call.name)
       const input = prepareToolInput(call, req)
-      const output: AiToolOutput = tool
+
+      if (tool && DANGEROUS_TOOL_PATTERNS.test(call.name)) {
+        yield {
+          type: 'toolConfirm',
+          toolCallId: call.id,
+          toolName: call.name,
+          input: call.input,
+          message: `The AI wants to execute "${call.name}". This may modify or delete content. Confirm to proceed.`,
+        }
+      }
+
+      let output: AiToolOutput = tool
         ? await executeAiTool(tool, input, req.bridge, req.signal, req.toolContextBase)
         : { ok: false, error: `Unknown tool: ${call.name}` }
+
+      // Self-healing: retry once for transient errors
+      if (!output.ok && isRetryableError(output.error)) {
+        await new Promise((r) => setTimeout(r, 500))
+        output = tool
+          ? await executeAiTool(tool, input, req.bridge, req.signal, req.toolContextBase)
+          : output
+      }
+
       yield {
         type: 'toolResult',
         toolCallId: call.id,
@@ -252,6 +272,24 @@ function prepareToolInput(call: TurnToolCall, req: AiStreamRequest): unknown {
 }
 
 // ---------------------------------------------------------------------------
+// Retryable error detection
+// ---------------------------------------------------------------------------
+
+function isRetryableError(error?: string): boolean {
+  if (!error) return false
+  const retryablePatterns = [
+    /timeout/i,
+    /network/i,
+    /temporarily/i,
+    /rate limit/i,
+    /503/i,
+    /502/i,
+    /connection/i,
+  ]
+  return retryablePatterns.some((p) => p.test(error))
+}
+
+// ---------------------------------------------------------------------------
 // Stale heavy-evidence elision
 // ---------------------------------------------------------------------------
 
@@ -261,6 +299,8 @@ function prepareToolInput(call: TurnToolCall, req: AiStreamRequest): unknown {
  * model has since mutated — useless to re-send. Any result with an image
  * attachment is heavy regardless of tool name.
  */
+const DANGEROUS_TOOL_PATTERNS = /delete|remove|clear|drop|overwrite|reset|destroy/i
+
 const HEAVY_TOOL_NAMES = new Set(['site_render_snapshot', 'site_read_document', 'site_get_node_html'])
 
 function isHeavyResult(r: TurnToolResult): boolean {

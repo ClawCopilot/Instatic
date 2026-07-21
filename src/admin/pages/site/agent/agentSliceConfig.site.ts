@@ -33,4 +33,8 @@ export const siteAgentSliceConfig: AgentSliceConfig = {
   // prefix and renders the setup CTA.
   noProviderMessage:
     'No AI provider configured for the site editor. Open /admin/ai/providers to add a credential, then /admin/ai/defaults to pick one for the "site" scope.',
+  undo: () => getAgentStoreApi<EditorStore>()?.getState().undo(),
+  redo: () => getAgentStoreApi<EditorStore>()?.getState().redo(),
+  canUndo: () => getAgentStoreApi<EditorStore>()?.getState().canUndo ?? false,
+  canRedo: () => getAgentStoreApi<EditorStore>()?.getState().canRedo ?? false,
 }

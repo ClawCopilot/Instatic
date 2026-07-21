@@ -1,0 +1,9 @@
+.toolName {
+  font-weight: 600;
+}
+
+.warning {
+  margin-top: var(--space-xs);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

@@ -44,6 +44,8 @@ interface ConversationRow {
   cache_read_tokens_total: number | string
   cache_creation_tokens_total: number | string
   context_tokens: number | string
+  parent_id: string | null
+  forked_at_position: number | string
   created_at: Date | string
   updated_at: Date | string
   deleted_at: Date | string | null
@@ -85,6 +87,8 @@ function conversationRowToRecord(row: ConversationRow): ConversationRecord {
     cacheReadTokensTotal: toNumber(row.cache_read_tokens_total),
     cacheCreationTokensTotal: toNumber(row.cache_creation_tokens_total),
     contextTokens: toNumber(row.context_tokens),
+    parentId: row.parent_id,
+    forkedAtPosition: toNumber(row.forked_at_position),
     createdAt: isoDateOrNull(row.created_at)!,
     updatedAt: isoDateOrNull(row.updated_at)!,
     deletedAt: isoDateOrNull(row.deleted_at),
@@ -142,6 +146,8 @@ export function toConversationView(record: ConversationRecord): ConversationView
     cacheReadTokensTotal: record.cacheReadTokensTotal,
     cacheCreationTokensTotal: record.cacheCreationTokensTotal,
     contextTokens: record.contextTokens,
+    parentId: record.parentId,
+    forkedAtPosition: record.forkedAtPosition,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }
@@ -186,7 +192,8 @@ export async function listConversationsForUserScope(
     select id, user_id, scope, title, credential_id, model_id,
            prompt_tokens_total, completion_tokens_total,
            cost_usd_total, cache_read_tokens_total, cache_creation_tokens_total,
-           context_tokens, created_at, updated_at, deleted_at
+           context_tokens, parent_id, forked_at_position,
+           created_at, updated_at, deleted_at
     from ai_conversations
     where user_id = ${userId}
       and scope = ${scope}
@@ -209,7 +216,8 @@ export async function readConversationForUser(
     select id, user_id, scope, title, credential_id, model_id,
            prompt_tokens_total, completion_tokens_total,
            cost_usd_total, cache_read_tokens_total, cache_creation_tokens_total,
-           context_tokens, created_at, updated_at, deleted_at
+           context_tokens, parent_id, forked_at_position,
+           created_at, updated_at, deleted_at
     from ai_conversations
     where id = ${conversationId}
       and user_id = ${userId}
@@ -282,7 +290,8 @@ export async function createConversationForUser(
     returning id, user_id, scope, title, credential_id, model_id,
               prompt_tokens_total, completion_tokens_total,
               cost_usd_total, cache_read_tokens_total, cache_creation_tokens_total,
-           context_tokens, created_at, updated_at, deleted_at
+              context_tokens, parent_id, forked_at_position,
+              created_at, updated_at, deleted_at
   `
   return conversationRowToRecord(rows[0]!)
 }
@@ -315,9 +324,52 @@ export async function updateConversationForUser(
     returning id, user_id, scope, title, credential_id, model_id,
               prompt_tokens_total, completion_tokens_total,
               cost_usd_total, cache_read_tokens_total, cache_creation_tokens_total,
-           context_tokens, created_at, updated_at, deleted_at
+              context_tokens, parent_id, forked_at_position,
+              created_at, updated_at, deleted_at
   `
   return rows[0] ? conversationRowToRecord(rows[0]) : null
+}
+
+/**
+ * Fork a conversation at a given message position. Copies the source
+ * conversation row and all messages up to (and including) `forkAtPosition`
+ * into a new conversation with a `parent_id` reference.
+ */
+export async function forkConversation(
+  db: DbClient,
+  userId: string,
+  sourceConversationId: string,
+  forkAtPosition: number,
+  title?: string,
+): Promise<ConversationRecord> {
+  // 1. Read source conversation
+  const source = await readConversationForUser(db, userId, sourceConversationId)
+  if (!source) throw new Error('Source conversation not found')
+
+  // 2. Create new conversation with parent reference
+  const newId = nanoid()
+  await db`
+    insert into ai_conversations (id, user_id, scope, title, credential_id, model_id, parent_id, forked_at_position)
+    values (${newId}, ${userId}, ${source.scope}, ${title ?? source.title + ' (fork)'}, ${source.credentialId}, ${source.modelId}, ${sourceConversationId}, ${forkAtPosition})
+  `
+
+  // 3. Copy messages up to forkAtPosition
+  const messages = await listMessagesForConversation(db, sourceConversationId)
+  const messagesToCopy = messages.filter((m) => m.position <= forkAtPosition)
+
+  for (const msg of messagesToCopy) {
+    await appendMessage(db, newId, {
+      role: msg.role,
+      content: msg.content,
+      toolCallId: msg.toolCallId,
+      toolName: msg.toolName,
+    })
+  }
+
+  // 4. Return new conversation
+  const newConv = await readConversationForUser(db, userId, newId)
+  if (!newConv) throw new Error('Failed to create fork')
+  return newConv
 }
 
 /**

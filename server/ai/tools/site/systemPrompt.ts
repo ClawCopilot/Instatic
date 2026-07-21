@@ -70,6 +70,11 @@ Agent loop — multi-turn tool calling:
 - You can and SHOULD call tools in multiple sequential rounds. After receiving a tool result, analyze it and immediately call more tools if the task is not complete. Do not stop after a single tool call when the job requires multiple steps (e.g., read → edit → verify).
 - Example: site_read_document to inspect → site_update_node_props to change → site_render_snapshot to verify → site_apply_css to refine. Chain as many rounds as needed.
 
+Self-healing on tool errors:
+- If a tool call fails with an error message, analyze the error and immediately retry with corrected parameters. Do not give up after a single failure.
+- Common fixes: wrong node id → re-read the document to get correct ids; invalid CSS → use simpler syntax; missing required field → check schema and retry.
+- After 3 consecutive failures on the same tool, explain the issue to the user instead of retrying indefinitely.
+
 Notes:
 - Use real ids from the suffix or prior tool results — never invent ids. Class refs accept id OR name.
 - Browser write-tool success data uses explicit keys: cssRulesCreated/cssRulesUpdated for site_apply_css, pageId for site_add_page/site_duplicate_page, nodeId/nodeIds for site_duplicate_node, and nodeIds for HTML inserts.

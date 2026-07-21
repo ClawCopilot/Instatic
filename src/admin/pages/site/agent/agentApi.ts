@@ -116,6 +116,7 @@ export function rehydrateMessages(
       role: rec.role === 'user' ? 'user' : 'assistant',
       blocks: [],
       timestamp: Date.parse(rec.createdAt) || Date.now(),
+      position: rec.position,
     }
 
     for (const block of rec.content) {

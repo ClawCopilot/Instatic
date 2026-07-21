@@ -176,6 +176,8 @@ export interface AgentMessage {
   role: 'user' | 'assistant'
   blocks: AgentMessageBlock[]
   timestamp: number
+  /** Server-side position in the conversation (-1 until rehydrated). */
+  position: number
 }
 
 // ---------------------------------------------------------------------------

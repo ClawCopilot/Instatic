@@ -1097,4 +1097,12 @@ export const pgMigrations: Migration[] = [
       );
     `,
   },
+  {
+    id: '022_ai_conversation_fork',
+    sql: `
+      alter table ai_conversations add column parent_id text references ai_conversations(id) on delete set null;
+      alter table ai_conversations add column forked_at_position integer not null default -1;
+      create index ai_conv_parent_idx on ai_conversations(parent_id) where parent_id is not null and deleted_at is null;
+    `,
+  },
 ]

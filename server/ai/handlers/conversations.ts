@@ -17,6 +17,7 @@ import { requireCapability } from '../../auth/authz'
 import type { DbClient } from '../../db/client'
 import {
   createConversationForUser,
+  forkConversation,
   listConversationsForUserScope,
   listMessagesForConversation,
   readConversationForUser,
@@ -42,6 +43,11 @@ const UpdateBodySchema = Type.Object({
   modelId: Type.Optional(Type.String({ minLength: 1 })),
 })
 
+const ForkBodySchema = Type.Object({
+  forkAtPosition: Type.Number(),
+  title: Type.Optional(Type.String()),
+})
+
 export function tryHandleAiConversations(
   req: Request,
   db: DbClient,
@@ -51,9 +57,13 @@ export function tryHandleAiConversations(
   if (pathname === '/admin/api/ai/conversations') {
     return dispatchCollection(req, db, url)
   }
-  const match = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)$/)
-  if (match) {
-    return dispatchItem(req, db, match[1]!)
+  const itemMatch = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)$/)
+  if (itemMatch) {
+    return dispatchItem(req, db, itemMatch[1]!)
+  }
+  const forkMatch = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)\/fork$/)
+  if (forkMatch) {
+    return handleFork(req, db, forkMatch[1]!)
   }
   return null
 }
@@ -139,4 +149,15 @@ async function handleDelete(req: Request, db: DbClient, id: string): Promise<Res
   const ok = await softDeleteConversationForUser(db, userOrResponse.id, id)
   if (!ok) return jsonResponse({ error: 'Conversation not found' }, { status: 404 })
   return jsonResponse({ ok: true })
+}
+
+async function handleFork(req: Request, db: DbClient, conversationId: string): Promise<Response> {
+  const userOrResponse = await requireCapability(req, db, 'ai.chat')
+  if (userOrResponse instanceof Response) return userOrResponse
+
+  const body = await readValidatedBody(req, ForkBodySchema)
+  if (!body) return badRequest('Invalid request body.')
+
+  const forked = await forkConversation(db, userOrResponse.id, conversationId, body.forkAtPosition, body.title)
+  return jsonResponse({ conversation: toConversationView(forked) })
 }

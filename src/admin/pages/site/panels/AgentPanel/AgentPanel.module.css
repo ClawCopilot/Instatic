@@ -85,6 +85,13 @@
   min-height: 0;
 }
 
+/* ── Header actions row (undo/redo, etc.) ───────────────────────────────── */
+.headerActions {
+  display: flex;
+  gap: var(--space-3xs);
+  align-items: center;
+}
+
 /* ── Streaming badge — shown in header extra actions slot ────────────────── */
 .streamingBadge {
   font-size: var(--text-2xs);
@@ -143,6 +150,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+}
+
+/* Relative positioning anchor for the absolute autocomplete dropdown. */
+.inputWrap {
+  position: relative;
 }
 
 /* Controls row under the textarea: model picker on the left, minimal
@@ -750,6 +762,39 @@
 .imageAttachmentRemove:hover {
   color: var(--danger);
   background: var(--danger-10);
+}
+
+/* ── Autocomplete dropdown ──────────────────────────────────────────────── */
+.autocompletePanel {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: var(--space-2xs);
+  max-height: 160px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--overlay-10);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+  z-index: 60;
+}
+
+.autocompleteItem {
+  padding: var(--space-xs) var(--space-m);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  transition: background 0.1s ease;
+}
+
+.autocompleteItem:hover {
+  background: var(--overlay-10);
+  color: var(--text-bright);
+}
+
+.autocompleteLabel {
+  font-weight: 500;
 }
 
 /* ── Command palette ────────────────────────────────────────────────────── */

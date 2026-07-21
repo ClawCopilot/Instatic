@@ -173,6 +173,12 @@ export type AiStreamEvent =
   | { type: 'toolResult'; toolCallId: string; toolName: string; ok: boolean; error?: string }
   /** Server asks the browser to apply a write tool against its store. */
   | { type: 'toolRequest'; requestId: string; toolName: string; input: unknown }
+  /** Server signals that a dangerous tool is about to execute. */
+  | { type: 'toolConfirm'; toolCallId: string; toolName: string; input: unknown; message: string }
+  /** User confirmed a dangerous tool — informational only (actual confirmation happens frontend-side). */
+  | { type: 'toolConfirmed'; toolCallId: string }
+  /** User rejected a dangerous tool — informational only (actual rejection happens frontend-side). */
+  | { type: 'toolRejected'; toolCallId: string; reason: string }
   /**
    * Aggregated token usage for the entire stream — emitted just before `done`.
    *

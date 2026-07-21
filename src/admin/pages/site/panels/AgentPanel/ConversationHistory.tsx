@@ -14,6 +14,7 @@ import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '@ui/componen
 import { BulletlistSolidIcon } from 'pixel-art-icons/icons/bulletlist-solid'
 import { PlusIcon } from 'pixel-art-icons/icons/plus'
 import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { FilesStack2SolidIcon } from 'pixel-art-icons/icons/files-stack-2-solid'
 import { formatRelativeTime } from './relativeTime'
 import styles from './AgentPanel.module.css'
 
@@ -79,6 +80,7 @@ export function ConversationHistory() {
           ) : (
             conversations.map((conv) => {
               const isActive = conv.id === activeId
+              const isFork = conv.parentId !== null
               return (
                 <ContextMenuItem
                   key={conv.id}
@@ -90,7 +92,20 @@ export function ConversationHistory() {
                     setOpen(false)
                   }}
                 >
-                  <span className={styles.historyItemTitle}>{conv.title}</span>
+                  <span
+                    className={styles.historyItemTitle}
+                    style={isFork ? { paddingLeft: 16 } : undefined}
+                    title={conv.title}
+                  >
+                    {isFork && (
+                      <FilesStack2SolidIcon
+                        size={10}
+                        style={{ marginRight: 6, opacity: 0.6, flexShrink: 0 }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {conv.title}
+                  </span>
                   <span className={styles.historyItemMeta}>
                     <span className={styles.historyItemTime}>
                       {formatRelativeTime(Date.parse(conv.updatedAt))}

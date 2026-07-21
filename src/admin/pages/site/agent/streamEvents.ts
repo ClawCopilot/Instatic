@@ -91,6 +91,20 @@ export const ServerStreamEventSchema = Type.Union([
 // Stream event processor
 // ---------------------------------------------------------------------------
 
+export interface StreamEventOptions {
+  /**
+   * Capture the current scope snapshot AFTER a browser tool runs. Posted with
+   * the tool result so the server refreshes the turn context and later read
+   * tools see post-mutation state. Optional — omit and no snapshot is sent.
+   */
+  buildSnapshot?: () => unknown
+  /**
+   * Called when a dangerous tool is about to execute. Return false to reject
+   * the tool without running it. Optional — omit and all tools run unchecked.
+   */
+  onToolConfirm?: (toolName: string, input: unknown) => Promise<boolean>
+}
+
 export async function processStreamEvent(
   event: ServerStreamEvent,
   assistantId: string,
@@ -99,12 +113,7 @@ export async function processStreamEvent(
   bridge: AgentBridgeRuntime,
   signal: AbortSignal | null,
   dispatchTool: (toolName: string, input: unknown) => Promise<AiToolOutput>,
-  /**
-   * Capture the current scope snapshot AFTER a browser tool runs. Posted with
-   * the tool result so the server refreshes the turn context and later read
-   * tools see post-mutation state. Optional — omit and no snapshot is sent.
-   */
-  buildSnapshot?: () => unknown,
+  options?: StreamEventOptions,
 ): Promise<void> {
   switch (event.type) {
     case 'text': {
@@ -125,7 +134,18 @@ export async function processStreamEvent(
       // error rather than hanging forever.
       let result: AiToolOutput
       try {
-        result = await dispatchTool(event.toolName, event.input)
+        const onToolConfirm = options?.onToolConfirm
+        const needsConfirm = isDangerousTool(event.toolName) && onToolConfirm != null
+        if (needsConfirm) {
+          const confirmed = await onToolConfirm(event.toolName, event.input)
+          if (!confirmed) {
+            result = aiToolError(`User rejected the "${event.toolName}" operation.`)
+          } else {
+            result = await dispatchTool(event.toolName, event.input)
+          }
+        } else {
+          result = await dispatchTool(event.toolName, event.input)
+        }
       } catch (err) {
         const message = getErrorMessage(err, String(err))
         console.error(`[AgentSlice] tool ${event.toolName} threw unexpectedly:`, err)
@@ -156,7 +176,7 @@ export async function processStreamEvent(
         break
       }
       // Snapshot AFTER the tool ran so the server sees the mutation it made.
-      const snapshot = buildSnapshot?.()
+      const snapshot = options?.buildSnapshot?.()
       await postToolResult(bridge.bridgeId, event.requestId, result, signal, snapshot)
       break
     }
@@ -253,4 +273,14 @@ export async function processStreamEvent(
     default:
       break
   }
+}
+
+// ---------------------------------------------------------------------------
+// Dangerous tool detection
+// ---------------------------------------------------------------------------
+
+const DANGEROUS_TOOL_PATTERNS = /delete|remove|clear|drop|overwrite|reset|destroy/i
+
+function isDangerousTool(toolName: string): boolean {
+  return DANGEROUS_TOOL_PATTERNS.test(toolName)
 }

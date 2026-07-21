@@ -24,6 +24,7 @@ import {
   getConversation,
   deleteConversation,
   updateConversationProvider,
+  forkConversation,
 } from '@admin/ai/api'
 import {
   createConversationForScope,
@@ -175,6 +176,8 @@ export function createAgentSlice(
   return (set, get) => {
   // AbortController held in closure (not reactive — intentional, not needed in UI)
   let _abortController: AbortController | null = null
+  // Dangerous-tool confirmation handler — set by the UI layer (AgentPanel).
+  let _onToolConfirm: ((toolName: string, input: unknown) => Promise<boolean>) | null = null
 
   // rAF-buffered text accumulation (Guideline #254). Pending deltas are
   // flushed once per animation frame, OR explicitly before any tool-call
@@ -243,6 +246,23 @@ export function createAgentSlice(
     agentConversations: [],
     agentContextTokens: null,
 
+    // ── Host-store undo/redo proxies ─────────────────────────────────────────
+    agentUndo() {
+      config.undo?.()
+    },
+
+    agentRedo() {
+      config.redo?.()
+    },
+
+    agentCanUndo() {
+      return config.canUndo?.() ?? false
+    },
+
+    agentCanRedo() {
+      return config.canRedo?.() ?? false
+    },
+
     // ── UI actions ───────────────────────────────────────────────────────────
     openAgent() {
       set({ isAgentOpen: true })
@@ -262,6 +282,10 @@ export function createAgentSlice(
       _abortController?.abort()
       _abortController = null
       set({ isAgentStreaming: false })
+    },
+
+    setOnToolConfirm(handler) {
+      _onToolConfirm = handler
     },
 
     clearAgentMessages() {
@@ -340,6 +364,31 @@ export function createAgentSlice(
       }
     },
 
+    async forkAgentConversation(forkAtPosition: number, title?: string) {
+      const { agentConversationId } = get()
+      if (!agentConversationId) return
+      try {
+        const conversation = await forkConversation(agentConversationId, forkAtPosition, title)
+        set((state) => {
+          state.agentConversationId = conversation.id
+          state.agentActiveCredentialId = conversation.credentialId
+          state.agentActiveModelId = conversation.modelId
+          state.agentMessages = []
+          state.agentError = null
+        })
+        // Load the forked conversation messages
+        await get().loadAgentConversation(conversation.id)
+      } catch (err) {
+        console.error('[AgentSlice] Failed to fork conversation:', err)
+        pushToast({
+          kind: 'error',
+          title: "Couldn't fork conversation",
+          body: getErrorMessage(err, 'Failed to fork the conversation.'),
+          location: 'site-editor',
+        })
+      }
+    },
+
     async setAgentProvider(credentialId: string, modelId: string) {
       const currentId = get().agentConversationId
       // Always reflect the picker selection locally so the dropdown's
@@ -398,6 +447,7 @@ export function createAgentSlice(
         role: 'user',
         blocks: [{ kind: 'text', text: content }],
         timestamp: Date.now(),
+        position: -1,
       }
 
       const assistantId = nanoid()
@@ -406,6 +456,7 @@ export function createAgentSlice(
         role: 'assistant',
         blocks: [],
         timestamp: Date.now(),
+        position: -1,
       }
 
       set((state) => {
@@ -468,7 +519,10 @@ export function createAgentSlice(
             bridge,
             _abortController?.signal ?? null,
             config.dispatchTool,
-            config.buildSnapshot,
+            {
+              buildSnapshot: config.buildSnapshot,
+              onToolConfirm: _onToolConfirm ?? config.onToolConfirm,
+            },
           )
         }
 

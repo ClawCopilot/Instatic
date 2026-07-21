@@ -125,6 +125,8 @@ const ConversationViewSchema = Type.Object({
   cacheCreationTokensTotal: Type.Number(),
   /** Current-context snapshot for the composer meter (latest turn). */
   contextTokens: Type.Number(),
+  parentId: Type.Union([Type.String(), Type.Null()]),
+  forkedAtPosition: Type.Number(),
   createdAt: Type.String(),
   updatedAt: Type.String(),
 })
@@ -294,6 +296,19 @@ export async function updateConversationProvider(
   const body = await apiRequest(`/admin/api/ai/conversations/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: { credentialId, modelId },
+    schema: ConversationItemResponseSchema,
+  })
+  return body.conversation
+}
+
+export async function forkConversation(
+  id: string,
+  forkAtPosition: number,
+  title?: string,
+): Promise<ConversationView> {
+  const body = await apiRequest(`/admin/api/ai/conversations/${encodeURIComponent(id)}/fork`, {
+    method: 'POST',
+    body: { forkAtPosition, title },
     schema: ConversationItemResponseSchema,
   })
   return body.conversation

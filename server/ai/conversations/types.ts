@@ -35,6 +35,10 @@ export interface ConversationRecord {
    * running total). Feeds the composer context meter on reload.
    */
   readonly contextTokens: number
+  /** Parent conversation id when this conversation is a fork. */
+  readonly parentId: string | null
+  /** Position in the parent conversation where the fork was created (-1 for root). */
+  readonly forkedAtPosition: number
   readonly createdAt: string
   readonly updatedAt: string
   readonly deletedAt: string | null
@@ -76,6 +80,10 @@ export interface ConversationView {
   readonly cacheCreationTokensTotal: number
   /** Current-context snapshot — see ConversationRecord.contextTokens. */
   readonly contextTokens: number
+  /** Parent conversation id when this conversation is a fork. */
+  readonly parentId: string | null
+  /** Position in the parent conversation where the fork was created (-1 for root). */
+  readonly forkedAtPosition: number
   readonly createdAt: string
   readonly updatedAt: string
 }

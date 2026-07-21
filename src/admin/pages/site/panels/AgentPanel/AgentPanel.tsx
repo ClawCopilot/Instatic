@@ -36,6 +36,8 @@ import { FilePlusSolidIcon } from 'pixel-art-icons/icons/file-plus-solid'
 import { ColorsSwatchSolidIcon } from 'pixel-art-icons/icons/colors-swatch-solid'
 import { ContainerSolidIcon } from 'pixel-art-icons/icons/container-solid'
 import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
+import { UndoIcon } from 'pixel-art-icons/icons/undo'
+import { RedoIcon } from 'pixel-art-icons/icons/redo'
 import { PanelHeader } from '@admin/shared/PanelHeader'
 import { UserAvatar } from '@admin/shared/UserAvatar'
 import { Button } from '@ui/components/Button'
@@ -51,7 +53,9 @@ import { MessageActions } from './MessageActions'
 import { QuickActions } from './QuickActions'
 import { ScreenshotLightbox } from './ScreenshotLightbox'
 import { formatRelativeTime } from './relativeTime'
-import { AgentSettingsButton } from './AgentSettings'
+import { AgentSettingsButton, useAgentSettings } from './AgentSettings'
+import { ToolConfirmDialog } from './ToolConfirmDialog'
+import AutocompleteSuggestions from './AutocompleteSuggestions'
 import styles from './AgentPanel.module.css'
 
 const PANEL_WIDTH = 320
@@ -79,9 +83,16 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
   const sendAgentMessage = useAgentStore((s) => s.sendAgentMessage)
   const abortAgent = useAgentStore((s) => s.abortAgent)
   const startNewAgentConversation = useAgentStore((s) => s.startNewAgentConversation)
+  const forkAgentConversation = useAgentStore((s) => s.forkAgentConversation)
   const loadScopeDefault = useAgentStore((s) => s.loadScopeDefault)
   const activeCredentialId = useAgentStore((s) => s.agentActiveCredentialId)
   const activeModelId = useAgentStore((s) => s.agentActiveModelId)
+  const undo = useAgentStore((s) => s.agentUndo)
+  const redo = useAgentStore((s) => s.agentRedo)
+  const canUndo = useAgentStore((s) => s.agentCanUndo())
+  const canRedo = useAgentStore((s) => s.agentCanRedo())
+  const setOnToolConfirm = useAgentStore((s) => s.setOnToolConfirm)
+  const { settings } = useAgentSettings()
   const credentialsResource = useAsyncResource(
     (signal) => listCredentials(signal),
     [],
@@ -143,6 +154,24 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
     setLightboxSrc(null)
   }, [])
 
+  // ── Autocomplete state ────────────────────────────────────────────────────
+  const [inputValue, setInputValue] = useState('')
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+
+  const handleAutocompleteSelect = useCallback((value: string) => {
+    const input = inputRef.current
+    if (!input) return
+    const newValue = inputValue.trim() + ' ' + value
+    input.value = newValue
+    setInputValue(newValue)
+    input.focus()
+    setShowAutocomplete(false)
+  }, [inputValue])
+
+  const handleAutocompleteClose = useCallback(() => {
+    setShowAutocomplete(false)
+  }, [])
+
   // ── Resizable panel dimensions ──────────────────────────────────────────────
   const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({
     width: PANEL_WIDTH,
@@ -197,6 +226,34 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
     }),
   )
 
+  // ── Dangerous tool confirmation dialog ─────────────────────────────────────
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    toolName: string
+    toolInput: unknown
+    resolve: ((confirmed: boolean) => void) | null
+  }>({ open: false, toolName: '', toolInput: null, resolve: null })
+
+  useEffect(() => {
+    setOnToolConfirm(async (toolName, toolInput) => {
+      if (!settings.confirmDangerousOps) return true
+      return new Promise<boolean>((resolve) => {
+        setConfirmDialog({ open: true, toolName, toolInput, resolve })
+      })
+    })
+    return () => setOnToolConfirm(null)
+  }, [setOnToolConfirm, settings.confirmDangerousOps])
+
+  const handleConfirm = useCallback(() => {
+    confirmDialog.resolve?.(true)
+    setConfirmDialog((prev) => ({ ...prev, open: false, resolve: null }))
+  }, [confirmDialog.resolve])
+
+  const handleReject = useCallback(() => {
+    confirmDialog.resolve?.(false)
+    setConfirmDialog((prev) => ({ ...prev, open: false, resolve: null }))
+  }, [confirmDialog.resolve])
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     const el = threadRef.current
@@ -247,6 +304,8 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
     if (!content || isStreaming) return
     input.value = ''
     input.style.height = 'auto'
+    setInputValue('')
+    setShowAutocomplete(false)
     await sendAgentMessage(content)
   }
 
@@ -261,6 +320,7 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
     const input = inputRef.current
     if (!input) return
     input.value = prompt
+    setInputValue(prompt)
     input.focus()
     input.style.height = 'auto'
     input.style.height = `${Math.min(input.scrollHeight, 120)}px`
@@ -322,6 +382,31 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
         >
           <EditSolidIcon size={14} />
         </Button>
+        {/* Undo / Redo — wired to the host store's Mutative history. */}
+        <div className={styles.headerActions}>
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
+            onClick={undo}
+            disabled={!canUndo}
+            tooltip="Undo"
+            aria-label="Undo"
+          >
+            <UndoIcon size={14} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
+            onClick={redo}
+            disabled={!canRedo}
+            tooltip="Redo"
+            aria-label="Redo"
+          >
+            <RedoIcon size={14} />
+          </Button>
+        </div>
         {isStreaming && (
           <span className={styles.streamingBadge}>
             <span className={styles.streamingDot} aria-hidden="true" />
@@ -379,6 +464,7 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
                       isStreaming={isStreaming}
                       onScreenshotClick={handleScreenshotClick}
                       onRetry={handleRetry}
+                      onFork={(position) => void forkAgentConversation(position)}
                     />
                   ))}
                 </>
@@ -405,24 +491,41 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
           {/* Textarea is hidden while streaming — the controls row collapses
               to just the model picker + Stop button. */}
           {!isStreaming && (
-            <Textarea
-              ref={inputRef}
-              placeholder={lockReason === 'setup'
-                ? 'Add AI credentials to start chatting'
-                : lockReason === 'chooseModel'
-                  ? 'Choose a model below to start'
-                  : 'Tell me what to build… (Enter to send)'}
-              aria-label="Message to AI assistant"
-              rows={2}
-              resize="none"
-              disabled={composerLocked}
-              onKeyDown={handleKeyDown}
-              onChange={(e) => {
-                // Auto-grow textarea
-                e.target.style.height = 'auto'
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
-              }}
-            />
+            <div className={styles.inputWrap}>
+              <AutocompleteSuggestions
+                text={inputValue}
+                visible={showAutocomplete}
+                onSelect={handleAutocompleteSelect}
+                onClose={handleAutocompleteClose}
+              />
+              <Textarea
+                ref={inputRef}
+                placeholder={lockReason === 'setup'
+                  ? 'Add AI credentials to start chatting'
+                  : lockReason === 'chooseModel'
+                    ? 'Choose a model below to start'
+                    : 'Tell me what to build… (Enter to send)'}
+                aria-label="Message to AI assistant"
+                rows={2}
+                resize="none"
+                disabled={composerLocked}
+                onKeyDown={handleKeyDown}
+                onChange={(e) => {
+                  // Auto-grow textarea
+                  e.target.style.height = 'auto'
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+                  setInputValue(e.target.value)
+                  setShowAutocomplete(true)
+                }}
+                onBlur={() => {
+                  // Delay hiding so click events on suggestions fire first
+                  setTimeout(() => setShowAutocomplete(false), 150)
+                }}
+                onFocus={() => {
+                  if (inputValue.length >= 2) setShowAutocomplete(true)
+                }}
+              />
+            </div>
           )}
           {/* Quick action pills — shown when the conversation is empty. */}
           {!isStreaming && messages.length === 0 && (
@@ -484,6 +587,13 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
       />
     )}
     <ScreenshotLightbox src={lightboxSrc} onClose={closeLightbox} />
+    <ToolConfirmDialog
+      open={confirmDialog.open}
+      toolName={confirmDialog.toolName}
+      toolInput={confirmDialog.toolInput}
+      onConfirm={handleConfirm}
+      onReject={handleReject}
+    />
     </aside>
   )
 }
@@ -505,6 +615,7 @@ function MessageBubble({
   isStreaming,
   onScreenshotClick,
   onRetry,
+  onFork,
 }: {
   group: ConversationGroup
   allGroups: ConversationGroup[]
@@ -512,6 +623,7 @@ function MessageBubble({
   isStreaming: boolean
   onScreenshotClick: (dataUrl: string) => void
   onRetry: (prompt: string) => void
+  onFork?: (position: number) => void
 }) {
   const isUser = group.role === 'user'
   const isAssistant = group.role === 'assistant'
@@ -538,6 +650,14 @@ function MessageBubble({
   const hasContent = group.messages.some((m) =>
     m.blocks.some((b) => b.kind === 'text' && b.text.trim().length > 0),
   )
+
+  // Highest valid server position inside this group — used as the fork point.
+  const forkPosition = isAssistant
+    ? group.messages.reduce<number | undefined>((max, m) => {
+        if (m.position >= 0) return max === undefined ? m.position : Math.max(max, m.position)
+        return max
+      }, undefined)
+    : undefined
 
   return (
     <div className={styles.messageTurn}>
@@ -580,6 +700,7 @@ function MessageBubble({
           userPrompt={userPrompt}
           onRetry={() => onRetry(userPrompt ?? '')}
           onCopyPrompt={(text) => void navigator.clipboard.writeText(text)}
+          onFork={forkPosition !== undefined ? () => onFork?.(forkPosition) : undefined}
           isStreaming={isStreaming}
         />
       )}

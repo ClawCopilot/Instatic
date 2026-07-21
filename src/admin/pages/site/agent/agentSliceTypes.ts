@@ -22,10 +22,23 @@ export interface AgentSliceConfig {
    */
   dispatchTool(toolName: string, input: unknown): Promise<AiToolOutput>
   /**
+   * Optional callback invoked before a dangerous tool executes. Return false
+   * to reject the tool. When omitted, all tools run unchecked.
+   */
+  onToolConfirm?(toolName: string, input: unknown): Promise<boolean>
+  /**
    * Optional copy override for the "no AI provider configured" error so
    * each scope can point the user at the right /admin/ai page.
    */
   readonly noProviderMessage?: string
+  /**
+   * Optional undo/redo callbacks wired to the host store's history.
+   * When absent the panel hides the undo/redo buttons.
+   */
+  undo?(): void
+  redo?(): void
+  canUndo?(): boolean
+  canRedo?(): boolean
 }
 
 export interface AgentSlice {
@@ -49,8 +62,15 @@ export interface AgentSlice {
   loadAgentConversation(id: string): Promise<void>
   startNewAgentConversation(): void
   deleteAgentConversation(id: string): Promise<void>
+  forkAgentConversation(forkAtPosition: number, title?: string): Promise<void>
   setAgentProvider(credentialId: string, modelId: string): Promise<void>
   loadScopeDefault(): Promise<void>
+  setOnToolConfirm(handler: ((toolName: string, input: unknown) => Promise<boolean>) | null): void
+  /** Host-store undo/redo proxies (optional — wired via AgentSliceConfig). */
+  agentUndo(): void
+  agentRedo(): void
+  agentCanUndo(): boolean
+  agentCanRedo(): boolean
 }
 
 export type EditorStoreSet = Parameters<EditorStoreSliceCreator<AgentSlice>>[0]
