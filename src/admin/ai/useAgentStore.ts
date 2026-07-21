@@ -5,7 +5,7 @@
  * the .tsx file holds (the context provider is the only export there).
  */
 import { createContext, useContext } from 'react'
-import { useStore as useZustandStore } from 'zustand'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { AgentSlice } from '@site/agent'
 
 /**
@@ -44,7 +44,10 @@ export const AgentStoreContext = createContext<AgentStoreApi | null>(null)
  * AgentStoreProvider — the panel components rely on a host being
  * mounted; an unprovided render is a wiring bug, not a missing-data case.
  */
-export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
+export function useAgentStore<U>(
+  selector: (slice: AgentSlice) => U,
+  equalityFn?: (a: U, b: U) => boolean,
+): U {
   const api = useContext(AgentStoreContext)
   if (!api) {
     throw new Error(
@@ -52,5 +55,5 @@ export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
       'Wrap the AgentPanel mount in <AgentStoreProvider store={...}>.',
     )
   }
-  return useZustandStore(api, selector)
+  return useStoreWithEqualityFn(api, selector, equalityFn)
 }

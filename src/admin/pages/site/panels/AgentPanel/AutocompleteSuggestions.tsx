@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { shallow } from 'zustand/shallow'
 import { useAgentStore } from '@admin/ai/useAgentStore'
 import styles from './AgentPanel.module.css'
 
@@ -30,57 +31,78 @@ interface AutocompleteProps {
 
 /** Safely read site-specific color tokens from the host store (site editor only). */
 function useColorSuggestions(): Suggestion[] {
-  return useAgentStore((s) => {
-    const store = s as unknown as {
-      site?: {
-        settings?: {
-          framework?: {
-            colors?: { tokens?: Array<{ slug: string; lightValue: string }> }
+  const tokens = useAgentStore(
+    (s) => {
+      const store = s as unknown as {
+        site?: {
+          settings?: {
+            framework?: {
+              colors?: { tokens?: Array<{ slug: string; lightValue: string }> }
+            }
           }
         }
       }
-    }
-    const tokens = store.site?.settings?.framework?.colors?.tokens ?? []
-    return tokens.map((t) => ({
-      label: `Color ${t.slug} — ${t.lightValue}`,
-      value: `var(--${t.slug})`,
-      type: 'color' as const,
-    }))
-  })
+      return store.site?.settings?.framework?.colors?.tokens ?? []
+    },
+    shallow,
+  )
+  return useMemo(
+    () =>
+      tokens.map((t) => ({
+        label: `Color ${t.slug} — ${t.lightValue}`,
+        value: `var(--${t.slug})`,
+        type: 'color' as const,
+      })),
+    [tokens],
+  )
 }
 
 /** Safely read site-specific font tokens from the host store (site editor only). */
 function useFontSuggestions(): Suggestion[] {
-  return useAgentStore((s) => {
-    const store = s as unknown as {
-      site?: {
-        settings?: {
-          fonts?: { families?: Array<{ cssVar: string; family?: string }> }
+  const families = useAgentStore(
+    (s) => {
+      const store = s as unknown as {
+        site?: {
+          settings?: {
+            fonts?: { families?: Array<{ cssVar: string; family?: string }> }
+          }
         }
       }
-    }
-    const families = store.site?.settings?.fonts?.families ?? []
-    return families.map((f) => ({
-      label: `Font ${f.cssVar} — ${f.family ?? 'custom'}`,
-      value: `var(${f.cssVar})`,
-      type: 'font' as const,
-    }))
-  })
+      return store.site?.settings?.fonts?.families ?? []
+    },
+    shallow,
+  )
+  return useMemo(
+    () =>
+      families.map((f) => ({
+        label: `Font ${f.cssVar} — ${f.family ?? 'custom'}`,
+        value: `var(${f.cssVar})`,
+        type: 'font' as const,
+      })),
+    [families],
+  )
 }
 
 /** Safely read page names from the host store (site editor only). */
 function usePageSuggestions(): Suggestion[] {
-  return useAgentStore((s) => {
-    const store = s as unknown as {
-      site?: { pages?: Array<{ id: string; slug?: string; title?: string }> }
-    }
-    const pages = store.site?.pages ?? []
-    return pages.map((p) => ({
-      label: `Page: ${p.title ?? p.slug ?? p.id}`,
-      value: p.id,
-      type: 'page' as const,
-    }))
-  })
+  const pages = useAgentStore(
+    (s) => {
+      const store = s as unknown as {
+        site?: { pages?: Array<{ id: string; slug?: string; title?: string }> }
+      }
+      return store.site?.pages ?? []
+    },
+    shallow,
+  )
+  return useMemo(
+    () =>
+      pages.map((p) => ({
+        label: `Page: ${p.title ?? p.slug ?? p.id}`,
+        value: p.id,
+        type: 'page' as const,
+      })),
+    [pages],
+  )
 }
 
 const AutocompleteSuggestions = memo(function AutocompleteSuggestions({
