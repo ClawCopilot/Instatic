@@ -21,19 +21,21 @@
  * @see Guideline #410 — 3 Self-Contained Independent Panels
  */
 
-import { useRef, useEffect, memo } from 'react'
+import { useState, useRef, useEffect, memo, useCallback } from 'react'
 import { useAgentStore } from '@admin/ai/useAgentStore'
 import { useAsyncResource } from '@admin/lib/useAsyncResource'
-import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
 import { listCredentials, listModels } from '@admin/ai/api'
-import { renderMarkdownToHtml, type AgentMessage, type AgentToolCall } from '@site/agent'
+import { renderMarkdownToHtml, type AgentMessage, type AgentToolCall, type AgentToolScope } from '@site/agent'
 import { SquareSolidIcon } from 'pixel-art-icons/icons/square-solid'
 import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
 import { AiBoxSolidIcon } from 'pixel-art-icons/icons/ai-box-solid'
 import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
-import { ArrowRightIcon } from 'pixel-art-icons/icons/arrow-right'
+import { FilePlusSolidIcon } from 'pixel-art-icons/icons/file-plus-solid'
+import { ColorsSwatchSolidIcon } from 'pixel-art-icons/icons/colors-swatch-solid'
+import { ContainerSolidIcon } from 'pixel-art-icons/icons/container-solid'
+import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
 import { PanelHeader } from '@admin/shared/PanelHeader'
 import { UserAvatar } from '@admin/shared/UserAvatar'
 import { Button } from '@ui/components/Button'
@@ -45,12 +47,16 @@ import { ModelPicker } from './ModelPicker'
 import { ConversationHistory } from './ConversationHistory'
 import { ContextMeter } from './ContextMeter'
 import { ToolCallRow } from './ToolCallRow'
+import { MessageActions } from './MessageActions'
+import { QuickActions } from './QuickActions'
+import { ScreenshotLightbox } from './ScreenshotLightbox'
 import { formatRelativeTime } from './relativeTime'
+import { AgentSettingsButton } from './AgentSettings'
 import styles from './AgentPanel.module.css'
 
 const PANEL_WIDTH = 320
 const PANEL_HEIGHT = 480
-const AI_SETTINGS_ROUTE = '/admin/ai'
+const COLLAPSE_THRESHOLD = 20
 type PanelVariant = 'floating' | 'docked'
 
 // ---------------------------------------------------------------------------
@@ -64,7 +70,7 @@ type PanelVariant = 'floating' | 'docked'
  * (`.floatPanelClosed`) to preserve Zustand conversation state across open/close cycles.
  * Agent routes via Vite proxy `/admin/api/agent` → local Bun server → Claude SDK.
  */
-export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant }) {
+export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?: PanelVariant; scope?: AgentToolScope }) {
   const isOpen = useAgentStore((s) => s.isAgentOpen)
   const isStreaming = useAgentStore((s) => s.isAgentStreaming)
   const messages = useAgentStore((s) => s.agentMessages)
@@ -124,6 +130,60 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const threadRef = useRef<HTMLDivElement>(null)
+
+  // ── Long conversation collapse ──────────────────────────────────────────────
+  const [collapsed, setCollapsed] = useState(true)
+
+  // ── Screenshot lightbox ─────────────────────────────────────────────────────
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const handleScreenshotClick = useCallback((dataUrl: string) => {
+    setLightboxSrc(dataUrl)
+  }, [])
+  const closeLightbox = useCallback(() => {
+    setLightboxSrc(null)
+  }, [])
+
+  // ── Resizable panel dimensions ──────────────────────────────────────────────
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({
+    width: PANEL_WIDTH,
+    height: PANEL_HEIGHT,
+  })
+  const resizeStartRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+  const MIN_WIDTH = 280
+  const MIN_HEIGHT = 360
+  const MAX_WIDTH = 560
+  const MAX_HEIGHT = 720
+
+  function handleResizeStart(e: React.MouseEvent) {
+    e.preventDefault()
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: panelSize.width,
+      h: panelSize.height,
+    }
+    document.addEventListener('mousemove', handleResizeMove)
+    document.addEventListener('mouseup', handleResizeEnd)
+  }
+
+  function handleResizeMove(e: MouseEvent) {
+    const start = resizeStartRef.current
+    if (!start) return
+    const newW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, start.w + (e.clientX - start.x)))
+    const newH = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, start.h + (e.clientY - start.y)))
+    const panel = panelRef.current
+    if (panel) {
+      panel.style.width = `${newW}px`
+      panel.style.height = `${newH}px`
+    }
+    setPanelSize({ width: newW, height: newH })
+  }
+
+  function handleResizeEnd() {
+    resizeStartRef.current = null
+    document.removeEventListener('mousemove', handleResizeMove)
+    document.removeEventListener('mouseup', handleResizeEnd)
+  }
 
   // ── Draggable panel position ───────────────────────────────────────────────
   // Default to bottom-right corner.
@@ -197,6 +257,24 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
     }
   }
 
+  const handleQuickActionSelect = (prompt: string) => {
+    const input = inputRef.current
+    if (!input) return
+    input.value = prompt
+    input.focus()
+    input.style.height = 'auto'
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`
+  }
+
+  const handleCategorySelect = (prompt: string) => {
+    handleQuickActionSelect(prompt)
+  }
+
+  const handleRetry = useCallback(async (prompt: string) => {
+    if (!prompt.trim() || isStreaming) return
+    await sendAgentMessage(prompt)
+  }, [isStreaming, sendAgentMessage])
+
   // Always-mounted: CSS display:none when closed (via .floatPanelClosed) preserves
   // Zustand state across open/close cycles without conditional rendering.
   return (
@@ -208,7 +286,11 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
       tabIndex={-1}
       onClick={(e) => e.stopPropagation()}
       // Panel position is drag-driven — CSS var injection from useDraggablePanel
-      style={variant === 'floating' ? panelPositionStyle : undefined}
+      style={
+        variant === 'floating'
+          ? { ...panelPositionStyle, width: `${panelSize.width}px`, height: `${panelSize.height}px` }
+          : undefined
+      }
       className={cn(
         styles.floatPanel,
         variant === 'docked' && styles.floatPanelDocked,
@@ -266,13 +348,42 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         className={styles.thread}
       >
         {messages.length === 0 ? (
-          <AgentEmptyState mode={lockReason ?? 'prompt'} />
+          <AgentEmptyState mode={lockReason ?? 'prompt'} onPromptSelect={handleCategorySelect} />
         ) : (
           <>
             {lockReason && <AgentCredentialAlert mode={lockReason} />}
-            {groupConsecutiveMessages(messages).map((group) => (
-              <MessageBubble key={group.id} group={group} />
-            ))}
+            {(() => {
+              const allGroups = groupConsecutiveMessages(messages)
+              const shouldCollapse = allGroups.length > COLLAPSE_THRESHOLD
+              const collapseCount = shouldCollapse ? allGroups.length - COLLAPSE_THRESHOLD : 0
+              const displayGroups = shouldCollapse && collapsed ? allGroups.slice(collapseCount) : allGroups
+              return (
+                <>
+                  {shouldCollapse && (
+                    <button
+                      className={styles.collapseToggle}
+                      onClick={() => setCollapsed(!collapsed)}
+                      aria-expanded={!collapsed}
+                    >
+                      {collapsed
+                        ? `${collapseCount} earlier messages — click to expand`
+                        : 'Collapse earlier messages'}
+                    </button>
+                  )}
+                  {displayGroups.map((group, groupIndex) => (
+                    <MessageBubble
+                      key={group.id}
+                      group={group}
+                      allGroups={allGroups}
+                      groupIndex={groupIndex}
+                      isStreaming={isStreaming}
+                      onScreenshotClick={handleScreenshotClick}
+                      onRetry={handleRetry}
+                    />
+                  ))}
+                </>
+              )
+            })()}
           </>
         )}
 
@@ -311,6 +422,14 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
                 e.target.style.height = 'auto'
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
               }}
+            />
+          )}
+          {/* Quick action pills — shown when the conversation is empty. */}
+          {!isStreaming && messages.length === 0 && (
+            <QuickActions
+              scope={scope}
+              visible={messages.length === 0}
+              onSelect={handleQuickActionSelect}
             />
           )}
           {/* Controls row: model picker on the left (saves vertical space),
@@ -355,6 +474,16 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         </form>
       </div>
     </div>
+    {variant === 'floating' && (
+      <div
+        className={styles.resizeHandle}
+        onMouseDown={handleResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panel"
+      />
+    )}
+    <ScreenshotLightbox src={lightboxSrc} onClose={closeLightbox} />
     </aside>
   )
 }
@@ -369,11 +498,46 @@ interface ConversationGroup {
   messages: AgentMessage[]
 }
 
-function MessageBubble({ group }: { group: ConversationGroup }) {
+function MessageBubble({
+  group,
+  allGroups,
+  groupIndex,
+  isStreaming,
+  onScreenshotClick,
+  onRetry,
+}: {
+  group: ConversationGroup
+  allGroups: ConversationGroup[]
+  groupIndex: number
+  isStreaming: boolean
+  onScreenshotClick: (dataUrl: string) => void
+  onRetry: (prompt: string) => void
+}) {
   const isUser = group.role === 'user'
+  const isAssistant = group.role === 'assistant'
   const user = useAuthenticatedAdminUser()
   const startedAt = group.messages[0]?.timestamp
   const relativeTime = startedAt ? formatRelativeTime(startedAt) : ''
+
+  // Look back in the groups array to find the preceding user message text.
+  const userPrompt = isAssistant
+    ? (() => {
+        for (let i = groupIndex - 1; i >= 0; i--) {
+          if (allGroups[i].role === 'user') {
+            return allGroups[i].messages
+              .flatMap((m) => m.blocks)
+              .filter((b): b is { kind: 'text'; text: string } => b.kind === 'text')
+              .map((b) => b.text)
+              .join('\n')
+          }
+        }
+        return undefined
+      })()
+    : undefined
+
+  const hasContent = group.messages.some((m) =>
+    m.blocks.some((b) => b.kind === 'text' && b.text.trim().length > 0),
+  )
 
   return (
     <div className={styles.messageTurn}>
@@ -404,10 +568,20 @@ function MessageBubble({ group }: { group: ConversationGroup }) {
           // stack tightly; text blocks around them stay separate bubbles.
           <div key={item.key} className={styles.toolCallsContainer}>
             {item.toolCalls.map((toolCall) => (
-              <ToolCallRow key={toolCall.id} toolCall={toolCall} />
+              <ToolCallRow key={toolCall.id} toolCall={toolCall} onScreenshotClick={onScreenshotClick} />
             ))}
           </div>
         ),
+      )}
+
+      {/* Action buttons — visible on hover for completed assistant turns */}
+      {isAssistant && hasContent && (
+        <MessageActions
+          userPrompt={userPrompt}
+          onRetry={() => onRetry(userPrompt ?? '')}
+          onCopyPrompt={(text) => void navigator.clipboard.writeText(text)}
+          isStreaming={isStreaming}
+        />
       )}
     </div>
   )
@@ -499,7 +673,14 @@ const MarkdownTextBubble = memo(function MarkdownTextBubble({
 
 type ComposerLockReason = 'setup' | 'chooseModel'
 
-function AgentEmptyState({ mode }: { mode: ComposerLockReason | 'prompt' }) {
+const TASK_CATEGORIES = [
+  { icon: <FilePlusSolidIcon size={22} />, title: 'Build pages', desc: 'Create sections, layouts, and pages', prompt: 'Create a new section or page. I will describe the layout and content I need.' },
+  { icon: <ColorsSwatchSolidIcon size={22} />, title: 'Design & style', desc: 'Colors, typography, spacing, CSS', prompt: 'Update the design and styling. I will describe what visual changes I want.' },
+  { icon: <ContainerSolidIcon size={22} />, title: 'Edit content', desc: 'Modify existing elements and text', prompt: 'Edit existing content on the page. I will describe what to change.' },
+  { icon: <DatabaseSolidIcon size={22} />, title: 'Manage data', desc: 'Tables, rows, imports, exports', prompt: 'Help me manage data. I will describe what tables, rows, or operations I need.' },
+]
+
+function AgentEmptyState({ mode, onPromptSelect }: { mode: ComposerLockReason | 'prompt'; onPromptSelect?: (prompt: string) => void }) {
   if (mode === 'setup') {
     return (
       <EmptyState
@@ -529,13 +710,23 @@ function AgentEmptyState({ mode }: { mode: ComposerLockReason | 'prompt' }) {
   }
 
   return (
-    <EmptyState
-      variant="centered"
-      size="large"
-      icon={<AiBoxSolidIcon size={28} color="var(--text-disabled)" />}
-      title="Describe what you want to build and I'll do it for you."
-      description={'Try: "Add a hero section with a heading and button"'}
-    />
+    <div className={styles.taskCategories}>
+      {TASK_CATEGORIES.map((cat) => (
+        <button
+          key={cat.title}
+          type="button"
+          className={styles.taskCategory}
+          onClick={() => onPromptSelect?.(cat.prompt)}
+          aria-label={cat.title}
+        >
+          <span className={styles.taskCategoryIcon} aria-hidden="true">
+            {cat.icon}
+          </span>
+          <span className={styles.taskCategoryTitle}>{cat.title}</span>
+          <span className={styles.taskCategoryDesc}>{cat.desc}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -552,59 +743,5 @@ function AgentCredentialAlert({ mode }: { mode: ComposerLockReason }) {
         label={mode === 'setup' ? 'Open AI settings' : 'Set a default'}
       />
     </div>
-  )
-}
-
-function AgentSettingsButton({
-  variant,
-  label,
-  'data-testid': testId,
-}: {
-  variant: 'header' | 'emptyState' | 'inline'
-  label: string
-  'data-testid'?: string
-}) {
-  const navigate = useAdminNavigate()
-
-  function openAiSettings() {
-    navigate(AI_SETTINGS_ROUTE)
-  }
-
-  if (variant === 'header') {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        iconOnly
-        onClick={openAiSettings}
-        tooltip={label}
-        aria-label={label}
-        data-testid={testId}
-        className={styles.credentialSettingsButtonHeader}
-      >
-        <AiSettingsSolidIcon size={14} aria-hidden="true" />
-      </Button>
-    )
-  }
-
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      size={variant === 'emptyState' ? 'md' : 'sm'}
-      onClick={openAiSettings}
-      aria-label={label}
-      data-testid={testId}
-      className={cn(
-        styles.credentialSettingsButton,
-        variant === 'emptyState' && styles.credentialSettingsButtonEmptyState,
-        variant === 'inline' && styles.credentialSettingsButtonInline,
-      )}
-    >
-      <AiSettingsSolidIcon size={14} aria-hidden="true" />
-      <span>{label}</span>
-      <ArrowRightIcon size={12} aria-hidden="true" />
-    </Button>
   )
 }

@@ -1,0 +1,24 @@
+/**
+ * ConfirmationOverlay — dangerous operation warning styles.
+ *
+ * Provides CSS classes for the destructive-operation warning banner rendered
+ * below ToolCallRows when a tool name matches destructive patterns
+ * (delete, remove, clear, drop, overwrite, reset, destroy).
+ */
+
+/* ── Dangerous operation warning ───────────────────────────────────────────── */
+.dangerousWarning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-3xs) var(--space-xs);
+  margin-top: var(--space-2xs);
+  background: var(--danger-10);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-3xs);
+  color: var(--danger);
+}
+
+.dangerousWarningIcon {
+  flex-shrink: 0;
+}

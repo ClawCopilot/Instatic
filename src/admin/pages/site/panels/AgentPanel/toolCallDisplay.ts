@@ -28,6 +28,8 @@ export interface ToolCallDisplay {
   detail: string
   icon: ToolCallIcon
   tone: ToolCallTone
+  /** True when the tool name indicates a destructive operation. */
+  dangerous?: boolean
 }
 
 /**
@@ -156,6 +158,20 @@ export function getToolCallDisplay(actionType: string, params: unknown): ToolCal
 
 function display(title: string, detail: string, icon: ToolCallIcon, tone: ToolCallTone): ToolCallDisplay {
   return { title, detail, icon, tone }
+}
+
+// ---------------------------------------------------------------------------
+// Dangerous tool detection
+// ---------------------------------------------------------------------------
+
+const DANGEROUS_TOOL_PATTERNS = /delete|remove|clear|drop|overwrite|reset|destroy/i
+
+/**
+ * Returns true when the raw tool action type name indicates a destructive
+ * operation. Used by ToolCallRow to render a warning banner underneath.
+ */
+export function isDangerousTool(actionType: string): boolean {
+  return DANGEROUS_TOOL_PATTERNS.test(actionType)
 }
 
 export interface ColorSwatch {

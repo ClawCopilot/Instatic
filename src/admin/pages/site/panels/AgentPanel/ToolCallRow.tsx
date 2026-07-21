@@ -3,13 +3,14 @@
  * human title · muted detail, status glyph, plus optional colour-token
  * swatches, a captured preview screenshot, and an inline error message.
  */
-import type { CSSProperties } from 'react'
-import type { AgentToolCall } from '@site/agent'
+import { useState, useCallback, type CSSProperties } from 'react'
+import type { AgentToolCall } from '@admin/pages/site/agent/types'
 import { cn } from '@ui/cn'
 import { Tooltip } from '@ui/components/Tooltip'
 import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { CircleAlertSolidIcon } from 'pixel-art-icons/icons/circle-alert-solid'
+import { WarningDiamondSolidIcon } from 'pixel-art-icons/icons/warning-diamond-solid'
 import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
 import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
 import { FilePlusSolidIcon } from 'pixel-art-icons/icons/file-plus-solid'
@@ -29,16 +30,20 @@ import { ColorsSwatchSolidIcon } from 'pixel-art-icons/icons/colors-swatch-solid
 import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
 import { UsersSolidIcon } from 'pixel-art-icons/icons/users-solid'
 import { ZapSolidIcon } from 'pixel-art-icons/icons/zap-solid'
-import { getToolCallDisplay, extractColorSwatches, type ToolCallIcon, type ToolCallTone } from './toolCallDisplay'
+import { ChevronDownIcon } from 'pixel-art-icons/icons/chevron-down'
+import { getToolCallDisplay, extractColorSwatches, isDangerousTool, type ToolCallIcon, type ToolCallTone } from './toolCallDisplay'
 import styles from './AgentPanel.module.css'
+import confirmationStyles from './ConfirmationOverlay.module.css'
 
-export function ToolCallRow({ toolCall }: { toolCall: AgentToolCall }) {
+export function ToolCallRow({ toolCall, onScreenshotClick }: { toolCall: AgentToolCall; onScreenshotClick?: (dataUrl: string) => void }) {
   const isPending = toolCall.status === 'pending'
   const isSuccess = toolCall.status === 'success'
   const isError = toolCall.status === 'error'
+  const [expanded, setExpanded] = useState(false)
 
   const display = getToolCallDisplay(toolCall.actionType, toolCall.params)
   const swatches = extractColorSwatches(toolCall.actionType, toolCall.params)
+  const dangerous = isDangerousTool(toolCall.actionType)
   const accessibleStatus = isPending ? 'Running' : isSuccess ? 'Completed' : 'Failed'
   const statusLabel = `${accessibleStatus} ${display.title}${display.detail ? ` — ${display.detail}` : ''}`
   const statusClass = isPending
@@ -51,6 +56,32 @@ export function ToolCallRow({ toolCall }: { toolCall: AgentToolCall }) {
   // sees WHY a tool failed without digging through devtools. The toolResult
   // handler in the agent store already populates `result.error`.
   const errorMessage = isError ? toolCall.result?.error ?? 'Tool call failed.' : null
+
+  // Build a summary string from the tool result data for the expansion area.
+  const resultSummary = useCallback((): string | null => {
+    const result = toolCall.result
+    if (!result) return null
+    if (isError) return result.error ?? 'Tool call failed.'
+    if (result.data === undefined || result.data === null) return null
+    if (typeof result.data === 'string') return result.data
+    try {
+      const summary = result.data as Record<string, unknown>
+      if (typeof summary.message === 'string') return summary.message
+      if (typeof summary.summary === 'string') return summary.summary
+      // Truncate JSON to a readable size
+      const json = JSON.stringify(result.data, null, 2)
+      return json.length > 500 ? json.slice(0, 500) + '…' : json
+    } catch {
+      return String(result.data)
+    }
+  }, [toolCall.result, isError])
+
+  const detailText = resultSummary()
+  const hasExpandableDetail = !isPending && detailText !== null
+
+  const handleToggle = useCallback(() => {
+    setExpanded((prev) => !prev)
+  }, [])
 
   return (
     <>
@@ -86,15 +117,41 @@ export function ToolCallRow({ toolCall }: { toolCall: AgentToolCall }) {
       )}
       {toolCall.screenshotDataUrl && (
         <img
-          className={styles.toolCallScreenshot}
+          className={cn(styles.toolCallScreenshot, onScreenshotClick && styles.toolCallScreenshotClickable)}
           src={toolCall.screenshotDataUrl}
           alt={`Preview the agent captured while running ${display.title}`}
+          onClick={onScreenshotClick ? () => onScreenshotClick(toolCall.screenshotDataUrl!) : undefined}
         />
       )}
       {errorMessage && (
         <p role="alert" className={styles.toolCallError}>
           {errorMessage}
         </p>
+      )}
+      {hasExpandableDetail && (
+        <button
+          type="button"
+          className={styles.toolResultToggle}
+          onClick={handleToggle}
+          aria-expanded={expanded}
+        >
+          <ChevronDownIcon
+            size={10}
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' } as CSSProperties}
+          />
+          {expanded ? 'Hide details' : 'Show details'}
+        </button>
+      )}
+      {expanded && hasExpandableDetail && detailText && (
+        <div className={styles.toolResultDetail}>
+          {detailText}
+        </div>
+      )}
+      {dangerous && !isPending && (
+        <div className={confirmationStyles.dangerousWarning} role="alert">
+          <WarningDiamondSolidIcon size={10} className={confirmationStyles.dangerousWarningIcon} aria-hidden="true" />
+          <span>Destructive operation performed</span>
+        </div>
       )}
     </>
   )

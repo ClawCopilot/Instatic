@@ -266,7 +266,7 @@ export function ContentAgentMount({
   // floating chrome.
   return (
     <AgentStoreProvider store={store}>
-      <AgentPanel variant="docked" />
+      <AgentPanel variant="docked" scope="content" />
     </AgentStoreProvider>
   )
 }
