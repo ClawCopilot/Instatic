@@ -9,6 +9,7 @@
  */
 
 import { useState, useRef, useCallback, memo } from 'react'
+import { Button } from '@ui/components/Button'
 import styles from './AgentPanel.module.css'
 
 interface VoiceInputProps {
@@ -69,13 +70,15 @@ const VoiceInput = memo(function VoiceInput({
   if (!VoiceInputSupported || disabled) return null
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="xs"
+      iconOnly
       className={styles.voiceBtn}
       data-active={isListening ? '' : undefined}
       onClick={toggleListening}
       aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-      title={isListening ? 'Stop listening' : 'Voice input'}
     >
       <svg
         width="14"
@@ -87,7 +90,7 @@ const VoiceInput = memo(function VoiceInput({
         <path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 8V4a3 3 0 0 1 6 0v4a3 3 0 0 1-6 0z" />
         <path d="M2 8a6 6 0 0 0 12 0h-1a5 5 0 0 1-10 0H2zm4 6v1a2 2 0 0 0 4 0v-1H6z" />
       </svg>
-    </button>
+    </Button>
   )
 })
 

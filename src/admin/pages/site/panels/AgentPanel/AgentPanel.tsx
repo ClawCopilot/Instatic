@@ -445,7 +445,10 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
               return (
                 <>
                   {shouldCollapse && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
                       className={styles.collapseToggle}
                       onClick={() => setCollapsed(!collapsed)}
                       aria-expanded={!collapsed}
@@ -453,7 +456,7 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
                       {collapsed
                         ? `${collapseCount} earlier messages — click to expand`
                         : 'Collapse earlier messages'}
-                    </button>
+                    </Button>
                   )}
                   {displayGroups.map((group, groupIndex) => (
                     <MessageBubble
@@ -833,9 +836,11 @@ function AgentEmptyState({ mode, onPromptSelect }: { mode: ComposerLockReason | 
   return (
     <div className={styles.taskCategories}>
       {TASK_CATEGORIES.map((cat) => (
-        <button
+        <Button
           key={cat.title}
           type="button"
+          variant="ghost"
+          size="xs"
           className={styles.taskCategory}
           onClick={() => onPromptSelect?.(cat.prompt)}
           aria-label={cat.title}
@@ -845,7 +850,7 @@ function AgentEmptyState({ mode, onPromptSelect }: { mode: ComposerLockReason | 
           </span>
           <span className={styles.taskCategoryTitle}>{cat.title}</span>
           <span className={styles.taskCategoryDesc}>{cat.desc}</span>
-        </button>
+        </Button>
       ))}
     </div>
   )

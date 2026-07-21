@@ -7,6 +7,7 @@ import { useState, useCallback, type CSSProperties } from 'react'
 import type { AgentToolCall } from '@admin/pages/site/agent/types'
 import { cn } from '@ui/cn'
 import { Tooltip } from '@ui/components/Tooltip'
+import { Button } from '@ui/components/Button'
 import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { CircleAlertSolidIcon } from 'pixel-art-icons/icons/circle-alert-solid'
@@ -129,8 +130,10 @@ export function ToolCallRow({ toolCall, onScreenshotClick }: { toolCall: AgentTo
         </p>
       )}
       {hasExpandableDetail && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           className={styles.toolResultToggle}
           onClick={handleToggle}
           aria-expanded={expanded}
@@ -140,7 +143,7 @@ export function ToolCallRow({ toolCall, onScreenshotClick }: { toolCall: AgentTo
             style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' } as CSSProperties}
           />
           {expanded ? 'Hide details' : 'Show details'}
-        </button>
+        </Button>
       )}
       {expanded && hasExpandableDetail && detailText && (
         <div className={styles.toolResultDetail}>

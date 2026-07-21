@@ -10,6 +10,7 @@
 
 import { useRef, memo, useCallback } from 'react'
 import { ImageSolidIcon } from 'pixel-art-icons/icons/image-solid'
+import { Button } from '@ui/components/Button'
 import styles from './AgentPanel.module.css'
 
 interface ImageAttachmentProps {
@@ -60,29 +61,33 @@ const ImageAttachment = memo(function ImageAttachment({
             alt="Attached image"
             className={styles.imageAttachmentImg}
           />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
+            iconOnly
             className={styles.imageAttachmentRemove}
             onClick={onImageRemoved}
             aria-label="Remove attached image"
-            title="Remove"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
-          </button>
+          </Button>
         </div>
       )}
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
+        iconOnly
         className={styles.imageAttachmentBtn}
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled}
         aria-label="Attach image"
-        title="Attach image"
       >
         <ImageSolidIcon size={14} aria-hidden="true" />
-      </button>
+      </Button>
       <input
         ref={fileInputRef}
         type="file"

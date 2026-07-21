@@ -869,36 +869,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
+  background: var(--scrim-80);
+  backdrop-filter: blur(var(--backdrop-blur));
 }
 
 .lightboxImage {
   max-width: 90vw;
   max-height: 90vh;
   border-radius: var(--radius);
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 40px var(--scrim-50);
   object-fit: contain;
 }
 
 .lightboxClose {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: var(--space-l);
+  right: var(--space-l);
   width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--overlay-20);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 20px;
+  background: var(--scrim-50);
+  color: var(--overlay);
+  font-size: var(--text-2xl);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .lightboxClose:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--scrim-80);
 }

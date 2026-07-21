@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef } from 'react'
+import { Button } from '@ui/components/Button'
 import styles from './AgentPanel.module.css'
 
 interface ScreenshotLightboxProps {
@@ -41,13 +42,17 @@ const ScreenshotLightbox = memo(function ScreenshotLightbox({ src, onClose }: Sc
       aria-label="Screenshot preview"
       aria-modal="true"
     >
-      <button
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        iconOnly
         className={styles.lightboxClose}
         onClick={onClose}
         aria-label="Close"
       >
         ×
-      </button>
+      </Button>
       <img
         className={styles.lightboxImage}
         src={src}

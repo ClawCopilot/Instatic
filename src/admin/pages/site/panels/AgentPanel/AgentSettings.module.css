@@ -33,7 +33,7 @@
 .settingsRowDesc {
   font-size: var(--text-3xs);
   color: var(--text-disabled);
-  margin-top: 1px;
+  margin-top: 0;
   line-height: 1.3;
 }
 
