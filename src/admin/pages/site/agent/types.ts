@@ -196,6 +196,8 @@ export interface AgentRequestBody {
    * …); each scope's tool handlers cast at the boundary.
    */
   snapshot: unknown
+  /** IDs of opted-in skills for this turn. */
+  skillIds: string[]
 }
 
 export interface AgentLayoutRect {

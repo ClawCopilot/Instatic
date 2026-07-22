@@ -26,6 +26,7 @@ import {
   updateConversationProvider,
   forkConversation,
 } from '@admin/ai/api'
+import { listCmsPlugins } from '@core/persistence'
 import {
   createConversationForScope,
   fetchScopeDefault,
@@ -245,6 +246,8 @@ export function createAgentSlice(
     agentActiveModelId: null,
     agentConversations: [],
     agentContextTokens: null,
+    agentSkills: [],
+    agentActiveSkillIds: [],
 
     // ── Host-store undo/redo proxies ─────────────────────────────────────────
     agentUndo() {
@@ -486,7 +489,8 @@ export function createAgentSlice(
           return
         }
 
-        const body: AgentRequestBody = { conversationId, prompt: content, snapshot }
+        const activeSkillIds = get().agentActiveSkillIds
+        const body: AgentRequestBody = { conversationId, prompt: content, snapshot, skillIds: activeSkillIds }
         const res = await fetch(`/admin/api/ai/chat/${config.scope}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -548,6 +552,29 @@ export function createAgentSlice(
         _abortController = null
         set({ isAgentStreaming: false })
       }
+    },
+
+    async loadAgentSkills() {
+      try {
+        const payload = await listCmsPlugins()
+        const skills = payload.plugins.filter(
+          (p) => (p.manifest.kind ?? 'plugin') === 'skill' && p.enabled,
+        )
+        set({ agentSkills: skills })
+      } catch (err) {
+        console.error('[AgentSlice] Failed to load skills:', err)
+      }
+    },
+
+    toggleAgentSkill(skillId: string) {
+      set((state) => {
+        const idx = state.agentActiveSkillIds.indexOf(skillId)
+        if (idx === -1) {
+          state.agentActiveSkillIds.push(skillId)
+        } else {
+          state.agentActiveSkillIds.splice(idx, 1)
+        }
+      })
     },
   }
   }

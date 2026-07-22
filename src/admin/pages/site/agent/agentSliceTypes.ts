@@ -1,6 +1,7 @@
 import type { EditorStoreSliceCreator } from '@site/store/types'
 import type { AiToolOutput } from '@core/ai'
 import type { ConversationView } from '@admin/ai/api'
+import type { InstalledPlugin } from '@core/plugin-sdk'
 import type { AgentMessage, AgentToolScope } from './types'
 
 export interface AgentSliceConfig {
@@ -51,6 +52,10 @@ export interface AgentSlice {
   agentActiveModelId: string | null
   agentConversations: ConversationView[]
   agentContextTokens: number | null
+  /** Installed skills (plugins with kind === 'skill'). */
+  agentSkills: InstalledPlugin[]
+  /** IDs of skills the user has opted-in to for the current conversation. */
+  agentActiveSkillIds: string[]
 
   openAgent(): void
   closeAgent(): void
@@ -66,6 +71,10 @@ export interface AgentSlice {
   setAgentProvider(credentialId: string, modelId: string): Promise<void>
   loadScopeDefault(): Promise<void>
   setOnToolConfirm(handler: ((toolName: string, input: unknown) => Promise<boolean>) | null): void
+  /** Load installed skills from the CMS. */
+  loadAgentSkills(): Promise<void>
+  /** Toggle a skill on/off for the current conversation. */
+  toggleAgentSkill(skillId: string): void
   /** Host-store undo/redo proxies (optional — wired via AgentSliceConfig). */
   agentUndo(): void
   agentRedo(): void

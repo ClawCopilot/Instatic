@@ -51,6 +51,7 @@ import { ContextMeter } from './ContextMeter'
 import { ToolCallRow } from './ToolCallRow'
 import { MessageActions } from './MessageActions'
 import { QuickActions } from './QuickActions'
+import { SkillSelector } from './SkillSelector'
 import { ScreenshotLightbox } from './ScreenshotLightbox'
 import { formatRelativeTime } from './relativeTime'
 import { AgentSettingsButton, useAgentSettings } from './AgentSettings'
@@ -92,6 +93,10 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
   const canUndo = useAgentStore((s) => s.agentCanUndo())
   const canRedo = useAgentStore((s) => s.agentCanRedo())
   const setOnToolConfirm = useAgentStore((s) => s.setOnToolConfirm)
+  const skills = useAgentStore((s) => s.agentSkills)
+  const activeSkillIds = useAgentStore((s) => s.agentActiveSkillIds)
+  const loadAgentSkills = useAgentStore((s) => s.loadAgentSkills)
+  const toggleAgentSkill = useAgentStore((s) => s.toggleAgentSkill)
   const { settings } = useAgentSettings()
   const credentialsResource = useAsyncResource(
     (signal) => listCredentials(signal),
@@ -283,6 +288,11 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
   useEffect(() => {
     if (isOpen) void loadScopeDefault()
   }, [isOpen, loadScopeDefault])
+
+  // Load installed skills when the panel opens.
+  useEffect(() => {
+    if (isOpen) void loadAgentSkills()
+  }, [isOpen, loadAgentSkills])
 
   // Escape key — close the AI panel
   useEffect(() => {
@@ -530,13 +540,20 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
               />
             </div>
           )}
-          {/* Quick action pills — shown when the conversation is empty. */}
+          {/* Quick actions + Skill selector row — shown when the conversation is empty. */}
           {!isStreaming && messages.length === 0 && (
-            <QuickActions
-              scope={scope}
-              visible={messages.length === 0}
-              onSelect={handleQuickActionSelect}
-            />
+            <div className={styles.inputBarRow}>
+              <QuickActions
+                scope={scope}
+                visible={messages.length === 0}
+                onSelect={handleQuickActionSelect}
+              />
+              <SkillSelector
+                skills={skills}
+                activeIds={activeSkillIds}
+                onToggle={toggleAgentSkill}
+              />
+            </div>
           )}
           {/* Controls row: model picker on the left (saves vertical space),
               minimal icon-only send/stop button on the right. */}
