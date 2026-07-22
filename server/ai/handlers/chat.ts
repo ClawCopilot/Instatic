@@ -50,7 +50,7 @@ import {
   type ContentSnapshot,
 } from '../tools/content'
 import { buildDataSystemPrompt } from '../tools/data'
-import { buildPluginSystemPrompt } from '../tools/plugin'
+import { buildPluginSystemPrompt, getPluginToolsForSkillIds, buildPluginSystemPromptForSkillIds } from '../tools/plugin'
 import {
   createBridge,
   createConversationsPersister,
@@ -71,6 +71,8 @@ const ChatRequestBodySchema = Type.Object({
   // their handlers. The handler narrows below based on the conversation's
   // scope before passing to the system-prompt builder.
   snapshot: Type.Optional(Type.Unknown()),
+  // skillIds: user-selected skills to inject into this conversation round
+  skillIds: Type.Optional(Type.Array(Type.String())),
 })
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
@@ -111,7 +113,7 @@ async function handleAiChat(
 
   const chatBody = await readValidatedBody(req, ChatRequestBodySchema)
   if (!chatBody) return badRequest('Invalid request body.')
-  const { conversationId, prompt, snapshot } = chatBody
+  const { conversationId, prompt, snapshot, skillIds } = chatBody
 
   const conversation = await readConversationForUser(db, user.id, conversationId)
   if (!conversation) {
@@ -149,7 +151,12 @@ async function handleAiChat(
   // Capability-filtered toolset. Callers without `ai.tools.write` only see
   // read tools registered with the driver — the model has no way to
   // emit a write call. See B6 in the capabilities review.
-  const tools = selectToolsForScope(scope, user.capabilities)
+  const baseTools = selectToolsForScope(scope, user.capabilities)
+  // Inject selected skill tools into the current scope's toolset
+  const selectedSkillTools = skillIds && skillIds.length > 0
+    ? getPluginToolsForSkillIds(skillIds)
+    : []
+  const tools = [...baseTools, ...selectedSkillTools]
 
   // Append the user's message BEFORE streaming so it's persisted even if
   // the stream aborts mid-response.
@@ -172,7 +179,7 @@ async function handleAiChat(
   const existingMessages = await listMessagesForConversation(db, conversation.id)
   const messages = buildMessageHistory(existingMessages)
 
-  const systemPrompt = buildSystemPromptForScope(scope, snapshot)
+  const systemPrompt = buildSystemPromptForScope(scope, snapshot, skillIds)
 
   // Capture totals reported by the persister so the audit row can hold
   // them when the stream completes (we read them off the conversation row
@@ -335,36 +342,44 @@ async function handleAiChat(
 export function buildSystemPromptForScope(
   scope: ToolScope,
   snapshot: unknown,
+  skillIds?: string[],
 ): string[] {
+  let basePrompts: string[]
+
   if (scope === 'site') {
     if (snapshot === undefined || snapshot === null) {
-      return buildSiteSystemPrompt(emptySiteAgentSnapshot())
+      basePrompts = buildSiteSystemPrompt(emptySiteAgentSnapshot())
+    } else {
+      const result = safeParseValue(SiteAgentSnapshotSchema, snapshot)
+      if (!result.ok) {
+        console.error('[ai/chat] invalid site snapshot, using empty fallback:', result.errors)
+        basePrompts = buildSiteSystemPrompt(emptySiteAgentSnapshot())
+      } else {
+        basePrompts = buildSiteSystemPrompt(result.value)
+      }
     }
-    // The snapshot comes straight off the untyped HTTP body — validate it
-    // before handing it to the prompt builder, and fall back to an empty
-    // snapshot (rather than crashing the stream) when it's malformed.
-    const result = safeParseValue(SiteAgentSnapshotSchema, snapshot)
-    if (!result.ok) {
-      console.error('[ai/chat] invalid site snapshot, using empty fallback:', result.errors)
-      return buildSiteSystemPrompt(emptySiteAgentSnapshot())
+  } else if (scope === 'content') {
+    basePrompts = buildContentSystemPrompt((snapshot ?? emptyContentSnapshot()) as ContentSnapshot)
+  } else if (scope === 'data') {
+    basePrompts = buildDataSystemPrompt()
+  } else if (scope === 'plugin') {
+    basePrompts = buildPluginSystemPrompt()
+  } else {
+    basePrompts = [
+      `You are an AI assistant embedded in the "${scope}" workspace of a CMS. ` +
+      `No scope-specific tools are wired up yet — respond conversationally only.`,
+    ]
+  }
+
+  // Inject selected skill system prompts into every scope
+  if (skillIds && skillIds.length > 0) {
+    const skillPrompts = buildPluginSystemPromptForSkillIds(skillIds)
+    if (skillPrompts.length > 0) {
+      basePrompts = [...basePrompts, ...skillPrompts]
     }
-    return buildSiteSystemPrompt(result.value)
   }
-  if (scope === 'content') {
-    return buildContentSystemPrompt((snapshot ?? emptyContentSnapshot()) as ContentSnapshot)
-  }
-  if (scope === 'data') {
-    return buildDataSystemPrompt()
-  }
-  if (scope === 'plugin') {
-    // 从缓存读取所有 active skill 的 systemPrompt 片段
-    return buildPluginSystemPrompt()
-  }
-  // 不应到达此处，但保留兜底逻辑防止遗漏
-  return [
-    `You are an AI assistant embedded in the "${scope}" workspace of a CMS. ` +
-    `No scope-specific tools are wired up yet — respond conversationally only.`,
-  ]
+
+  return basePrompts
 }
 
 function emptySiteAgentSnapshot(): SiteAgentSnapshot {

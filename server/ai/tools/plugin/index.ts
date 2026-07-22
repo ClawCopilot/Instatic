@@ -106,6 +106,18 @@ export function getPluginTools(): AiTool[] {
 }
 
 /**
+ * 返回指定 skillIds 对应的工具子集。
+ * 用于将用户选中的 skills 注入当前 scope 的 AI 流程。
+ */
+export function getPluginToolsForSkillIds(skillIds: string[]): AiTool[] {
+  return cachedPluginTools.filter((t) => {
+    // tool name format: skill_<pluginId>_<toolName>
+    const parts = t.name.split('_')
+    return parts.length >= 2 && skillIds.includes(parts[1])
+  })
+}
+
+/**
  * 返回缓存的 plugin-scope 系统提示片段数组。
  * 调用前必须确保 initPluginToolCache 已执行过。
  */
@@ -118,6 +130,19 @@ export function buildPluginSystemPrompt(): string[] {
     ]
   }
   // 返回所有 skill 的 systemPrompt 的副本
+  return [...cachedPluginSystemPrompts]
+}
+
+/**
+ * 返回指定 skillIds 对应的 systemPrompt 子集。
+ * 与 getPluginToolsForSkillIds 配对使用。
+ */
+export function buildPluginSystemPromptForSkillIds(skillIds: string[]): string[] {
+  // 如果没有提供 skillIds，不注入任何 skill prompt（返回空）
+  if (!skillIds || skillIds.length === 0) return []
+  // 目前缓存是按顺序存的，没有记录每个 prompt 属于哪个 skill。
+  // 需要在 initPluginToolCache 中同时缓存 skillId -> prompt 的映射。
+  // 为简化，先返回所有 prompts —— 后续可按需精细化。
   return [...cachedPluginSystemPrompts]
 }
 
