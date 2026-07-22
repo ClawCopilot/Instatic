@@ -9,6 +9,7 @@ import { startConversationPurgeTick } from './ai/boot'
 await import('./richtextSanitizer')
 const { handleServerRequest } = await import('./router')
 const { activateInstalledServerPlugins } = await import('./plugins/runtime')
+const { seedBuiltinPlugins } = await import('./plugins/builtinPlugins')
 const { mediaStorageRegistry } = await import('@core/plugins/mediaStorageRegistry')
 
 const config = readServerConfig()
@@ -25,6 +26,9 @@ await syncSystemRoles(db)
 // plugin adapters register through the same registry but local-disk is
 // always the fallback for unset roles. See `mediaStorageRegistry.ts`.
 mediaStorageRegistry.configureLocalDisk({ uploadsDir: config.uploadsDir })
+// Seed built-in plugins (8 main + 14 skills) into installed_plugins so
+// they ship pre-registered. Idempotent — safe to call on every boot.
+await seedBuiltinPlugins(db)
 await activateInstalledServerPlugins(db, config.uploadsDir)
 // Plugin migrations: run AFTER every plugin's install/migrate hook has
 // registered its migrations through the api-call bridge, but BEFORE

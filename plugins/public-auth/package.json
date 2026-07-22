@@ -32,7 +32,7 @@
     "settings": [
       {
         "id": "jwtSecret",
-        "type": "string",
+        "type": "text",
         "label": "JWT signing secret",
         "description": "HMAC secret for signing access tokens. Rotate to invalidate all sessions.",
         "required": true,
@@ -49,7 +49,7 @@
       },
       {
         "id": "requireEmailVerification",
-        "type": "boolean",
+        "type": "toggle",
         "label": "Require email verification",
         "description": "Block login until the user clicks the verification email.",
         "required": false,

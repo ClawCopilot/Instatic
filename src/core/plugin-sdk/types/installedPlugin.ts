@@ -11,6 +11,8 @@ export interface InstalledPlugin {
   id: string
   name: string
   version: string
+  /** `'builtin'` for plugins that ship with Instatic; `'user'` for manually installed. */
+  source: 'builtin' | 'user'
   enabled: boolean
   lifecycleStatus: PluginLifecycleStatus
   lastError: string | null

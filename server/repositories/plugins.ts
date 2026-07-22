@@ -38,6 +38,7 @@ interface InstalledPluginRow {
   id: string
   name: string
   version: string
+  source?: string | null
   enabled: boolean
   lifecycle_status?: string | null
   last_error?: string | null
@@ -88,6 +89,7 @@ function mapInstalledPlugin(row: InstalledPluginRow): InstalledPluginResult {
         id: row.id,
         name: row.name,
         version: row.version,
+        source: row.source === 'builtin' ? 'builtin' : 'user',
         enabled: Boolean(row.enabled),
         lifecycleStatus,
         lastError: row.last_error ?? null,
@@ -170,7 +172,7 @@ function mapPluginRecord(row: PluginRecordRow): PluginRecord {
 
 export async function listInstalledPlugins(db: DbClient): Promise<InstalledPluginResult[]> {
   const { rows } = await db<InstalledPluginRow>`
-    select id, name, version, enabled, lifecycle_status, last_error,
+    select id, name, version, source, enabled, lifecycle_status, last_error,
            granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
     from installed_plugins
     order by installed_at desc
@@ -180,7 +182,7 @@ export async function listInstalledPlugins(db: DbClient): Promise<InstalledPlugi
 
 export async function getInstalledPlugin(db: DbClient, id: string): Promise<InstalledPluginResult | null> {
   const { rows } = await db<InstalledPluginRow>`
-    select id, name, version, enabled, lifecycle_status, last_error,
+    select id, name, version, source, enabled, lifecycle_status, last_error,
            granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
     from installed_plugins
     where id = ${id}
@@ -215,7 +217,7 @@ export async function installPlugin(
           lifecycle_status = 'installed',
           last_error = null,
           updated_at = current_timestamp
-    returning id, name, version, enabled, lifecycle_status, last_error,
+    returning id, name, version, source, enabled, lifecycle_status, last_error,
               granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
   `
   // Secret settings with a non-empty manifest default get an encrypted row.
@@ -239,7 +241,7 @@ export async function setPluginEnabled(
   const { rows } = await db<InstalledPluginRow>`
     update installed_plugins set enabled = ${enabled}, updated_at = current_timestamp
     where id = ${id}
-    returning id, name, version, enabled, lifecycle_status, last_error,
+    returning id, name, version, source, enabled, lifecycle_status, last_error,
               granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
   `
   return rows[0] ? mapInstalledPlugin(rows[0]) : null
@@ -254,7 +256,7 @@ export async function setPluginLifecycleStatus(
   const { rows } = await db<InstalledPluginRow>`
     update installed_plugins set lifecycle_status = ${lifecycleStatus}, last_error = ${lastError}, updated_at = current_timestamp
     where id = ${id}
-    returning id, name, version, enabled, lifecycle_status, last_error,
+    returning id, name, version, source, enabled, lifecycle_status, last_error,
               granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
   `
   return rows[0] ? mapInstalledPlugin(rows[0]) : null
@@ -286,7 +288,7 @@ export async function setPluginSettings(
        set settings_json = ${writeJson(plainSettings)},
            updated_at = current_timestamp
      where id = ${id}
-    returning id, name, version, enabled, lifecycle_status, last_error,
+    returning id, name, version, source, enabled, lifecycle_status, last_error,
               granted_permissions_json, manifest_json, settings_json, installed_at, updated_at
   `
   return rows[0] ? mapInstalledPlugin(rows[0]) : null

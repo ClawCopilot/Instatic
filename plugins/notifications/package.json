@@ -12,7 +12,7 @@
     "id": "instatic.notifications",
     "name": "Notifications",
     "version": "0.1.0",
-    "apiVersion": "1.0.0",
+    "apiVersion": 1,
     "description": "Multi-channel notification delivery. Consumes hook events from other plugins (public-auth, commerce, membership) and delivers via email, SMS, or webhook.",
     "permissions": [
       "cms.migrations",
@@ -30,7 +30,7 @@
     "settings": [
       {
         "id": "smtpHost",
-        "type": "string",
+        "type": "text",
         "label": "SMTP host",
         "description": "Outgoing SMTP server hostname (e.g. smtp.sendgrid.net).",
         "required": false,
@@ -44,27 +44,27 @@
       },
       {
         "id": "smtpUser",
-        "type": "string",
+        "type": "text",
         "label": "SMTP username",
         "default": ""
       },
       {
         "id": "smtpPassword",
-        "type": "string",
+        "type": "text",
         "label": "SMTP password",
         "secret": true,
         "default": ""
       },
       {
         "id": "smtpFromAddress",
-        "type": "string",
+        "type": "text",
         "label": "From address",
         "description": "e.g. noreply@example.com",
         "default": ""
       },
       {
         "id": "smtpFromName",
-        "type": "string",
+        "type": "text",
         "label": "From name",
         "default": "Instatic"
       },
@@ -76,13 +76,13 @@
       },
       {
         "id": "siteName",
-        "type": "string",
+        "type": "text",
         "label": "Site display name (used in email templates)",
         "default": "Our Site"
       },
       {
         "id": "siteUrl",
-        "type": "string",
+        "type": "text",
         "label": "Public site URL (used in email links)",
         "default": ""
       }

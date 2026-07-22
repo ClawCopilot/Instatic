@@ -177,6 +177,9 @@ export function PluginCard(props: PluginCardProps) {
             <span className={styles.pluginKindPill} data-kind={plugin.manifest.kind ?? 'plugin'}>
               {(plugin.manifest.kind ?? 'plugin') === 'skill' ? 'Skill' : 'Plugin'}
             </span>
+            {plugin.source === 'builtin' && (
+              <span className={styles.pluginSourcePill}>Builtin</span>
+            )}
             <span className={styles.pluginStatusPill} data-status={status.status}>
               {status.label}
             </span>
@@ -251,7 +254,7 @@ export function PluginCard(props: PluginCardProps) {
               <span>Restart</span>
             </Button>
           )}
-          {canManageLifecycle && status.status !== 'error' && (
+          {canManageLifecycle && status.status !== 'error' && plugin.source !== 'builtin' && (
             <Button
               variant="secondary"
               size="sm"
@@ -267,7 +270,7 @@ export function PluginCard(props: PluginCardProps) {
               <span>{plugin.enabled ? 'Disable' : 'Enable'}</span>
             </Button>
           )}
-          {canInstall && (
+          {canInstall && plugin.source !== 'builtin' && (
             <Button
               variant="destructive"
               size="sm"

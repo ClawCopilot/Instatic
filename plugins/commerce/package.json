@@ -12,7 +12,7 @@
     "id": "instatic.commerce",
     "name": "Commerce",
     "version": "0.1.0",
-    "apiVersion": "1.0.0",
+    "apiVersion": 1,
     "description": "Product catalog, shopping cart, checkout, and order management with Stripe payment integration.",
     "permissions": [
       "cms.migrations",
@@ -34,7 +34,7 @@
     "settings": [
       {
         "id": "stripeSecretKey",
-        "type": "string",
+        "type": "text",
         "label": "Stripe secret key",
         "description": "Stripe API secret key (sk_live_... or sk_test_...).",
         "required": false,
@@ -43,7 +43,7 @@
       },
       {
         "id": "stripeWebhookSecret",
-        "type": "string",
+        "type": "text",
         "label": "Stripe webhook signing secret",
         "description": "Signing secret from Stripe dashboard (whsec_...).",
         "required": false,
@@ -52,17 +52,14 @@
       },
       {
         "id": "currency",
-        "type": "string",
+        "type": "text",
         "label": "Default currency",
         "default": "USD"
       }
     ],
     "networkAllowedHosts": ["api.stripe.com"],
     "contentAccess": [
-      { "tableSlug": "products", "mode": "read" },
-      { "tableSlug": "products", "mode": "write" },
-      { "tableSlug": "products", "mode": "publish" },
-      { "tableSlug": "products", "mode": "tables.manage" }
+      { "table": "products", "modes": ["read", "write", "publish"] }
     ]
   }
 }

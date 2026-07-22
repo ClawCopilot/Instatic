@@ -1162,4 +1162,10 @@ export const sqliteMigrations: Migration[] = [
       create index ai_conv_parent_idx on ai_conversations(parent_id) where parent_id is not null and deleted_at is null;
     `,
   },
+  {
+    id: '023_plugin_builtin_source',
+    sql: `
+      alter table installed_plugins add column source text not null default 'user';
+    `,
+  },
 ]

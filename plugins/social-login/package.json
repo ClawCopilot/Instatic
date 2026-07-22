@@ -12,7 +12,7 @@
     "id": "instatic.social-login",
     "name": "Social Login",
     "version": "0.1.0",
-    "apiVersion": "1.0.0",
+    "apiVersion": 1,
     "description": "Social login bridges. Auto-provisions public_users from Google/GitHub/Apple/WeChat identity, then redirects into the OIDC authorize flow.",
     "permissions": [
       "cms.migrations",
@@ -30,56 +30,56 @@
     "settings": [
       {
         "id": "googleClientId",
-        "type": "string",
+        "type": "text",
         "label": "Google OAuth client ID",
         "required": false,
         "default": ""
       },
       {
         "id": "googleClientSecret",
-        "type": "string",
+        "type": "text",
         "label": "Google OAuth client secret",
         "secret": true,
         "default": ""
       },
       {
         "id": "githubClientId",
-        "type": "string",
+        "type": "text",
         "label": "GitHub OAuth app client ID",
         "required": false,
         "default": ""
       },
       {
         "id": "githubClientSecret",
-        "type": "string",
+        "type": "text",
         "label": "GitHub OAuth app client secret",
         "secret": true,
         "default": ""
       },
       {
         "id": "appleClientId",
-        "type": "string",
+        "type": "text",
         "label": "Apple Sign-In client ID (Services ID)",
         "required": false,
         "default": ""
       },
       {
         "id": "appleTeamId",
-        "type": "string",
+        "type": "text",
         "label": "Apple Developer Team ID",
         "required": false,
         "default": ""
       },
       {
         "id": "appleKeyId",
-        "type": "string",
+        "type": "text",
         "label": "Apple private key ID",
         "required": false,
         "default": ""
       },
       {
         "id": "applePrivateKey",
-        "type": "string",
+        "type": "text",
         "label": "Apple private key (PEM, with newlines)",
         "required": false,
         "secret": true,
@@ -87,21 +87,21 @@
       },
       {
         "id": "wechatAppId",
-        "type": "string",
+        "type": "text",
         "label": "WeChat Open Platform AppID",
         "required": false,
         "default": ""
       },
       {
         "id": "wechatAppSecret",
-        "type": "string",
+        "type": "text",
         "label": "WeChat AppSecret",
         "secret": true,
         "default": ""
       },
       {
         "id": "enabledProviders",
-        "type": "string",
+        "type": "text",
         "label": "Enabled providers (comma-separated)",
         "description": "e.g. 'google,github' — only listed providers will accept callbacks.",
         "default": "google,github"

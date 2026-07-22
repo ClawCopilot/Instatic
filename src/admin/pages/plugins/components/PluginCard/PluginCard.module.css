@@ -203,6 +203,21 @@ a.pluginAttributionItem:hover {
     border: 1px solid color-mix(in srgb, var(--accent-3) 30%, transparent);
 }
 
+.pluginSourcePill {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-3xs) var(--space-xs);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+    background: var(--warning-10);
+    color: var(--warning);
+    border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
 .pluginBody p {
     color: var(--text-subtle);
 }
