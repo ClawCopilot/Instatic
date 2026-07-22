@@ -153,10 +153,11 @@ async function handleAiChat(
   // emit a write call. See B6 in the capabilities review.
   const baseTools = selectToolsForScope(scope, user.capabilities)
 
-  // Resolve skillIds: user-selected > auto-recommended > none
-  const resolvedSkillIds = skillIds && skillIds.length > 0
-    ? skillIds
-    : recommendSkills(prompt)
+  // Resolve skillIds: user-selected + auto-recommended (merged, deduplicated)
+  const autoIds = recommendSkills(prompt)
+  const manualIds = skillIds ?? []
+  const mergedSet = new Set([...manualIds, ...autoIds])
+  const resolvedSkillIds = [...mergedSet]
   const selectedSkillTools = resolvedSkillIds.length > 0
     ? getPluginToolsForSkillIds(resolvedSkillIds)
     : []
