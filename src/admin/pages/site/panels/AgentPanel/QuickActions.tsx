@@ -24,8 +24,7 @@ interface QuickAction {
 export type QuickActionsScope = AgentToolScope
 
 interface QuickActionsProps {
-  scope: QuickActionsScope
-  visible: boolean
+  scope: AgentToolScope
   onSelect: (prompt: string) => void
 }
 
@@ -71,9 +70,7 @@ const QUICK_ACTIONS_MAP: Record<QuickActionsScope, QuickAction[]> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function QuickActions({ scope, visible, onSelect }: QuickActionsProps) {
-  if (!visible) return null
-
+export function QuickActions({ scope, onSelect }: QuickActionsProps) {
   const actions = QUICK_ACTIONS_MAP[scope] ?? SITE_QUICK_ACTIONS
 
   const options = [

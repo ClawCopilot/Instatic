@@ -540,12 +540,11 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
               />
             </div>
           )}
-          {/* Quick actions + Skill selector row — shown when the conversation is empty. */}
-          {!isStreaming && messages.length === 0 && (
+          {/* Quick actions + Skill selector row — always visible below the textarea. */}
+          {!isStreaming && (
             <div className={styles.inputBarRow}>
               <QuickActions
                 scope={scope}
-                visible={messages.length === 0}
                 onSelect={handleQuickActionSelect}
               />
               <SkillSelector
