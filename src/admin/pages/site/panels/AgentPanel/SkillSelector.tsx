@@ -8,7 +8,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { InstalledPlugin } from '@core/plugin-sdk'
-import { CheckSolidIcon } from 'pixel-art-icons/icons/check-solid'
+import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import styles from './AgentPanel.module.css'
 
@@ -67,22 +67,18 @@ export function SkillSelector({ skills, activeIds, onToggle }: SkillSelectorProp
           {skills.map((skill) => {
             const checked = activeIds.includes(skill.id)
             return (
-              <li key={skill.id} role="option" aria-selected={checked}>
-                <label
-                  className={styles.skillDropdownItem}
-                  title={skill.manifest.description ?? skill.name}
-                >
-                  <span className={styles.skillDropdownCheck}>
-                    {checked && <CheckSolidIcon size={12} />}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(skill.id)}
-                    className={styles.skillDropdownInput}
-                  />
-                  <span className={styles.skillDropdownLabel}>{skill.name}</span>
-                </label>
+              <li
+                key={skill.id}
+                role="option"
+                aria-selected={checked}
+                className={styles.skillDropdownItem}
+                title={skill.manifest.description ?? skill.name}
+                onClick={() => onToggle(skill.id)}
+              >
+                <span className={styles.skillDropdownCheck}>
+                  {checked && <CheckIcon size={12} />}
+                </span>
+                <span className={styles.skillDropdownLabel}>{skill.name}</span>
               </li>
             )
           })}
