@@ -1,13 +1,14 @@
 /**
- * QuickActions — horizontal scrollable row of pill-shaped prompt shortcuts.
+ * QuickActions — dropdown selector of prompt shortcuts.
  *
  * Shown below the textarea (above the controls row) when the conversation is
- * empty. Each button fills the textarea with a starter prompt for the current
- * scope. Actions are defined per scope so the suggestions stay relevant.
+ * empty. Selecting an option fills the textarea with a starter prompt for the
+ * current scope. Actions are defined per scope so the suggestions stay relevant.
  */
 
 import type { AgentToolScope } from '@site/agent'
-import { Button } from '@ui/components/Button'
+import { Select } from '@ui/components/Select'
+import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import styles from './AgentPanel.module.css'
 
 // ---------------------------------------------------------------------------
@@ -75,20 +76,26 @@ export function QuickActions({ scope, visible, onSelect }: QuickActionsProps) {
 
   const actions = QUICK_ACTIONS_MAP[scope] ?? SITE_QUICK_ACTIONS
 
+  const options = [
+    { value: '', label: <span className={styles.quickActionsPlaceholder}><SparklesSolidIcon size={12} /> Quick actions</span>, textValue: 'Quick actions', placeholder: true },
+    ...actions.map((action) => ({
+      value: action.id,
+      label: action.label,
+    })),
+  ]
+
   return (
     <div className={styles.quickActions}>
-      {actions.map((action) => (
-        <Button
-          key={action.id}
-          type="button"
-          variant="ghost"
-          size="micro"
-          shape="pill"
-          onClick={() => onSelect(action.prompt)}
-        >
-          {action.label}
-        </Button>
-      ))}
+      <Select
+        fieldSize="xs"
+        options={options}
+        value=""
+        aria-label="Quick actions"
+        onChange={(e) => {
+          const action = actions.find((a) => a.id === e.target.value)
+          if (action) onSelect(action.prompt)
+        }}
+      />
     </div>
   )
 }

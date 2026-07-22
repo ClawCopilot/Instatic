@@ -543,12 +543,22 @@
   word-break: break-word;
 }
 
-/* ── Quick actions row ───────────────────────────────────────────────────── */
+/* ── Quick actions dropdown ─────────────────────────────────────────────── */
 .quickActions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  padding: 0;
+}
+
+.quickActions :global(.select) {
+  width: 100%;
+}
+
+.quickActionsPlaceholder {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-2xs);
-  padding: var(--space-2xs) 0;
+  color: var(--text-muted);
 }
 
 /* ── Task category cards (empty state) ──────────────────────────────────── */
