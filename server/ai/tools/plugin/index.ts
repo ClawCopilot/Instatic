@@ -35,6 +35,15 @@ let cachedPluginTools: AiTool[] = []
 /** 缓存的 plugin-scope 系统提示片段 */
 let cachedPluginSystemPrompts: string[] = []
 
+/** Skill 元数据 — 用于自动推荐 */
+interface SkillMeta {
+  id: string
+  name: string
+  description: string
+  keywords: string[]
+}
+let cachedSkillMetas: SkillMeta[] = []
+
 // ---------------------------------------------------------------------------
 // 缓存初始化 — 在 activateInstalledServerPlugins 中调用
 // ---------------------------------------------------------------------------
@@ -58,6 +67,7 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
 
   const tools: AiTool[] = []
   const prompts: string[] = []
+  const metas: SkillMeta[] = []
 
   for (const result of results) {
     // 跳过解析失败的 manifest
@@ -86,11 +96,101 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
     for (const skillTool of skillAiTools) {
       tools.push(buildAiToolFromSkillTool(skillTool, pluginId))
     }
+
+    // 收集元数据用于自动推荐
+    const keywords = extractSkillKeywords(manifest, skillAiTools)
+    metas.push({
+      id: pluginId,
+      name: manifest.name,
+      description: manifest.description ?? '',
+      keywords,
+    })
   }
 
   // 原子替换缓存，确保并发读取不会看到部分更新
   cachedPluginTools = tools
   cachedPluginSystemPrompts = prompts
+  cachedSkillMetas = metas
+}
+
+// ---------------------------------------------------------------------------
+// Skill 自动推荐 — 根据用户 prompt 关键词匹配最相关的技能
+// ---------------------------------------------------------------------------
+
+/**
+ * 从 skill manifest 和 tools 中提取关键词用于匹配。
+ */
+function extractSkillKeywords(manifest: PluginManifest, tools: SkillAiTool[]): string[] {
+  const words = new Set<string>()
+  const add = (text: string) => {
+    text.toLowerCase().split(/\W+/).forEach((w) => { if (w.length > 2) words.add(w) })
+  }
+  add(manifest.name)
+  add(manifest.description ?? '')
+  tools.forEach((t) => {
+    add(t.name)
+    add(t.description)
+  })
+  return [...words]
+}
+
+/**
+ * Bilingual keyword hints for built-in skills.
+ * Maps skillId -> array of English and Chinese trigger words/phrases.
+ * Extend this map when adding new skills with non-English names.
+ */
+const SKILL_HINTS: Record<string, string[]> = {
+  'instatic.agent-bridge': ['agent', 'bridge', '代理', '桥接'],
+  'instatic.code-helper': ['code', 'coding', 'program', 'python', 'javascript', 'typescript', 'debug', 'function', 'class', 'algorithm', '代码', '编程', '程序', '调试', '函数', '算法'],
+  'instatic.comment-system': ['comment', 'review', 'feedback', '讨论', '评论', '反馈'],
+  'instatic.content-assistant': ['content', 'article', 'blog', 'post', 'write', 'rewrite', 'copy', 'copywriting', 'draft', 'edit', '文案', '内容', '写作', '改写', '润色', '文章', '博客', '草稿', '编辑'],
+  'instatic.design-advisor': ['design', 'ui', 'ux', 'color', 'layout', 'typography', '设计', '界面', '配色', '排版'],
+  'instatic.graphic-designer': ['graphic', 'image', 'logo', 'banner', 'svg', '矢量', '图形', '标志', '横幅'],
+  'instatic.humanizer': ['humanize', 'natural', 'tone', 'style', 'rewrite', 'polish', 'summar', '总结', '摘要', '自然', '语气', '润色'],
+  'instatic.image-generator': ['image', 'photo', 'picture', 'generate', 'create', 'draw', '插画', '图片', '照片', '生成', '绘画', '画图'],
+  'instatic.layout-builder': ['layout', 'grid', 'flex', 'section', 'column', 'row', 'structure', '排版', '布局', '网格', '分栏', '结构', 'section'],
+  'instatic.site-api': ['api', 'endpoint', 'route', 'fetch', 'request', '接口', '端点', '路由', '请求'],
+  'instatic.social-media': ['social', 'twitter', 'facebook', 'instagram', 'share', 'post', '社交', '分享', '转发'],
+  'instatic.weather': ['weather', 'temperature', 'rain', 'sunny', 'forecast', '天气', '温度', '下雨', '晴天', '预报'],
+  'instatic.web-research': ['search', 'research', 'web', 'internet', 'google', 'find', 'lookup', '搜索', '查找', '调研', '资料', '查询'],
+  'instatic.youtube-summarizer': ['youtube', 'video', 'summar', 'transcript', '字幕', '视频', '总结', '摘要', 'youtube'],
+}
+
+/**
+ * 根据用户 prompt 自动推荐最相关的 skill IDs。
+ * 基于双语关键词和子串匹配，不消耗额外 AI token。
+ * 返回前 N 个最相关的技能（默认最多 3 个）。
+ */
+export function recommendSkills(prompt: string, limit = 3): string[] {
+  if (!prompt || cachedSkillMetas.length === 0) return []
+
+  const p = prompt.toLowerCase()
+
+  const scored = cachedSkillMetas.map((meta) => {
+    let score = 0
+
+    // 1. 检查预定义的双语 hints
+    const hints = SKILL_HINTS[meta.id]
+    if (hints) {
+      for (const h of hints) {
+        if (p.includes(h.toLowerCase())) score += 5
+      }
+    }
+
+    // 2. 检查技能元数据关键词（英文 name / description / tool names）
+    for (const kw of meta.keywords) {
+      if (p.includes(kw.toLowerCase())) score += 3
+    }
+
+    // 3. 检查 skill id 本身作为子串（如 "weather"）
+    const shortId = meta.id.replace('instatic.', '')
+    if (p.includes(shortId.toLowerCase())) score += 2
+
+    return { id: meta.id, score }
+  })
+
+  scored.sort((a, b) => b.score - a.score)
+  return scored.filter((s) => s.score > 0).slice(0, limit).map((s) => s.id)
 }
 
 // ---------------------------------------------------------------------------

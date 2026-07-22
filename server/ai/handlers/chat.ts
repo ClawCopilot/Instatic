@@ -50,7 +50,7 @@ import {
   type ContentSnapshot,
 } from '../tools/content'
 import { buildDataSystemPrompt } from '../tools/data'
-import { buildPluginSystemPrompt, getPluginToolsForSkillIds, buildPluginSystemPromptForSkillIds } from '../tools/plugin'
+import { buildPluginSystemPrompt, getPluginToolsForSkillIds, buildPluginSystemPromptForSkillIds, recommendSkills } from '../tools/plugin'
 import {
   createBridge,
   createConversationsPersister,
@@ -152,9 +152,13 @@ async function handleAiChat(
   // read tools registered with the driver — the model has no way to
   // emit a write call. See B6 in the capabilities review.
   const baseTools = selectToolsForScope(scope, user.capabilities)
-  // Inject selected skill tools into the current scope's toolset
-  const selectedSkillTools = skillIds && skillIds.length > 0
-    ? getPluginToolsForSkillIds(skillIds)
+
+  // Resolve skillIds: user-selected > auto-recommended > none
+  const resolvedSkillIds = skillIds && skillIds.length > 0
+    ? skillIds
+    : recommendSkills(prompt)
+  const selectedSkillTools = resolvedSkillIds.length > 0
+    ? getPluginToolsForSkillIds(resolvedSkillIds)
     : []
   const tools = [...baseTools, ...selectedSkillTools]
 
@@ -179,7 +183,7 @@ async function handleAiChat(
   const existingMessages = await listMessagesForConversation(db, conversation.id)
   const messages = buildMessageHistory(existingMessages)
 
-  const systemPrompt = buildSystemPromptForScope(scope, snapshot, skillIds)
+  const systemPrompt = buildSystemPromptForScope(scope, snapshot, resolvedSkillIds)
 
   // Capture totals reported by the persister so the audit row can hold
   // them when the stream completes (we read them off the conversation row
