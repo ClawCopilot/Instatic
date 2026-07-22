@@ -836,11 +836,9 @@ function AgentEmptyState({ mode, onPromptSelect }: { mode: ComposerLockReason | 
   return (
     <div className={styles.taskCategories}>
       {TASK_CATEGORIES.map((cat) => (
-        <Button
+        <button
           key={cat.title}
           type="button"
-          variant="ghost"
-          size="xs"
           className={styles.taskCategory}
           onClick={() => onPromptSelect?.(cat.prompt)}
           aria-label={cat.title}
@@ -850,7 +848,7 @@ function AgentEmptyState({ mode, onPromptSelect }: { mode: ComposerLockReason | 
           </span>
           <span className={styles.taskCategoryTitle}>{cat.title}</span>
           <span className={styles.taskCategoryDesc}>{cat.desc}</span>
-        </Button>
+        </button>
       ))}
     </div>
   )

@@ -580,6 +580,9 @@
   cursor: pointer;
   text-align: center;
   color: var(--text-muted);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
