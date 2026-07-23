@@ -35,6 +35,12 @@ let cachedPluginTools: AiTool[] = []
 /** 缓存的 plugin-scope 系统提示片段 */
 let cachedPluginSystemPrompts: string[] = []
 
+/** skillId → systemPrompt 映射，用于精细化注入 */
+let cachedSkillPromptMap: Map<string, string> = new Map()
+
+/** skillId → settings 映射，让 tool handler 可以读取用户配置 */
+let cachedSkillSettingsMap: Map<string, Record<string, unknown>> = new Map()
+
 /** Skill 元数据 — 用于自动推荐 */
 interface SkillMeta {
   id: string
@@ -67,6 +73,8 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
 
   const tools: AiTool[] = []
   const prompts: string[] = []
+  const promptMap = new Map<string, string>()
+  const settingsMap = new Map<string, Record<string, unknown>>()
   const metas: SkillMeta[] = []
 
   for (const result of results) {
@@ -86,9 +94,15 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
 
     const pluginId = manifest.id
 
-    // 收集系统提示
+    // 收集系统提示（同时缓存映射）
     if (manifest.systemPrompt) {
       prompts.push(manifest.systemPrompt)
+      promptMap.set(pluginId, manifest.systemPrompt)
+    }
+
+    // 收集插件用户配置（settings）
+    if (plugin.settings && Object.keys(plugin.settings).length > 0) {
+      settingsMap.set(pluginId, plugin.settings)
     }
 
     // 转换 AI 工具
@@ -110,6 +124,8 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
   // 原子替换缓存，确保并发读取不会看到部分更新
   cachedPluginTools = tools
   cachedPluginSystemPrompts = prompts
+  cachedSkillPromptMap = promptMap
+  cachedSkillSettingsMap = settingsMap
   cachedSkillMetas = metas
 }
 
@@ -207,6 +223,15 @@ export function getPluginTools(): AiTool[] {
 }
 
 /**
+ * 获取指定 skill 的用户配置（settings）。
+ * Tool handler 通过此函数读取用户在管理面板配置的插件参数（如 API token）。
+ * 返回空对象如果该 skill 没有配置或未找到。
+ */
+export function getPluginSettings(pluginId: string): Record<string, unknown> {
+  return cachedSkillSettingsMap.get(pluginId) ?? {}
+}
+
+/**
  * 返回指定 skillIds 对应的工具子集。
  * 用于将用户选中的 skills 注入当前 scope 的 AI 流程。
  */
@@ -237,14 +262,18 @@ export function buildPluginSystemPrompt(): string[] {
 /**
  * 返回指定 skillIds 对应的 systemPrompt 子集。
  * 与 getPluginToolsForSkillIds 配对使用。
+ *
+ * 精细化注入：只返回用户选中（或自动推荐）的 skill 的 prompt，
+ * 避免注入不相关 skill 的 prompt 浪费 token 或产生指令冲突。
  */
 export function buildPluginSystemPromptForSkillIds(skillIds: string[]): string[] {
-  // 如果没有提供 skillIds，不注入任何 skill prompt（返回空）
   if (!skillIds || skillIds.length === 0) return []
-  // 目前缓存是按顺序存的，没有记录每个 prompt 属于哪个 skill。
-  // 需要在 initPluginToolCache 中同时缓存 skillId -> prompt 的映射。
-  // 为简化，先返回所有 prompts —— 后续可按需精细化。
-  return [...cachedPluginSystemPrompts]
+  const result: string[] = []
+  for (const id of skillIds) {
+    const prompt = cachedSkillPromptMap.get(id)
+    if (prompt) result.push(prompt)
+  }
+  return result
 }
 
 // ---------------------------------------------------------------------------

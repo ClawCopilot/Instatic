@@ -28,6 +28,8 @@
  * convention used by `buildAiToolFromSkillTool` for the qualified tool name.
  */
 
+import { getPluginSettings } from './index'
+
 // ===========================================================================
 // Proxy-aware fetch helper
 // ===========================================================================
@@ -56,6 +58,36 @@ async function proxyFetch(url: string, init?: RequestInit): Promise<Response> {
     ...init,
     ...(proxy ? { proxy } as RequestInit : {}),
   })
+}
+
+/**
+ * 带重试的 HTTP 请求。在 5xx 和网络错误时自动重试最多 `retries` 次，
+ * 使用指数退避（1s, 2s, 4s ...）。4xx 错误不重试。
+ */
+async function retryFetch(
+  url: string,
+  init?: RequestInit,
+  retries = 2,
+): Promise<Response> {
+  let lastErr: Error | null = null
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await proxyFetch(url, init)
+      // 5xx 服务器错误时重试
+      if (res.status >= 500 && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt))
+        continue
+      }
+      return res
+    } catch (err) {
+      lastErr = err as Error
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt))
+        continue
+      }
+    }
+  }
+  throw lastErr ?? new Error(`Request to ${url} failed after ${retries + 1} attempts`)
 }
 
 // ===========================================================================
@@ -414,15 +446,15 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
     urlOrId?: string
     summaryLength?: string
     includeTimestamps?: boolean
+    language?: string
   }
   const urlOrId = args?.urlOrId
   if (!urlOrId || typeof urlOrId !== 'string' || urlOrId.trim() === '') {
     return { ok: false, error: 'urlOrId is required and must be a non-empty string' }
   }
   const includeTimestamps = args.includeTimestamps !== false
-  // summaryLength is passed through to the model via the note below — the
-  // handler only fetches the transcript, the model does the actual summary.
   const summaryLength = args.summaryLength ?? 'medium'
+  const preferredLang = args.language
 
   const videoId = extractVideoId(urlOrId)
   if (!videoId) {
@@ -430,7 +462,7 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
   }
 
   try {
-    const pageRes = await proxyFetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const pageRes = await retryFetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -452,8 +484,18 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
       return { ok: false, error: 'No caption tracks available for this video' }
     }
 
-    // Pick the first track (usually the primary language of the video).
-    const track = tracks[0]
+    // Pick track: prefer user-specified language, otherwise first track
+    let track = tracks[0]
+    if (preferredLang) {
+      const langLower = preferredLang.toLowerCase()
+      const match = tracks.find(
+        (t) =>
+          (t.languageCode?.toLowerCase().startsWith(langLower)) ||
+          (t.name?.simpleText?.toLowerCase().includes(langLower)),
+      )
+      if (match) track = match
+    }
+
     const transcriptRes = await proxyFetch(track.baseUrl)
     if (!transcriptRes.ok) {
       return {
@@ -468,14 +510,28 @@ export async function handleYoutubeSummarize(input: unknown): Promise<unknown> {
       return { ok: false, error: 'Transcript was empty or could not be parsed' }
     }
 
+    // Truncate extremely long transcripts to protect model context window
+    const MAX_TRANSCRIPT_LENGTH = 25000
+    const truncated = transcript.length > MAX_TRANSCRIPT_LENGTH
+    const finalTranscript = truncated
+      ? transcript.slice(0, MAX_TRANSCRIPT_LENGTH) + '\n\n[...transcript truncated due to length...]'
+      : transcript
+
     return {
       ok: true,
       data: {
         videoId,
-        transcript,
-        transcriptLength: transcript.length,
+        transcript: finalTranscript,
+        transcriptLength: finalTranscript.length,
+        originalLength: transcript.length,
+        truncated,
+        selectedLanguage: track.languageCode ?? track.name?.simpleText ?? 'unknown',
+        availableLanguages: tracks.map((t) => ({
+          code: t.languageCode ?? 'unknown',
+          name: t.name?.simpleText ?? 'unknown',
+        })),
         note:
-          `Transcript retrieved. The AI should summarise it based on the ` +
+          `Transcript retrieved (${track.languageCode ?? 'unknown'}). The AI should summarise it based on the ` +
           `requested summaryLength (${summaryLength}: brief/medium/detailed) ` +
           `and include timestamps if requested.`,
       },
@@ -614,8 +670,14 @@ function formatTime(seconds: number): string {
 const HF_HUB_API = 'https://huggingface.co/api'
 const HF_INFERENCE_API = 'https://api-inference.huggingface.co/models'
 
-/** Read the HuggingFace API token from environment variables. */
+/** Read the HuggingFace API token. Precedence: plugin settings > env vars. */
 function getHfToken(): string | undefined {
+  // 1. 从插件 settings 中读取（用户在管理面板配置）
+  const settings = getPluginSettings('instatic.huggingface')
+  const settingToken = settings.apiToken as string | undefined
+  if (settingToken && settingToken.length > 0) return settingToken
+
+  // 2. 从环境变量中读取
   return process.env.HUGGINGFACE_API_TOKEN ?? process.env.HF_TOKEN
 }
 
@@ -679,7 +741,7 @@ async function handleHfSearchModels(input: unknown): Promise<unknown> {
   })
 
   try {
-    const res = await proxyFetch(`${HF_HUB_API}/models${query}`, {
+    const res = await retryFetch(`${HF_HUB_API}/models${query}`, {
       headers: { Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -709,7 +771,7 @@ async function handleHfGetModelInfo(input: unknown): Promise<unknown> {
 
   try {
     // Fetch model metadata
-    const metaRes = await proxyFetch(`${HF_HUB_API}/models/${encodeURIComponent(modelId)}`, {
+    const metaRes = await retryFetch(`${HF_HUB_API}/models/${encodeURIComponent(modelId)}`, {
       headers: { Accept: 'application/json' },
     })
     if (!metaRes.ok) {
@@ -768,7 +830,7 @@ async function handleHfSearchDatasets(input: unknown): Promise<unknown> {
   })
 
   try {
-    const res = await proxyFetch(`${HF_HUB_API}/datasets${query}`, {
+    const res = await retryFetch(`${HF_HUB_API}/datasets${query}`, {
       headers: { Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -804,7 +866,7 @@ async function handleHfSearchSpaces(input: unknown): Promise<unknown> {
   })
 
   try {
-    const res = await proxyFetch(`${HF_HUB_API}/spaces${query}`, {
+    const res = await retryFetch(`${HF_HUB_API}/spaces${query}`, {
       headers: { Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -838,7 +900,7 @@ async function handleHfRunInference(input: unknown): Promise<unknown> {
     return {
       ok: false,
       error:
-        'No HuggingFace API token found. Set HUGGINGFACE_API_TOKEN environment variable or configure the token in plugin settings. Get a free token at https://huggingface.co/settings/tokens',
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
     }
   }
 
