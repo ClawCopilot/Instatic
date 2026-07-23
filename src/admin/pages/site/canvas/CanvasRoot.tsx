@@ -116,7 +116,10 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   const setFocusedPanel = useEditorStore((s) => s.setFocusedPanel)
   const setActiveDocument = useEditorStore((s) => s.setActiveDocument)
   const activeDocument = useEditorStore((s) => s.activeDocument)
-  const templatePreviewContext = useTemplatePreviewContext(canvasPage)
+  const {
+    context: templatePreviewContext,
+    loading: templatePreviewContextLoading,
+  } = useTemplatePreviewContext(canvasPage)
   // Permission context — gates canvas affordances:
   //   canEditContent → double-click inline text editing
   //   canEditStyle / canEditStructure → properties sidebar
