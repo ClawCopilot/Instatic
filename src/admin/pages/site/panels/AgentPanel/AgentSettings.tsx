@@ -75,6 +75,7 @@ function saveSettings(settings: AgentSettings): void {
 // Hook
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAgentSettings() {
   const [settings, setSettingsState] = useState<AgentSettings>(loadSettings)
 

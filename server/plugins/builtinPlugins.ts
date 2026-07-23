@@ -85,7 +85,7 @@ export async function seedBuiltinPlugins(db: DbClient): Promise<void> {
 
   for (const dir of dirs) {
     const manifest = readPluginManifest(dir)
-    const grantedPermissions: PluginPermission[] = (manifest as any).grantedPermissions ?? (manifest as any).permissions ?? []
+    const grantedPermissions: PluginPermission[] = manifest.grantedPermissions ?? manifest.permissions ?? []
     const manifestToStore = { ...manifest, grantedPermissions }
     const now = new Date().toISOString()
 

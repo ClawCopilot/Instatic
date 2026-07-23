@@ -12,16 +12,53 @@ import { useState, useRef, useCallback, memo } from 'react'
 import { Button } from '@ui/components/Button'
 import styles from './AgentPanel.module.css'
 
+// ---------------------------------------------------------------------------
+// Web Speech API types (not in standard DOM lib)
+// ---------------------------------------------------------------------------
+
+interface SpeechRecognitionEventResult {
+  0: { transcript: string }
+  isFinal: boolean
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionEventResult[]
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start(): void
+  stop(): void
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance
+}
+
+interface WindowWithSpeechRecognition extends Window {
+  SpeechRecognition?: SpeechRecognitionConstructor
+  webkitSpeechRecognition?: SpeechRecognitionConstructor
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   disabled?: boolean
 }
 
 // Check if browser supports speech recognition
-const SpeechRecognition =
+const SpeechRecognition: SpeechRecognitionConstructor | undefined =
   typeof window !== 'undefined'
-    ? ((window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition)
+    ? ((window as WindowWithSpeechRecognition).SpeechRecognition ||
+        (window as WindowWithSpeechRecognition).webkitSpeechRecognition)
     : undefined
 
 export const VoiceInputSupported = !!SpeechRecognition
@@ -31,7 +68,7 @@ const VoiceInput = memo(function VoiceInput({
   disabled,
 }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false)
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -47,9 +84,9 @@ const VoiceInput = memo(function VoiceInput({
     recognition.interimResults = true
     recognition.lang = 'zh-CN' // Default to Chinese; browser auto-detects
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = Array.from(event.results)
-        .map((r: any) => r[0].transcript)
+        .map((r) => r[0].transcript)
         .join('')
       onTranscript(transcript)
     }

@@ -118,7 +118,7 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   const activeDocument = useEditorStore((s) => s.activeDocument)
   const {
     context: templatePreviewContext,
-    loading: templatePreviewContextLoading,
+    loading: _templatePreviewContextLoading,
   } = useTemplatePreviewContext(canvasPage)
   // Permission context — gates canvas affordances:
   //   canEditContent → double-click inline text editing
