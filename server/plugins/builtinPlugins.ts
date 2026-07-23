@@ -26,6 +26,7 @@ const SKILLS = [
   'content-assistant',
   'design-advisor',
   'graphic-designer',
+  'huggingface',
   'humanizer',
   'image-generator',
   'layout-builder',

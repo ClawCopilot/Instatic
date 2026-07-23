@@ -1,0 +1,195 @@
+{
+  "name": "@instatic/huggingface",
+  "version": "0.1.0",
+  "description": "HuggingFace Hub integration — search models, datasets, Spaces, and run inference.",
+  "instaticManifest": {
+    "id": "instatic.huggingface",
+    "name": "HuggingFace",
+    "version": "0.1.0",
+    "apiVersion": 1,
+    "description": "Seamlessly interact with HuggingFace Hub: search models, datasets, and Spaces, get model details, and run inference on 800K+ ML models.",
+    "permissions": [
+      "network.outbound",
+      "cms.routes.public"
+    ],
+    "networkAllowedHosts": [
+      "huggingface.co",
+      "api-inference.huggingface.co"
+    ],
+    "entrypoints": {
+      "server": "dist/index.js"
+    },
+    "resources": [],
+    "adminPages": [],
+    "settings": [
+      {
+        "id": "apiToken",
+        "label": "HuggingFace API Token",
+        "description": "Access token from https://huggingface.co/settings/tokens. Required for inference; optional for public search.",
+        "type": "password",
+        "required": false,
+        "secret": true
+      }
+    ],
+    "kind": "skill",
+    "aiTools": [
+      {
+        "name": "search_models",
+        "description": "Search the HuggingFace Hub for AI/ML models by keyword, task type, author, or sort by popularity (downloads, likes, trending). Returns model ID, downloads, likes, tags, and pipeline task.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g. 'bert', 'stable diffusion', 'llama')"
+            },
+            "task": {
+              "type": "string",
+              "description": "Filter by pipeline task: text-generation, text-classification, image-classification, image-generation, summarization, translation, question-answering, token-classification, speech-recognition, text-to-speech, fill-mask, etc.",
+              "enum": [
+                "text-generation",
+                "text-classification",
+                "token-classification",
+                "question-answering",
+                "fill-mask",
+                "summarization",
+                "translation",
+                "image-classification",
+                "image-generation",
+                "image-to-text",
+                "object-detection",
+                "speech-recognition",
+                "text-to-speech",
+                "text-to-image",
+                "zero-shot-classification",
+                "sentence-similarity",
+                "feature-extraction"
+              ]
+            },
+            "author": {
+              "type": "string",
+              "description": "Filter by author/organization (e.g. 'meta-llama', 'google', 'mistralai')"
+            },
+            "sort": {
+              "type": "string",
+              "description": "Sort order",
+              "enum": ["downloads", "likes", "trending", "modified", "created"],
+              "default": "trending"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-30)",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        }
+      },
+      {
+        "name": "get_model_info",
+        "description": "Get detailed information about a specific HuggingFace model: description, tags, pipeline type, downloads, likes, config, library, and a snippet of the model card (README).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "model_id": {
+              "type": "string",
+              "description": "Model ID on HuggingFace Hub (e.g. 'meta-llama/Llama-3.1-8B', 'bert-base-uncased')"
+            }
+          },
+          "required": ["model_id"]
+        }
+      },
+      {
+        "name": "search_datasets",
+        "description": "Search the HuggingFace Hub for datasets by keyword, task, or author. Returns dataset ID, downloads, likes, and tags.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g. 'imdb', 'cifar', 'wikipedia')"
+            },
+            "author": {
+              "type": "string",
+              "description": "Filter by author/organization"
+            },
+            "sort": {
+              "type": "string",
+              "description": "Sort order",
+              "enum": ["downloads", "likes", "trending", "modified", "created"],
+              "default": "trending"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-30)",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        }
+      },
+      {
+        "name": "search_spaces",
+        "description": "Search the HuggingFace Hub for Spaces (interactive ML app demos) by keyword or author. Returns Space ID, author, SDK, likes, and status.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g. 'stable diffusion', 'chatbot', 'whisper')"
+            },
+            "author": {
+              "type": "string",
+              "description": "Filter by author/organization"
+            },
+            "sort": {
+              "type": "string",
+              "description": "Sort order",
+              "enum": ["likes", "trending", "modified", "created"],
+              "default": "trending"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-30)",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        }
+      },
+      {
+        "name": "run_inference",
+        "description": "Run inference on a HuggingFace model using the Serverless Inference API. Supports text generation, text classification, image classification, summarization, question answering, NER, translation, and more. Requires an API token (set in plugin settings or HUGGINGFACE_API_TOKEN env var) for most models.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "model_id": {
+              "type": "string",
+              "description": "Model ID (e.g. 'meta-llama/Meta-Llama-3-8B-Instruct', 'distilbert-base-uncased-finetuned-sst-2-english')"
+            },
+            "inputs": {
+              "type": "string",
+              "description": "Input text for the model (prompt, sentence, question, etc.)"
+            },
+            "parameters": {
+              "type": "object",
+              "description": "Optional model-specific parameters (e.g. {max_new_tokens: 100, temperature: 0.7, top_p: 0.9} for text generation)",
+              "properties": {
+                "max_new_tokens": { "type": "integer", "description": "Max tokens to generate (text generation)" },
+                "temperature": { "type": "number", "description": "Sampling temperature (0-2)" },
+                "top_p": { "type": "number", "description": "Top-p sampling (0-1)" },
+                "top_k": { "type": "integer", "description": "Top-k sampling" },
+                "return_full_text": { "type": "boolean", "description": "Return prompt + generated text" }
+              }
+            }
+          },
+          "required": ["model_id", "inputs"]
+        }
+      }
+    ],
+    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces on the HuggingFace Hub, get detailed model information, and run inference on models.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type (text-generation, image-classification, etc.), author, or sort by popularity. Use this when users want to discover models for a task.\n- **get_model_info**: Get detailed info about a specific model (README snippet, tags, downloads, config). Use this after search to deep-dive into a model.\n- **search_datasets**: Find datasets for training or evaluation.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **run_inference**: Run a model on input text. Requires an API token. Common tasks: text generation, classification, summarization, Q&A, NER, translation.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task filter first.\n- Always present model results in a clear format: model ID, task type, downloads, likes, and a brief description.\n- For inference, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
+  }
+}

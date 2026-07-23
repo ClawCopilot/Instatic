@@ -604,6 +604,289 @@ function formatTime(seconds: number): string {
 }
 
 // ===========================================================================
+// HuggingFace handlers — Hub API + Serverless Inference API
+//
+// Hub API (huggingface.co/api/) is public, no token needed for search.
+// Inference API (api-inference.huggingface.co) requires a token for most models.
+// Token precedence: HUGGINGFACE_API_TOKEN env var > HF_TOKEN env var.
+// ===========================================================================
+
+const HF_HUB_API = 'https://huggingface.co/api'
+const HF_INFERENCE_API = 'https://api-inference.huggingface.co/models'
+
+/** Read the HuggingFace API token from environment variables. */
+function getHfToken(): string | undefined {
+  return process.env.HUGGINGFACE_API_TOKEN ?? process.env.HF_TOKEN
+}
+
+/** Clamp a number to [min, max]. */
+function clampInt(val: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof val === 'number' ? val : typeof val === 'string' ? parseInt(val, 10) : NaN
+  if (isNaN(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
+
+/** Build query string from a record, skipping undefined/null/empty values. */
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const parts: string[] = []
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+  }
+  return parts.length ? `?${parts.join('&')}` : ''
+}
+
+interface HfModelSummary {
+  id: string
+  downloads?: number
+  likes?: number
+  tags?: string[]
+  pipeline_tag?: string
+  library_name?: string
+  last_modified?: string
+}
+
+interface HfDatasetSummary {
+  id: string
+  downloads?: number
+  likes?: number
+  tags?: string[]
+  last_modified?: string
+}
+
+interface HfSpaceSummary {
+  id: string
+  author?: string
+  sdk?: string
+  likes?: number
+  last_modified?: string
+  status?: string
+}
+
+/** Search HuggingFace Hub for models. */
+async function handleHfSearchModels(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const limit = clampInt(p.limit, 1, 30, 10)
+  const sort = typeof p.sort === 'string' ? p.sort : 'trending'
+  const direction = sort === 'downloads' || sort === 'likes' || sort === 'trending' ? '-1' : '-1'
+
+  const query = buildQuery({
+    search: typeof p.query === 'string' ? p.query : undefined,
+    filter: typeof p.task === 'string' ? p.task : undefined,
+    author: typeof p.author === 'string' ? p.author : undefined,
+    sort,
+    direction,
+    limit,
+  })
+
+  try {
+    const res = await proxyFetch(`${HF_HUB_API}/models${query}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `HuggingFace API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const models = (await res.json()) as HfModelSummary[]
+    const results = models.map((m) => ({
+      id: m.id,
+      task: m.pipeline_tag ?? 'unknown',
+      downloads: m.downloads ?? 0,
+      likes: m.likes ?? 0,
+      library: m.library_name ?? 'unknown',
+      tags: (m.tags ?? []).slice(0, 8),
+      url: `https://huggingface.co/${m.id}`,
+    }))
+    return { ok: true, data: { count: results.length, models: results } }
+  } catch (err) {
+    return { ok: false, error: `Failed to search models: ${(err as Error).message}` }
+  }
+}
+
+/** Get detailed information about a specific HuggingFace model. */
+async function handleHfGetModelInfo(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const modelId = typeof p.model_id === 'string' ? p.model_id.trim() : ''
+  if (!modelId) return { ok: false, error: 'model_id is required' }
+
+  try {
+    // Fetch model metadata
+    const metaRes = await proxyFetch(`${HF_HUB_API}/models/${encodeURIComponent(modelId)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!metaRes.ok) {
+      return { ok: false, error: `Model not found or API returned ${metaRes.status}` }
+    }
+    const meta = (await metaRes.json()) as Record<string, unknown>
+
+    // Fetch a snippet of the README/model card
+    let readme = ''
+    try {
+      const readmeRes = await proxyFetch(
+        `https://huggingface.co/${encodeURIComponent(modelId)}/raw/main/README.md`,
+      )
+      if (readmeRes.ok) {
+        const fullReadme = await readmeRes.text()
+        readme = fullReadme.slice(0, 1500) + (fullReadme.length > 1500 ? '\n...(truncated)' : '')
+      }
+    } catch {
+      // README is optional
+    }
+
+    return {
+      ok: true,
+      data: {
+        id: meta.id ?? modelId,
+        author: meta.author ?? modelId.split('/')[0],
+        pipeline_tag: meta.pipeline_tag ?? meta['pipeline-tag'] ?? 'unknown',
+        library_name: meta.library_name ?? 'unknown',
+        downloads: meta.downloads ?? 0,
+        likes: meta.likes ?? 0,
+        created: meta.created ?? 'unknown',
+        last_modified: meta.lastModified ?? 'unknown',
+        tags: (meta.tags as string[] | undefined)?.slice(0, 10) ?? [],
+        config: meta.config ? { model_type: (meta.config as Record<string, unknown>).model_type ?? 'unknown' } : null,
+        cardSnippet: readme,
+        url: `https://huggingface.co/${modelId}`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to get model info: ${(err as Error).message}` }
+  }
+}
+
+/** Search HuggingFace Hub for datasets. */
+async function handleHfSearchDatasets(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const limit = clampInt(p.limit, 1, 30, 10)
+  const sort = typeof p.sort === 'string' ? p.sort : 'trending'
+
+  const query = buildQuery({
+    search: typeof p.query === 'string' ? p.query : undefined,
+    author: typeof p.author === 'string' ? p.author : undefined,
+    sort,
+    direction: '-1',
+    limit,
+  })
+
+  try {
+    const res = await proxyFetch(`${HF_HUB_API}/datasets${query}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `HuggingFace API returned ${res.status}` }
+    }
+    const datasets = (await res.json()) as HfDatasetSummary[]
+    const results = datasets.map((d) => ({
+      id: d.id,
+      downloads: d.downloads ?? 0,
+      likes: d.likes ?? 0,
+      tags: (d.tags ?? []).slice(0, 8),
+      last_modified: d.last_modified ?? 'unknown',
+      url: `https://huggingface.co/datasets/${d.id}`,
+    }))
+    return { ok: true, data: { count: results.length, datasets: results } }
+  } catch (err) {
+    return { ok: false, error: `Failed to search datasets: ${(err as Error).message}` }
+  }
+}
+
+/** Search HuggingFace Hub for Spaces (interactive ML demos). */
+async function handleHfSearchSpaces(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const limit = clampInt(p.limit, 1, 30, 10)
+  const sort = typeof p.sort === 'string' ? p.sort : 'trending'
+
+  const query = buildQuery({
+    search: typeof p.query === 'string' ? p.query : undefined,
+    author: typeof p.author === 'string' ? p.author : undefined,
+    sort,
+    direction: '-1',
+    limit,
+  })
+
+  try {
+    const res = await proxyFetch(`${HF_HUB_API}/spaces${query}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `HuggingFace API returned ${res.status}` }
+    }
+    const spaces = (await res.json()) as HfSpaceSummary[]
+    const results = spaces.map((s) => ({
+      id: s.id,
+      author: s.author ?? 'unknown',
+      sdk: s.sdk ?? 'unknown',
+      likes: s.likes ?? 0,
+      last_modified: s.last_modified ?? 'unknown',
+      url: `https://huggingface.co/spaces/${s.id}`,
+    }))
+    return { ok: true, data: { count: results.length, spaces: results } }
+  } catch (err) {
+    return { ok: false, error: `Failed to search spaces: ${(err as Error).message}` }
+  }
+}
+
+/** Run inference on a HuggingFace model via the Serverless Inference API. */
+async function handleHfRunInference(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const modelId = typeof p.model_id === 'string' ? p.model_id.trim() : ''
+  const inputs = typeof p.inputs === 'string' ? p.inputs : ''
+  if (!modelId) return { ok: false, error: 'model_id is required' }
+  if (!inputs) return { ok: false, error: 'inputs is required' }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Set HUGGINGFACE_API_TOKEN environment variable or configure the token in plugin settings. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  const parameters = (p.parameters ?? {}) as Record<string, unknown>
+  const body: Record<string, unknown> = { inputs }
+  if (Object.keys(parameters).length > 0) {
+    body.parameters = parameters
+  }
+
+  try {
+    const res = await proxyFetch(`${HF_INFERENCE_API}/${encodeURIComponent(modelId)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (res.status === 503) {
+      const errorBody = await res.json().catch(() => ({}))
+      const estimatedTime = (errorBody as Record<string, unknown>)?.estimated_time
+      return {
+        ok: false,
+        error: `Model is loading on HuggingFace servers. Estimated time: ${estimatedTime ?? 'unknown'} seconds. Please retry shortly.`,
+      }
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Inference API returned ${res.status}: ${errorText}` }
+    }
+
+    const contentType = res.headers.get('content-type') ?? ''
+    let result: unknown
+    if (contentType.includes('application/json')) {
+      result = await res.json()
+    } else {
+      result = await res.text()
+    }
+
+    return { ok: true, data: { model_id: modelId, result } }
+  } catch (err) {
+    return { ok: false, error: `Inference request failed: ${(err as Error).message}` }
+  }
+}
+
+// ===========================================================================
 // Handler registry — keyed by `<pluginId>:<toolName>`
 // ===========================================================================
 
@@ -613,6 +896,11 @@ const HANDLERS: Record<string, LocalToolHandler> = {
   'instatic.weather:get_weather': handleWeatherGet,
   'instatic.weather:get_forecast': handleWeatherForecast,
   'instatic.youtube-summarizer:summarize_youtube': handleYoutubeSummarize,
+  'instatic.huggingface:search_models': handleHfSearchModels,
+  'instatic.huggingface:get_model_info': handleHfGetModelInfo,
+  'instatic.huggingface:search_datasets': handleHfSearchDatasets,
+  'instatic.huggingface:search_spaces': handleHfSearchSpaces,
+  'instatic.huggingface:run_inference': handleHfRunInference,
 }
 
 /**

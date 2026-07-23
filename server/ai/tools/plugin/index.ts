@@ -146,6 +146,7 @@ const SKILL_HINTS: Record<string, string[]> = {
   'instatic.content-assistant': ['content', 'article', 'blog', 'post', 'write', 'rewrite', 'copy', 'copywriting', 'draft', 'edit', '文案', '内容', '写作', '改写', '润色', '文章', '博客', '草稿', '编辑'],
   'instatic.design-advisor': ['design', 'ui', 'ux', 'color', 'layout', 'typography', '设计', '界面', '配色', '排版'],
   'instatic.graphic-designer': ['graphic', 'image', 'logo', 'banner', 'svg', '矢量', '图形', '标志', '横幅'],
+  'instatic.huggingface': ['huggingface', 'hugging face', 'hf', 'transformer', 'model', 'inference', 'dataset', 'spaces', 'ml model', 'ai model', '机器学习', '模型', '推理', '数据集', 'transformers', 'pytorch', 'tensorflow'],
   'instatic.humanizer': ['humanize', 'natural', 'tone', 'style', 'rewrite', 'polish', 'summar', '总结', '摘要', '自然', '语气', '润色'],
   'instatic.image-generator': ['image', 'photo', 'picture', 'generate', 'create', 'draw', '插画', '图片', '照片', '生成', '绘画', '画图'],
   'instatic.layout-builder': ['layout', 'grid', 'flex', 'section', 'column', 'row', 'structure', '排版', '布局', '网格', '分栏', '结构', 'section'],
