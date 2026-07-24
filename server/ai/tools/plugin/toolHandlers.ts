@@ -1749,24 +1749,14 @@ async function handleHfRunCommand(input: unknown): Promise<unknown> {
   const installErr = cliInstallError()
   if (installErr) return installErr
 
-  // Build all args
+  // Build all args: command + positional args + flags
   const cmdArgs = command.split(/\s+/).concat(args)
   for (const [key, val] of Object.entries(flags)) {
     if (val === true) cmdArgs.push(`--${key}`)
     else if (val !== false && val != null) cmdArgs.push(`--${key}=${String(val)}`)
   }
 
-  const result = runHfCli(command, args, jsonOutput)
-
-  // Add flags that weren't passed as args
-  for (const [key, val] of Object.entries(flags)) {
-    if (val === true && !cmdArgs.includes(`--${key}`)) cmdArgs.push(`--${key}`)
-    else if (val !== false && val != null && !cmdArgs.some((a) => a.startsWith(`--${key}=`))) {
-      cmdArgs.push(`--${key}=${String(val)}`)
-    }
-  }
-
-  // Re-run with flags included
+  // Run with complete args (including flags)
   const finalResult = runHfCli(command, cmdArgs.slice(command.split(/\s+/).length), jsonOutput)
 
   if (finalResult.exitCode !== 0) {
@@ -2085,6 +2075,469 @@ async function handleHfTagManage(input: unknown): Promise<unknown> {
   }
 }
 
+// ===========================================================================
+// REST API enhancement tools — pure HTTP, no CLI dependency
+// ===========================================================================
+
+/** Build the HuggingFace API path prefix for a repo type. */
+function hfRepoPath(repoType: string, repoId: string): string {
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+  return `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}`
+}
+
+/**
+ * Upload multiple text files to a HuggingFace repository in a single operation.
+ *
+ * Iterates through the provided files array and uploads each one via the
+ * HuggingFace Hub upload API. Returns a per-file result summary.
+ */
+async function handleHfUploadFolder(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const message = typeof p.message === 'string' ? p.message.trim() : 'Batch upload via Instatic'
+  const files = Array.isArray(p.files) ? p.files : []
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+  if (files.length === 0) return { ok: false, error: 'files array is required and must not be empty' }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please configure the token in the HuggingFace plugin settings or set HUGGINGFACE_API_TOKEN env var.',
+    }
+  }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+  const results: Array<Record<string, unknown>> = []
+  let successCount = 0
+  let failureCount = 0
+
+  for (const file of files) {
+    const f = file as Record<string, unknown>
+    const pathInRepo = typeof f.path_in_repo === 'string' ? f.path_in_repo.trim() : ''
+    const content = typeof f.content === 'string' ? f.content : ''
+
+    if (!pathInRepo) {
+      results.push({ path_in_repo: '(missing)', ok: false, error: 'path_in_repo is required' })
+      failureCount++
+      continue
+    }
+
+    try {
+      const form = new FormData()
+      const blob = new Blob([content], { type: 'text/plain' })
+      form.append('file', blob, pathInRepo.split('/').pop() ?? 'file')
+
+      const res = await proxyFetch(
+        `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/upload/main/${encodeURIComponent(pathInRepo)}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Commit-Message': message,
+          },
+          body: form,
+        },
+      )
+
+      if (res.ok) {
+        results.push({ path_in_repo: pathInRepo, ok: true })
+        successCount++
+      } else {
+        const errText = await res.text().catch(() => res.statusText)
+        results.push({ path_in_repo: pathInRepo, ok: false, error: `${res.status} ${errText}` })
+        failureCount++
+      }
+    } catch (err) {
+      results.push({ path_in_repo: pathInRepo, ok: false, error: (err as Error).message })
+      failureCount++
+    }
+  }
+
+  return {
+    ok: failureCount === 0,
+    data: {
+      repo_id: repoId,
+      repo_type: repoType,
+      commit_message: message,
+      total: files.length,
+      succeeded: successCount,
+      failed: failureCount,
+      files: results,
+      url: `https://huggingface.co/${typePrefix}${repoId}/tree/main`,
+    },
+  }
+}
+
+/**
+ * List discussions or pull requests on a HuggingFace repository.
+ *
+ * Uses the HuggingFace Hub Discussion API to retrieve discussion threads
+ * with optional status filtering.
+ */
+async function handleHfListDiscussions(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const status = typeof p.status === 'string' ? p.status : 'all'
+  const limit = clampInt(p.limit, 1, 50, 20)
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const basePath = hfRepoPath(repoType, repoId)
+  const query = buildQuery({ status: status !== 'all' ? status : undefined, limit })
+
+  try {
+    const res = await retryFetch(`${basePath}/discussions${query}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const data = (await res.json()) as Record<string, unknown>
+    const discussions = Array.isArray(data) ? data : (data.discussions as Array<Record<string, unknown>>) ?? []
+
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        status,
+        count: discussions.length,
+        discussions: discussions.map((d) => ({
+          id: d.id ?? d.num ?? 'unknown',
+          title: d.title ?? '',
+          status: d.status ?? 'unknown',
+          type: d.type ?? (d.is_pull_request ? 'pull_request' : 'discussion'),
+          author: d.author ?? (typeof d.authorData === 'object' ? (d.authorData as Record<string, unknown>)?.name : undefined),
+          created_at: d.created_at ?? d.createdAt ?? '',
+          num_comments: d.num_comments ?? 0,
+        })),
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to list discussions: ${(err as Error).message}` }
+  }
+}
+
+/**
+ * Create a new discussion or pull request on a HuggingFace repository.
+ *
+ * Posts to the HuggingFace Hub Discussion API with a title and optional
+ * initial comment content.
+ */
+async function handleHfCreateDiscussion(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const title = typeof p.title === 'string' ? p.title.trim() : ''
+  const content = typeof p.content === 'string' ? p.content : ''
+  const discussionType = typeof p.type === 'string' ? p.type : 'discussion'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!title) return { ok: false, error: 'title is required' }
+  if (!['discussion', 'pull_request'].includes(discussionType)) {
+    return { ok: false, error: 'type must be one of: discussion, pull_request' }
+  }
+
+  const token = getHfToken()
+  if (!token) {
+    return { ok: false, error: 'No HuggingFace API token found. Please configure the token in plugin settings.' }
+  }
+
+  const basePath = hfRepoPath(repoType, repoId)
+
+  try {
+    const res = await proxyFetch(`${basePath}/discussions/${discussionType}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        title,
+        content: { raw: content },
+      }),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Create discussion failed: ${res.status} ${errText}` }
+    }
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        discussion_id: data.id ?? data.num ?? 'unknown',
+        title,
+        type: discussionType,
+        url: data.url ?? `https://huggingface.co/${repoType === 'model' ? '' : `${repoType}s/`}${repoId}/discussions/${data.id ?? ''}`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to create discussion: ${(err as Error).message}` }
+  }
+}
+
+/**
+ * Update a HuggingFace repository's settings (visibility, license, etc.).
+ *
+ * Sends a PATCH request to the HuggingFace Hub settings API to modify
+ * the repository configuration.
+ */
+async function handleHfUpdateRepoSettings(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const token = getHfToken()
+  if (!token) {
+    return { ok: false, error: 'No HuggingFace API token found. Please configure the token in plugin settings.' }
+  }
+
+  // Build settings body from provided fields
+  const body: Record<string, unknown> = {}
+  if (typeof p.private === 'boolean') body.private = p.private
+  if (typeof p.license === 'string') body.license = p.license.trim()
+  if (typeof p.default_branch === 'string') body.default_branch = p.default_branch.trim()
+  if (typeof p.gated === 'string') {
+    if (['auto', 'manual', 'false', 'true'].includes(p.gated)) {
+      body.gated = p.gated === 'false' ? false : p.gated === 'true' ? 'auto' : p.gated
+    }
+  }
+
+  if (Object.keys(body).length === 0) {
+    return { ok: false, error: 'At least one setting must be provided: private, license, default_branch, or gated' }
+  }
+
+  const basePath = hfRepoPath(repoType, repoId)
+
+  try {
+    const res = await proxyFetch(`${basePath}/settings`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Update settings failed: ${res.status} ${errText}` }
+    }
+
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        updated_fields: Object.keys(body),
+        message: 'Repository settings updated successfully.',
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to update repo settings: ${(err as Error).message}` }
+  }
+}
+
+/**
+ * Get the commit history of a HuggingFace repository.
+ *
+ * Retrieves recent commits with their messages, authors, and timestamps
+ * using the HuggingFace Hub commits API.
+ */
+async function handleHfGetCommitHistory(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const limit = clampInt(p.limit, 1, 100, 20)
+  const revision = typeof p.revision === 'string' ? p.revision.trim() : 'main'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const basePath = hfRepoPath(repoType, repoId)
+  const query = buildQuery({ limit })
+
+  try {
+    const res = await retryFetch(`${basePath}/commits/${encodeURIComponent(revision)}${query}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const data = (await res.json()) as Record<string, unknown>
+    const commits = Array.isArray(data) ? data : (data.commits as Array<Record<string, unknown>>) ?? []
+
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        revision,
+        count: commits.length,
+        commits: commits.map((c) => ({
+          id: c.id ?? c.oid ?? 'unknown',
+          message: c.message ?? '',
+          date: c.date ?? c.timestamp ?? '',
+          authors: Array.isArray(c.authors) ? c.authors : [],
+          files_changed: Array.isArray(c.files) ? c.files.length : (c.files_changed as number | undefined) ?? 0,
+        })),
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to get commit history: ${(err as Error).message}` }
+  }
+}
+
+/**
+ * Manage HuggingFace Inference Endpoints via REST API (no CLI required).
+ *
+ * Uses the HuggingFace Inference Endpoints Cloud API to list, create,
+ * get, delete, pause, resume, and scale dedicated inference endpoints.
+ */
+async function handleHfEndpointsRest(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'list'
+  const namespace = typeof p.namespace === 'string' ? p.namespace.trim() : ''
+  const endpointId = typeof p.endpoint_id === 'string' ? p.endpoint_id.trim() : ''
+  const config = typeof p.config === 'object' && p.config != null ? (p.config as Record<string, unknown>) : {}
+
+  const validActions = ['list', 'get', 'create', 'delete', 'pause', 'resume', 'scale-to-zero']
+  if (!validActions.includes(action)) {
+    return { ok: false, error: `action must be one of: ${validActions.join(', ')}` }
+  }
+
+  const token = getHfToken()
+  if (!token) {
+    return { ok: false, error: 'No HuggingFace API token found. Inference Endpoints management requires a token.' }
+  }
+
+  // For list, namespace defaults to the current user (derived from token)
+  const ns = namespace || '~'
+
+  const BASE = 'https://api.endpoints.huggingface.cloud/v2/endpoint'
+
+  try {
+    let method = 'GET'
+    let url = `${BASE}/${encodeURIComponent(ns)}`
+    let body: string | undefined
+
+    switch (action) {
+      case 'list':
+        method = 'GET'
+        url = `${BASE}/${encodeURIComponent(ns)}`
+        break
+      case 'get':
+        if (!endpointId) return { ok: false, error: 'endpoint_id is required for get action' }
+        method = 'GET'
+        url = `${BASE}/${encodeURIComponent(ns)}/${encodeURIComponent(endpointId)}`
+        break
+      case 'create': {
+        method = 'POST'
+        url = `${BASE}/${encodeURIComponent(ns)}`
+        const createBody: Record<string, unknown> = {
+          model: config.model ?? '',
+          revision: config.revision ?? 'main',
+          task: config.task ?? 'text-generation',
+          accelerator: config.accelerator ?? 'cpu',
+          instanceType: config.instance_type ?? 'intel-cpu-xl-4',
+          instanceReplicas: config.instance_replicas ?? 1,
+          vendor: config.vendor ?? 'aws',
+          region: config.region ?? 'us-east-1',
+          name: config.name ?? endpointId,
+        }
+        if (typeof config.min_replicas === 'number') createBody.minReplicas = config.min_replicas
+        if (typeof config.max_replicas === 'number') createBody.maxReplicas = config.max_replicas
+        body = JSON.stringify(createBody)
+        break
+      }
+      case 'delete':
+        if (!endpointId) return { ok: false, error: 'endpoint_id is required for delete action' }
+        method = 'DELETE'
+        url = `${BASE}/${encodeURIComponent(ns)}/${encodeURIComponent(endpointId)}`
+        break
+      case 'pause':
+        if (!endpointId) return { ok: false, error: 'endpoint_id is required for pause action' }
+        method = 'POST'
+        url = `${BASE}/${encodeURIComponent(ns)}/${encodeURIComponent(endpointId)}/pause`
+        break
+      case 'resume':
+        if (!endpointId) return { ok: false, error: 'endpoint_id is required for resume action' }
+        method = 'POST'
+        url = `${BASE}/${encodeURIComponent(ns)}/${encodeURIComponent(endpointId)}/resume`
+        break
+      case 'scale-to-zero':
+        if (!endpointId) return { ok: false, error: 'endpoint_id is required for scale-to-zero action' }
+        method = 'POST'
+        url = `${BASE}/${encodeURIComponent(ns)}/${encodeURIComponent(endpointId)}/scale-to-zero`
+        break
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    }
+    if (body) headers['Content-Type'] = 'application/json'
+
+    const res = await proxyFetch(url, { method, headers, body })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Inference Endpoints API returned ${res.status}: ${errText}` }
+    }
+
+    // Delete and some actions may return no body
+    const data = res.status === 204 ? {} : ((await res.json().catch(() => ({}))) as Record<string, unknown>)
+    const endpoints = Array.isArray(data) ? data : (data.items as Array<Record<string, unknown>> | undefined) ?? (data.data ? (data.data as Array<Record<string, unknown>>) : null)
+
+    return {
+      ok: true,
+      data: {
+        action,
+        namespace: ns,
+        endpoint_id: endpointId || undefined,
+        count: Array.isArray(endpoints) ? endpoints.length : undefined,
+        endpoints: Array.isArray(endpoints)
+          ? endpoints.map((e) => ({
+              id: e.id ?? e.name ?? 'unknown',
+              name: e.name ?? '',
+              model: e.model ?? '',
+              status: e.status ?? 'unknown',
+              accelerator: e.accelerator ?? '',
+              instance_type: e.instanceType ?? e.instance_type ?? '',
+              vendor: e.vendor ?? '',
+              region: e.region ?? '',
+              url: e.url ?? '',
+              created_at: e.createdAt ?? e.created_at ?? '',
+            }))
+          : data,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to manage inference endpoints: ${(err as Error).message}` }
+  }
+}
+
 /** Format bytes to human-readable string. */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -2136,6 +2589,12 @@ const HANDLERS: Record<string, LocalToolHandler> = {
   'instatic.huggingface:hf_cache_manage': handleHfCacheManage,
   'instatic.huggingface:hf_repo_transfer': handleHfRepoTransfer,
   'instatic.huggingface:hf_tag_manage': handleHfTagManage,
+  'instatic.huggingface:upload_folder': handleHfUploadFolder,
+  'instatic.huggingface:list_discussions': handleHfListDiscussions,
+  'instatic.huggingface:create_discussion': handleHfCreateDiscussion,
+  'instatic.huggingface:update_repo_settings': handleHfUpdateRepoSettings,
+  'instatic.huggingface:get_commit_history': handleHfGetCommitHistory,
+  'instatic.huggingface:manage_endpoints': handleHfEndpointsRest,
 }
 
 /**

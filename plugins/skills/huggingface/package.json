@@ -1,20 +1,21 @@
 {
   "name": "@instatic/huggingface",
   "version": "0.1.0",
-  "description": "HuggingFace Hub full integration — search models, datasets, Spaces, run inference, and manage resources via hf CLI (Space, Endpoints, Cache, Transfer, Tags).",
+  "description": "HuggingFace Hub full integration — search models, datasets, Spaces, run inference, manage discussions, commits, repo settings, Inference Endpoints, and more via REST API and hf CLI.",
   "instaticManifest": {
     "id": "instatic.huggingface",
     "name": "HuggingFace",
     "version": "0.1.0",
     "apiVersion": 1,
-    "description": "Seamlessly interact with HuggingFace Hub: search models, datasets, and Spaces, get model details, run inference, manage Spaces and Endpoints, transfer repos, manage tags and cache — all through REST API and hf CLI integration.",
+    "description": "Seamlessly interact with HuggingFace Hub: search models, datasets, and Spaces, get model details, run inference, manage discussions, commits, repo settings, Inference Endpoints — all through REST API plus hf CLI integration for advanced operations.",
     "permissions": [
       "network.outbound",
       "cms.routes.public"
     ],
     "networkAllowedHosts": [
       "huggingface.co",
-      "api-inference.huggingface.co"
+      "api-inference.huggingface.co",
+      "api.endpoints.huggingface.cloud"
     ],
     "entrypoints": {
       "server": "dist/index.js"
@@ -698,8 +699,226 @@
           },
           "required": ["repo_id"]
         }
+      },
+      {
+        "name": "upload_folder",
+        "description": "Upload multiple text files to a HuggingFace repository in a single batch operation. Accepts an array of files with path_in_repo and content. Returns per-file upload results with success/failure counts. Requires a write-enabled API token.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Target repository ID (e.g. 'username/my-dataset')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "files": {
+              "type": "array",
+              "description": "Array of files to upload. Each file has path_in_repo (string) and content (string).",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path_in_repo": {
+                    "type": "string",
+                    "description": "Target file path inside the repository (e.g. 'data/train.json', 'README.md')"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Text content of the file"
+                  }
+                },
+                "required": ["path_in_repo", "content"]
+              }
+            },
+            "message": {
+              "type": "string",
+              "description": "Git commit message for the batch upload",
+              "default": "Batch upload via Instatic"
+            }
+          },
+          "required": ["repo_id", "files"]
+        }
+      },
+      {
+        "name": "list_discussions",
+        "description": "List discussions and pull requests on a HuggingFace repository. Returns discussion ID, title, status, type (discussion or pull_request), author, creation date, and comment count. Filter by status (open, closed, all).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B', 'imdb')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "status": {
+              "type": "string",
+              "description": "Filter by discussion status",
+              "enum": ["open", "closed", "all"],
+              "default": "all"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-50)",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "create_discussion",
+        "description": "Create a new discussion or pull request on a HuggingFace repository. Requires a write-enabled API token. The discussion will be visible on the repository's discussions tab.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'username/my-model')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "title": {
+              "type": "string",
+              "description": "Discussion title (required)"
+            },
+            "content": {
+              "type": "string",
+              "description": "Initial comment content (markdown supported)"
+            },
+            "type": {
+              "type": "string",
+              "description": "Discussion type",
+              "enum": ["discussion", "pull_request"],
+              "default": "discussion"
+            }
+          },
+          "required": ["repo_id", "title"]
+        }
+      },
+      {
+        "name": "update_repo_settings",
+        "description": "Update a HuggingFace repository's settings: visibility (private/public), license, default branch, and gated access. Requires a write-enabled API token. Use this to change repo visibility or configure gated access.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'username/my-model')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "private": {
+              "type": "boolean",
+              "description": "Set repository visibility: true for private, false for public"
+            },
+            "license": {
+              "type": "string",
+              "description": "License identifier (e.g. 'mit', 'apache-2.0', 'cc-by-sa-4.0')"
+            },
+            "default_branch": {
+              "type": "string",
+              "description": "Default git branch name (e.g. 'main', 'master')"
+            },
+            "gated": {
+              "type": "string",
+              "description": "Gated access mode: 'auto' (automatic approval), 'manual' (manual approval), 'false' (disable gating)",
+              "enum": ["auto", "manual", "false", "true"]
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "get_commit_history",
+        "description": "Get the commit history of a HuggingFace repository. Returns recent commits with their IDs, messages, authors, timestamps, and number of files changed. Useful for tracking repository activity and changes.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B', 'imdb')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Git revision (branch name, tag, or commit hash). Defaults to 'main'.",
+              "default": "main"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max commits to retrieve (1-100)",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "manage_endpoints",
+        "description": "Manage HuggingFace Inference Endpoints via REST API (no CLI required). List, get, create, delete, pause, resume, or scale-to-zero dedicated inference endpoints. Uses the HuggingFace Inference Endpoints Cloud API directly. Requires an API token.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Endpoint management action",
+              "enum": ["list", "get", "create", "delete", "pause", "resume", "scale-to-zero"],
+              "default": "list"
+            },
+            "namespace": {
+              "type": "string",
+              "description": "User or organization namespace. Defaults to current user (~)."
+            },
+            "endpoint_id": {
+              "type": "string",
+              "description": "Endpoint ID or name. Required for get, delete, pause, resume, scale-to-zero actions."
+            },
+            "config": {
+              "type": "object",
+              "description": "Configuration for create action: {model, revision, task, accelerator, instance_type, instance_replicas, vendor, region, name, min_replicas, max_replicas}.",
+              "properties": {
+                "model": { "type": "string", "description": "Model ID (e.g. 'meta-llama/Meta-Llama-3-8B')" },
+                "task": { "type": "string", "description": "Inference task (e.g. text-generation, text-classification)" },
+                "accelerator": { "type": "string", "description": "Hardware accelerator: cpu, gpu" },
+                "instance_type": { "type": "string", "description": "Instance type (e.g. 'intel-cpu-xl-4', 'nvidia-a10g-xl')" },
+                "instance_replicas": { "type": "integer", "description": "Number of replicas" },
+                "vendor": { "type": "string", "description": "Cloud vendor: aws, gcp" },
+                "region": { "type": "string", "description": "Region (e.g. 'us-east-1', 'eu-west-1')" },
+                "name": { "type": "string", "description": "Endpoint name" },
+                "min_replicas": { "type": "integer", "description": "Minimum replicas for autoscaling" },
+                "max_replicas": { "type": "integer", "description": "Maximum replicas for autoscaling" }
+              }
+            }
+          }
+        }
       }
     ],
-    "systemPrompt": "You are a HuggingFace Hub integration assistant with full CLI-level capabilities. You can search, discover, inspect, create, delete, manage, and administrate all HuggingFace Hub resources through both REST APIs and the hf CLI.\n\n## REST API Tools (no CLI required)\n- **search_models**: Find models by keyword, task, library, author, tags, language. Sort by popularity. Set full=true for complete metadata.\n- **get_model_info**: Get comprehensive model info: README, tags, downloads, config, library, and sibling files.\n- **search_datasets**: Find datasets by keyword, task, tags, language, or size category. Sort by 'created' for newest.\n- **get_dataset_info**: Get full dataset details including file tree and README.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **get_trending**: Discover trending models, datasets, or Spaces from the last 24 hours or 7 days.\n- **list_collections**: Search user-curated collections of related models, datasets, and Spaces.\n- **list_repo_files**: List files in any repository. Explore contents, check file sizes, find specific files.\n- **list_repo_refs**: List branches, tags, or commits in a repository.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **download_file**: Get a direct download URL or raw content of a specific file.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Supports description and license.\n- **upload_file**: Upload a text file to a repository.\n- **delete_file**: Delete a file from a repository.\n- **delete_repo**: Delete a repository. Irreversible.\n- **get_whoami**: Verify the configured API token and show current user info.\n\n## hf CLI Tools (require hf CLI installed)\n- **run_hf_command**: Universal CLI passthrough for any hf command not covered by dedicated tools.\n- **hf_space_manage**: Full Space management: list, restart, pause, resume, view logs, configure hardware, secrets, storage, env, sleep-time, duplicate.\n- **hf_endpoints_manage**: Inference Endpoints management: list, create, update, delete, pause, resume, scale, list-jobs.\n- **hf_cache_manage**: Cache management: scan (list cached repos with sizes), dir (show cache dir), prune (delete specific repos), clear (clear entire cache).\n- **hf_repo_transfer**: Transfer (move to another user/org) or rename repositories.\n- **hf_tag_manage**: List, add, or remove tags on repositories.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task and library filters first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading single files, use download_file. For downloading entire repos or folders, use run_hf_command with 'download'.\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'. You can also provide an initial description that becomes the README.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Before destructive operations (delete_repo, delete_file), confirm the user's intent.\n- For CLI tools: prefer dedicated tools (hf_space_manage, hf_endpoints_manage, etc.) over run_hf_command when available. Use run_hf_command only for ad-hoc commands not covered by dedicated tools.\n- If hf CLI is not installed, guide the user to install it via 'pip install -U huggingface_hub' or 'curl -LsSf https://huggingface.co/cli/install.sh | bash'.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
+    "systemPrompt": "You are a HuggingFace Hub integration assistant with full CLI-level capabilities. You can search, discover, inspect, create, delete, manage, and administrate all HuggingFace Hub resources through both REST APIs and the hf CLI.\n\n## REST API Tools (no CLI required)\n- **search_models**: Find models by keyword, task, library, author, tags, language. Sort by popularity. Set full=true for complete metadata.\n- **get_model_info**: Get comprehensive model info: README, tags, downloads, config, library, and sibling files.\n- **search_datasets**: Find datasets by keyword, task, tags, language, or size category. Sort by 'created' for newest.\n- **get_dataset_info**: Get full dataset details including file tree and README.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **get_trending**: Discover trending models, datasets, or Spaces from the last 24 hours or 7 days.\n- **list_collections**: Search user-curated collections of related models, datasets, and Spaces.\n- **list_repo_files**: List files in any repository. Explore contents, check file sizes, find specific files.\n- **list_repo_refs**: List branches, tags, or commits in a repository.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **download_file**: Get a direct download URL or raw content of a specific file.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Supports description and license.\n- **upload_file**: Upload a single text file to a repository.\n- **upload_folder**: Upload multiple text files in a batch. Accepts an array of {path_in_repo, content}.\n- **delete_file**: Delete a file from a repository.\n- **delete_repo**: Delete a repository. Irreversible.\n- **get_whoami**: Verify the configured API token and show current user info.\n- **list_discussions**: List discussions and pull requests on a repository. Filter by status (open/closed/all).\n- **create_discussion**: Create a new discussion or pull request on a repository.\n- **update_repo_settings**: Update repository visibility (private/public), license, default branch, or gated access.\n- **get_commit_history**: Get the commit history of a repository with messages, authors, and timestamps.\n- **manage_endpoints**: Manage Inference Endpoints via REST API (no CLI needed): list, get, create, delete, pause, resume, scale-to-zero.\n\n## hf CLI Tools (require hf CLI installed)\n- **run_hf_command**: Universal CLI passthrough for any hf command not covered by dedicated tools.\n- **hf_space_manage**: Full Space management: list, restart, pause, resume, view logs, configure hardware, secrets, storage, env, sleep-time, duplicate.\n- **hf_endpoints_manage**: Inference Endpoints management via CLI: list, create, update, delete, pause, resume, scale, list-jobs.\n- **hf_cache_manage**: Cache management: scan (list cached repos with sizes), dir (show cache dir), prune (delete specific repos), clear (clear entire cache).\n- **hf_repo_transfer**: Transfer (move to another user/org) or rename repositories.\n- **hf_tag_manage**: List, add, or remove tags on repositories.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task and library filters first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading single files, use download_file. For downloading entire repos or folders, use run_hf_command with 'download'.\n- For batch uploading multiple files (e.g. config + README + data files), use upload_folder instead of calling upload_file multiple times.\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'. You can also provide an initial description that becomes the README.\n- To track repository changes or audit activity, use get_commit_history.\n- To manage discussions or PRs on a repository, use list_discussions and create_discussion.\n- To change repository visibility or configure gated access, use update_repo_settings.\n- For Inference Endpoints management, prefer manage_endpoints (REST API) over hf_endpoints_manage (CLI) when CLI is not available.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Before destructive operations (delete_repo, delete_file), confirm the user's intent.\n- For CLI tools: prefer dedicated tools (hf_space_manage, hf_cache_manage, etc.) over run_hf_command when available. Use run_hf_command only for ad-hoc commands not covered by dedicated tools.\n- If hf CLI is not installed, guide the user to install it via 'pip install -U huggingface_hub' or 'curl -LsSf https://huggingface.co/cli/install.sh | bash'.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
   }
 }
