@@ -74,13 +74,13 @@ function makeFakeDb() {
         rowCount: 1,
       }
     }
-    // getInstalledPlugin — single-row lookup by id
-    if (normalized.includes('select id, name, version, enabled') && normalized.includes('where id =')) {
+    // getInstalledPlugin — single-row lookup by id (must start with select to avoid matching delete)
+    if (normalized.includes('select') && normalized.includes('from installed_plugins') && normalized.includes('where id =')) {
       const row = plugins.find((plugin) => plugin.id === values[0])
       return { rows: row ? [row as Row] : [], rowCount: row ? 1 : 0 }
     }
-    // listInstalledPlugins — no values
-    if (normalized.includes('select id, name, version, enabled')) {
+    // listInstalledPlugins — no values (must start with select)
+    if (normalized.includes('select') && normalized.includes('from installed_plugins') && normalized.includes('order by')) {
       return { rows: [...plugins] as Row[], rowCount: plugins.length }
     }
     // setPluginSettings — values[0]=settings_json, values[1]=id
@@ -100,6 +100,7 @@ function makeFakeDb() {
         id,
         name: values[1],
         version: values[2],
+        source: 'user',
         enabled: true,
         lifecycle_status: 'installed',
         last_error: null,

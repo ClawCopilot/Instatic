@@ -83,11 +83,11 @@ function makeFakeDb() {
     if (normalized.includes('insert into audit_events')) {
       return { rows: [], rowCount: 1 }
     }
-    if (normalized.includes('select id, name, version, enabled') && normalized.includes('where id =')) {
+    if (normalized.includes('select') && normalized.includes('from installed_plugins') && normalized.includes('where id =')) {
       const row = plugins.find((plugin) => plugin.id === values[0])
       return { rows: row ? [row as Row] : [], rowCount: row ? 1 : 0 }
     }
-    if (normalized.includes('select id, name, version, enabled')) {
+    if (normalized.includes('select') && normalized.includes('from installed_plugins') && normalized.includes('order by')) {
       return { rows: [...plugins] as Row[], rowCount: plugins.length }
     }
     if (normalized.includes('insert into installed_plugins')) {
@@ -98,6 +98,7 @@ function makeFakeDb() {
         id,
         name: values[1],
         version: values[2],
+        source: 'user',
         enabled: true,
         lifecycle_status: 'installed',
         last_error: null,
