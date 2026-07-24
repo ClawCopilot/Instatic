@@ -1,13 +1,13 @@
 {
   "name": "@instatic/huggingface",
   "version": "0.1.0",
-  "description": "HuggingFace Hub integration — search models, datasets, Spaces, and run inference.",
+  "description": "HuggingFace Hub full integration — search models, datasets, Spaces, run inference, and manage resources via hf CLI (Space, Endpoints, Cache, Transfer, Tags).",
   "instaticManifest": {
     "id": "instatic.huggingface",
     "name": "HuggingFace",
     "version": "0.1.0",
     "apiVersion": 1,
-    "description": "Seamlessly interact with HuggingFace Hub: search models, datasets, and Spaces, get model details, and run inference on 800K+ ML models.",
+    "description": "Seamlessly interact with HuggingFace Hub: search models, datasets, and Spaces, get model details, run inference, manage Spaces and Endpoints, transfer repos, manage tags and cache — all through REST API and hf CLI integration.",
     "permissions": [
       "network.outbound",
       "cms.routes.public"
@@ -538,35 +538,168 @@
       },
       {
         "name": "run_hf_command",
-        "description": "Execute a HuggingFace hf CLI command for advanced operations not covered by REST API: download entire repositories/folders (hf download), upload folders (hf upload), list jobs (hf jobs), manage inference endpoints (hf endpoints), manage cache (hf cache), etc. Requires hf CLI to be installed. The token is automatically injected from plugin settings. Output is parsed as JSON when available.",
+        "description": "Execute ANY HuggingFace hf CLI command directly. Supports all hf subcommands: download, upload, space, endpoints, scan-cache, delete-cache, clear-cache, transfer, move, tag, env, whoami, list, jobs, api, login, logout. Automatically injects --json for known structured subcommands and auto-attaches the API token from settings. Output is auto-parsed as JSON when available. Use this as a universal CLI passthrough for operations not covered by dedicated tools.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "command": {
               "type": "string",
-              "description": "hf subcommand to run (e.g. 'download', 'upload', 'jobs ps', 'cache dir', 'auth whoami'). Do NOT include 'hf' prefix."
+              "description": "hf subcommand to run (e.g. 'download', 'upload', 'space restart', 'endpoints list', 'scan-cache', 'transfer', 'move', 'tag list', 'env', 'whoami', 'list', 'api', 'jobs ps'). Do NOT include 'hf' prefix."
             },
             "args": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Additional positional arguments (e.g. repo_id, file paths).",
+              "description": "Additional positional arguments (e.g. repo_id, file paths, space_id).",
               "default": []
             },
             "flags": {
               "type": "object",
-              "description": "Additional flags as key-value pairs (e.g. {\"local-dir\": \"./models\", \"include\": \"*.safetensors\"}). Boolean flags use true as value.",
+              "description": "Additional flags as key-value pairs (e.g. {\"local-dir\": \"./models\", \"include\": \"*.safetensors\", \"type\": \"dataset\"}). Boolean flags use true as value.",
               "default": {}
             },
             "json_output": {
               "type": "boolean",
-              "description": "Add --json flag to get structured JSON output (recommended for agent parsing).",
+              "description": "Auto-add --json flag for structured output (recommended for agent parsing).",
               "default": true
             }
           },
           "required": ["command"]
         }
+      },
+      {
+        "name": "hf_space_manage",
+        "description": "Manage HuggingFace Spaces via hf CLI: list, restart, pause, resume, view logs, configure hardware, manage secrets, storage, env vars, and sleep time. Returns structured JSON output. Requires hf CLI and API token.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Space management action",
+              "enum": ["list", "info", "restart", "pause", "resume", "logs", "hardware", "secrets", "storage", "env", "sleep-time", "duplicate"],
+              "default": "list"
+            },
+            "space_id": {
+              "type": "string",
+              "description": "Space ID (e.g. 'username/my-space'). Required for all actions except 'list'."
+            },
+            "flags": {
+              "type": "object",
+              "description": "Additional flags (e.g. {\"limit\": 50, \"raw\": true} for logs; {\"flavor\": \"cpu-2x\"} for hardware).",
+              "default": {}
+            }
+          }
+        }
+      },
+      {
+        "name": "hf_endpoints_manage",
+        "description": "Manage HuggingFace Inference Endpoints via hf CLI: list, create, update, delete, pause, resume, scale. Supports all endpoint management operations. Returns structured JSON output. Requires hf CLI and API token.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Endpoint management action",
+              "enum": ["list", "create", "update", "delete", "pause", "resume", "scale", "info", "list-jobs"],
+              "default": "list"
+            },
+            "endpoint_id": {
+              "type": "string",
+              "description": "Endpoint ID (e.g. 'my-endpoint'). Required for all actions except 'list'."
+            },
+            "flags": {
+              "type": "object",
+              "description": "Additional flags for create/update/scale: {\"model\": \"meta-llama/Meta-Llama-3-8B\", \"revision\": \"main\", \"task\": \"text-generation\", \"accelerator\": \"cpu\", \"instance-type\": \"intel-cpu-xl-4\", \"instance-replicas\": 1, \"vendor\": \"aws\", \"region\": \"us-east-1\", \"namespace\": \"org-name\"}.",
+              "default": {}
+            }
+          }
+        }
+      },
+      {
+        "name": "hf_cache_manage",
+        "description": "Manage HuggingFace cache via hf CLI: scan cache to see all cached repos with sizes, show cache directory location, prune specific repos by type, or clear entire cache. Returns structured JSON with size summaries. Requires hf CLI.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Cache management action: scan (list all cached repos with sizes), dir (show cache directory), prune (delete specific cached repos), clear (clear entire cache).",
+              "enum": ["scan", "dir", "prune", "clear"],
+              "default": "scan"
+            },
+            "flags": {
+              "type": "object",
+              "description": "Additional flags. For prune: {\"repo\": \"repo-id-to-delete\"} or {\"type\": \"dataset\"}. For scan: {\"limit\": 50}.",
+              "default": {}
+            }
+          }
+        }
+      },
+      {
+        "name": "hf_repo_transfer",
+        "description": "Transfer or rename a HuggingFace repository between namespaces/users. Supports transfer (move repo to another user/org) and move (rename within same namespace). Requires a write-enabled API token. Returns structured output.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "transfer: move repo to another user/org. move: rename within same namespace.",
+              "enum": ["transfer", "move"],
+              "default": "transfer"
+            },
+            "source_repo": {
+              "type": "string",
+              "description": "Source repository ID (e.g. 'my-username/old-repo-name')"
+            },
+            "target_repo": {
+              "type": "string",
+              "description": "Target repository ID. For transfer: new owner namespace (e.g. 'new-owner/repo-name'). For move: new name (e.g. 'my-username/new-repo-name')."
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "flags": {
+              "type": "object",
+              "description": "Additional flags (e.g. {\"safe\": true} for dry-run).",
+              "default": {}
+            }
+          },
+          "required": ["source_repo"]
+        }
+      },
+      {
+        "name": "hf_tag_manage",
+        "description": "Manage tags on a HuggingFace repository: list all tags, add a new tag, or remove a tag. Tags help categorize and discover repositories. Returns structured JSON output. Requires hf CLI and write-enabled API token.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Tag management action",
+              "enum": ["list", "add", "remove"],
+              "default": "list"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'username/my-repo')"
+            },
+            "tag": {
+              "type": "string",
+              "description": "Tag name to add or remove (e.g. 'transformers', 'pytorch', 'llama'). Required for add and remove actions."
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            }
+          },
+          "required": ["repo_id"]
+        }
       }
     ],
-    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces, inspect repository contents, create/delete repositories, upload/download/delete files, run inference, discover trending items and collections, and execute advanced hf CLI commands.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type, library (transformers, diffusers, etc.), author, tags, or language. Sort by popularity. Use this when users want to discover models for a task. Set full=true for complete metadata.\n- **get_model_info**: Get comprehensive info about a specific model: README snippet, tags, downloads, config, library, and sibling files (config.json, weights, tokenizer). Use this after search to deep-dive into model structure.\n- **search_datasets**: Find datasets for training or evaluation. Filter by task, tags, language, or size category. Sort by 'created' to find the newest datasets.\n- **get_dataset_info**: Get full dataset details including file tree and README. Use this to inspect a dataset's structure before downloading.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **get_trending**: Discover trending models, datasets, or Spaces from the last 24 hours or 7 days.\n- **list_collections**: Search user-curated collections of related models, datasets, and Spaces.\n- **list_repo_files**: List files in any repository (model/dataset/space). Use this to explore contents, check file sizes, or find specific files.\n- **list_repo_refs**: List branches, tags, or commits in a repository. Useful for finding specific versions.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **download_file**: Get a direct download URL or raw content of a specific file in a repo.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Supports description and license. Requires a write-enabled API token.\n- **upload_file**: Upload a text file to a repository. Requires a write-enabled API token.\n- **delete_file**: Delete a file from a repository. Creates a new commit. Requires write token.\n- **delete_repo**: Delete a repository. Irreversible. Requires admin token.\n- **get_whoami**: Verify the configured API token and show current user info.\n- **run_hf_command**: Execute advanced hf CLI commands: download entire repos/folders, upload folders, manage jobs/endpoints/cache, etc. Requires hf CLI installation.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task and library filters first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading single files, use download_file. For downloading entire repos or folders, use run_hf_command with 'download'.\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'. You can also provide an initial description that becomes the README.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Before destructive operations (delete_repo, delete_file), confirm the user's intent.\n- For run_hf_command, prefer --json output for structured data. If hf CLI is not installed, guide the user to install it via 'pip install -U huggingface_hub' or 'curl -LsSf https://huggingface.co/cli/install.sh | bash'.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
+    "systemPrompt": "You are a HuggingFace Hub integration assistant with full CLI-level capabilities. You can search, discover, inspect, create, delete, manage, and administrate all HuggingFace Hub resources through both REST APIs and the hf CLI.\n\n## REST API Tools (no CLI required)\n- **search_models**: Find models by keyword, task, library, author, tags, language. Sort by popularity. Set full=true for complete metadata.\n- **get_model_info**: Get comprehensive model info: README, tags, downloads, config, library, and sibling files.\n- **search_datasets**: Find datasets by keyword, task, tags, language, or size category. Sort by 'created' for newest.\n- **get_dataset_info**: Get full dataset details including file tree and README.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **get_trending**: Discover trending models, datasets, or Spaces from the last 24 hours or 7 days.\n- **list_collections**: Search user-curated collections of related models, datasets, and Spaces.\n- **list_repo_files**: List files in any repository. Explore contents, check file sizes, find specific files.\n- **list_repo_refs**: List branches, tags, or commits in a repository.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **download_file**: Get a direct download URL or raw content of a specific file.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Supports description and license.\n- **upload_file**: Upload a text file to a repository.\n- **delete_file**: Delete a file from a repository.\n- **delete_repo**: Delete a repository. Irreversible.\n- **get_whoami**: Verify the configured API token and show current user info.\n\n## hf CLI Tools (require hf CLI installed)\n- **run_hf_command**: Universal CLI passthrough for any hf command not covered by dedicated tools.\n- **hf_space_manage**: Full Space management: list, restart, pause, resume, view logs, configure hardware, secrets, storage, env, sleep-time, duplicate.\n- **hf_endpoints_manage**: Inference Endpoints management: list, create, update, delete, pause, resume, scale, list-jobs.\n- **hf_cache_manage**: Cache management: scan (list cached repos with sizes), dir (show cache dir), prune (delete specific repos), clear (clear entire cache).\n- **hf_repo_transfer**: Transfer (move to another user/org) or rename repositories.\n- **hf_tag_manage**: List, add, or remove tags on repositories.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task and library filters first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading single files, use download_file. For downloading entire repos or folders, use run_hf_command with 'download'.\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'. You can also provide an initial description that becomes the README.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Before destructive operations (delete_repo, delete_file), confirm the user's intent.\n- For CLI tools: prefer dedicated tools (hf_space_manage, hf_endpoints_manage, etc.) over run_hf_command when available. Use run_hf_command only for ad-hoc commands not covered by dedicated tools.\n- If hf CLI is not installed, guide the user to install it via 'pip install -U huggingface_hub' or 'curl -LsSf https://huggingface.co/cli/install.sh | bash'.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
   }
 }

@@ -1652,17 +1652,63 @@ async function handleHfDeleteRepo(input: unknown): Promise<unknown> {
   }
 }
 
-/** Execute a HuggingFace hf CLI command. */
-async function handleHfRunCommand(input: unknown): Promise<unknown> {
-  const p = (input ?? {}) as Record<string, unknown>
-  const command = typeof p.command === 'string' ? p.command.trim() : ''
-  const args = Array.isArray(p.args) ? p.args.filter((a): a is string => typeof a === 'string') : []
-  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
-  const jsonOutput = p.json_output !== false
+// ===========================================================================
+// hf CLI wrapper — shared utilities for all CLI-based tools
+// ===========================================================================
 
-  if (!command) return { ok: false, error: 'command is required' }
+/** Result of a hf CLI invocation. */
+interface HfCliResult {
+  exitCode: number
+  stdout: string
+  stderr: string
+}
 
-  // Check if hf CLI is available
+/**
+ * Run a hf CLI subcommand and return structured output.
+ *
+ * Detects known --json-capable subcommands automatically and injects
+ * the token from plugin settings. Handles both parsing and error cases.
+ */
+function runHfCli(
+  subcommand: string,
+  args: string[] = [],
+  jsonOutput = true,
+): HfCliResult & { parsed?: unknown } {
+  const cmdArgs = subcommand.split(/\s+/).concat(args)
+
+  // Inject token if available
+  const token = getHfToken()
+  if (token && !args.some((a) => a.startsWith('--token='))) {
+    cmdArgs.push(`--token=${token}`)
+  }
+
+  // Subcommands that support --json
+  const jsonCapable = [
+    'scan-cache', 'scan_cache', 'delete-cache', 'delete_cache', 'clear-cache', 'clear_cache',
+    'space', 'list', 'env', 'whoami', 'tag', 'transfer', 'move',
+    'endpoints', 'jobs', 'endpoint',
+  ]
+  const needsJson = jsonOutput && jsonCapable.some((c) => subcommand.startsWith(c))
+  if (needsJson && !args.some((a) => a === '--json' || a.startsWith('--format='))) {
+    cmdArgs.push('--json')
+  }
+
+  const result = Bun.spawnSync(['hf', ...cmdArgs], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, ...(token ? { HF_TOKEN: token } : {}) },
+  })
+
+  const stdout = new TextDecoder().decode(result.stdout)
+  const stderr = new TextDecoder().decode(result.stderr)
+
+  return { exitCode: result.exitCode, stdout, stderr }
+}
+
+/**
+ * Check that hf CLI is installed, returning an error object if not.
+ */
+function cliInstallError(): { ok: false; error: string } | null {
   try {
     const check = Bun.spawnSync(['hf', '--version'], { stdout: 'ignore', stderr: 'ignore' })
     if (check.exitCode !== 0) {
@@ -1672,6 +1718,7 @@ async function handleHfRunCommand(input: unknown): Promise<unknown> {
           'hf CLI is not installed. Install it via: pip install -U "huggingface_hub" or follow https://huggingface.co/docs/huggingface_hub/guides/cli#getting-started',
       }
     }
+    return null
   } catch {
     return {
       ok: false,
@@ -1679,69 +1726,381 @@ async function handleHfRunCommand(input: unknown): Promise<unknown> {
         'hf CLI is not installed. Install it via: pip install -U "huggingface_hub" or follow https://huggingface.co/docs/huggingface_hub/guides/cli#getting-started',
     }
   }
+}
 
-  // Build command arguments
+/**
+ * Execute a HuggingFace hf CLI command with structured output.
+ *
+ * Smart execution engine that:
+ * - Automatically detects JSON-capable subcommands and injects --json
+ * - Parses known command output formats into structured data
+ * - Provides human-readable error messages for known failure modes
+ * - Supports all hf CLI subcommands including download, upload, space, endpoints, etc.
+ */
+async function handleHfRunCommand(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const command = typeof p.command === 'string' ? p.command.trim() : ''
+  const args = Array.isArray(p.args) ? p.args.filter((a): a is string => typeof a === 'string') : []
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+  const jsonOutput = p.json_output !== false
+
+  if (!command) return { ok: false, error: 'command is required' }
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  // Build all args
   const cmdArgs = command.split(/\s+/).concat(args)
-
-  // Inject token if available
-  const token = getHfToken()
-  if (token && !args.some((a) => a.startsWith('--token='))) {
-    cmdArgs.push(`--token=${token}`)
-  }
-
-  // Add --json for structured output
-  if (jsonOutput && !args.some((a) => a === '--json' || a.startsWith('--format='))) {
-    cmdArgs.push('--json')
-  }
-
-  // Add flags
   for (const [key, val] of Object.entries(flags)) {
-    if (val === true) {
-      cmdArgs.push(`--${key}`)
-    } else if (val !== false && val != null) {
+    if (val === true) cmdArgs.push(`--${key}`)
+    else if (val !== false && val != null) cmdArgs.push(`--${key}=${String(val)}`)
+  }
+
+  const result = runHfCli(command, args, jsonOutput)
+
+  // Add flags that weren't passed as args
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true && !cmdArgs.includes(`--${key}`)) cmdArgs.push(`--${key}`)
+    else if (val !== false && val != null && !cmdArgs.some((a) => a.startsWith(`--${key}=`))) {
       cmdArgs.push(`--${key}=${String(val)}`)
     }
   }
 
-  try {
-    const result = Bun.spawnSync(['hf', ...cmdArgs], {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: { ...process.env, ...(token ? { HF_TOKEN: token } : {}) },
-    })
+  // Re-run with flags included
+  const finalResult = runHfCli(command, cmdArgs.slice(command.split(/\s+/).length), jsonOutput)
 
-    const stdout = new TextDecoder().decode(result.stdout)
-    const stderr = new TextDecoder().decode(result.stderr)
-
-    if (result.exitCode !== 0) {
-      return {
-        ok: false,
-        error: `hf CLI exited with code ${result.exitCode}. stderr: ${stderr || stdout || 'unknown error'}`,
-      }
-    }
-
-    // Try to parse as JSON
-    let parsed: unknown = null
-    if (jsonOutput && stdout.trim()) {
-      try {
-        parsed = JSON.parse(stdout.trim())
-      } catch {
-        // Not valid JSON, keep raw output
-      }
-    }
-
+  if (finalResult.exitCode !== 0) {
     return {
-      ok: true,
-      data: {
-        command: `hf ${command}`,
-        exit_code: result.exitCode,
-        output: parsed ?? stdout,
-        stderr: stderr || undefined,
-      },
+      ok: false,
+      error: `hf CLI exited with code ${finalResult.exitCode}. ${finalResult.stderr || finalResult.stdout || 'unknown error'}`,
+      data: { command: `hf ${command}`, exit_code: finalResult.exitCode, stderr: finalResult.stderr },
     }
-  } catch (err) {
-    return { ok: false, error: `Failed to run hf command: ${(err as Error).message}` }
   }
+
+  // Try to parse as JSON
+  let parsed: unknown = null
+  if (jsonOutput && finalResult.stdout.trim()) {
+    try {
+      parsed = JSON.parse(finalResult.stdout.trim())
+    } catch {
+      // Not valid JSON, keep raw output
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      command: `hf ${command}`,
+      exit_code: finalResult.exitCode,
+      output: parsed ?? finalResult.stdout,
+      stderr: finalResult.stderr || undefined,
+      hint: parsed
+        ? 'Output is structured JSON. Use the parsed fields directly.'
+        : 'Output is plain text. Use it as-is or request a different format.',
+    },
+  }
+}
+
+// ===========================================================================
+// hf CLI wrapper tools — structured wrappers for specific CLI subcommands
+// ===========================================================================
+
+/**
+ * Manage HuggingFace Spaces via hf CLI.
+ *
+ * Wraps `hf space` subcommands: restart, pause, resume, logs, hardware,
+ * secrets, storage, env, sleep-time, etc.
+ */
+async function handleHfSpaceManage(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'list'
+  const spaceId = typeof p.space_id === 'string' ? p.space_id.trim() : ''
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+
+  if (!spaceId && action !== 'list') return { ok: false, error: 'space_id is required for this action' }
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  const validActions = ['list', 'info', 'restart', 'pause', 'resume', 'logs', 'hardware', 'secrets', 'storage', 'env', 'sleep-time', 'duplicate']
+  if (!validActions.includes(action)) {
+    return { ok: false, error: `action must be one of: ${validActions.join(', ')}` }
+  }
+
+  const args: string[] = [action]
+  if (spaceId) args.push(spaceId)
+
+  // Add flags
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true) args.push(`--${key}`)
+    else if (val !== false && val != null) args.push(`--${key}=${String(val)}`)
+  }
+
+  const result = runHfCli('space', args, true)
+
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `hf space failed: ${result.stderr || result.stdout || 'unknown error'}`,
+      data: { action, space_id: spaceId, exit_code: result.exitCode, stderr: result.stderr },
+    }
+  }
+
+  let parsed: unknown = null
+  try { parsed = JSON.parse(result.stdout.trim()) } catch { /* keep raw */ }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      space_id: spaceId || undefined,
+      output: parsed ?? result.stdout,
+      raw: parsed ? undefined : result.stdout,
+    },
+  }
+}
+
+/**
+ * Manage HuggingFace Inference Endpoints via hf CLI.
+ *
+ * Wraps `hf endpoints` subcommands: list, create, update, delete, pause, resume, scale.
+ */
+async function handleHfEndpointsManage(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'list'
+  const endpointId = typeof p.endpoint_id === 'string' ? p.endpoint_id.trim() : undefined
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  const validActions = ['list', 'create', 'update', 'delete', 'pause', 'resume', 'scale', 'info', 'list-jobs']
+  if (!validActions.includes(action)) {
+    return { ok: false, error: `action must be one of: ${validActions.join(', ')}` }
+  }
+
+  const args: string[] = [action]
+  if (endpointId) args.push(endpointId)
+
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true) args.push(`--${key}`)
+    else if (val !== false && val != null) args.push(`--${key}=${String(val)}`)
+  }
+
+  const result = runHfCli('endpoints', args, true)
+
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `hf endpoints failed: ${result.stderr || result.stdout || 'unknown error'}`,
+      data: { action, endpoint_id: endpointId, exit_code: result.exitCode, stderr: result.stderr },
+    }
+  }
+
+  let parsed: unknown = null
+  try { parsed = JSON.parse(result.stdout.trim()) } catch { /* keep raw */ }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      endpoint_id: endpointId,
+      output: parsed ?? result.stdout,
+      raw: parsed ? undefined : result.stdout,
+    },
+  }
+}
+
+/**
+ * Manage HuggingFace cache via hf CLI.
+ *
+ * Wraps `hf scan-cache`, `hf delete-cache`, `hf clear-cache`.
+ */
+async function handleHfCacheManage(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'scan'
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  const validActions = ['scan', 'dir', 'prune', 'clear']
+  if (!validActions.includes(action)) {
+    return { ok: false, error: `action must be one of: ${validActions.join(', ')}` }
+  }
+
+  // Map action to hf CLI subcommand
+  const subcommand = action === 'scan' ? 'scan-cache'
+    : action === 'dir' ? 'scan-cache'  // scan-cache shows dir info too
+    : action === 'prune' ? 'delete-cache'
+    : 'clear-cache'
+
+  const args: string[] = []
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true) args.push(`--${key}`)
+    else if (val !== false && val != null) args.push(`--${key}=${String(val)}`)
+  }
+
+  const result = runHfCli(subcommand, args, true)
+
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `hf cache ${action} failed: ${result.stderr || result.stdout || 'unknown error'}`,
+      data: { action, exit_code: result.exitCode, stderr: result.stderr },
+    }
+  }
+
+  let parsed: unknown = null
+  try { parsed = JSON.parse(result.stdout.trim()) } catch { /* keep raw */ }
+
+  // Compute summary for scan results
+  let summary: Record<string, unknown> | undefined
+  if (action === 'scan' && Array.isArray(parsed)) {
+    const entries = parsed as Array<Record<string, unknown>>
+    const totalSize = entries.reduce((s, e) => s + (typeof e.sizeOnDisk === 'number' ? e.sizeOnDisk : 0), 0)
+    summary = {
+      total_repos: entries.length,
+      total_size_bytes: totalSize,
+      total_size_readable: formatBytes(totalSize),
+      by_type: countBy(entries, 'repoType'),
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      subcommand: `hf ${subcommand}`,
+      output: parsed ?? result.stdout,
+      summary,
+    },
+  }
+}
+
+/**
+ * Transfer or rename a HuggingFace repository.
+ *
+ * Wraps `hf transfer` and `hf move` CLI subcommands.
+ */
+async function handleHfRepoTransfer(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'transfer'
+  const sourceRepo = typeof p.source_repo === 'string' ? p.source_repo.trim() : ''
+  const targetRepo = typeof p.target_repo === 'string' ? p.target_repo.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+
+  if (!sourceRepo) return { ok: false, error: 'source_repo is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  if (!['transfer', 'move'].includes(action)) {
+    return { ok: false, error: 'action must be either "transfer" or "move"' }
+  }
+
+  const args: string[] = [sourceRepo]
+  if (targetRepo) args.push(targetRepo)
+  if (repoType !== 'model') args.push('--type', repoType)
+
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true) args.push(`--${key}`)
+    else if (val !== false && val != null) args.push(`--${key}=${String(val)}`)
+  }
+
+  const result = runHfCli(action, args, true)
+
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `hf ${action} failed: ${result.stderr || result.stdout || 'unknown error'}`,
+      data: { action, source_repo: sourceRepo, target_repo: targetRepo, exit_code: result.exitCode },
+    }
+  }
+
+  let parsed: unknown = null
+  try { parsed = JSON.parse(result.stdout.trim()) } catch { /* keep raw */ }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      source_repo: sourceRepo,
+      target_repo: targetRepo || undefined,
+      result: parsed ?? result.stdout,
+    },
+  }
+}
+
+/**
+ * Manage tags on a HuggingFace repository.
+ *
+ * Wraps `hf tag` CLI subcommands: list, add, remove.
+ */
+async function handleHfTagManage(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const action = typeof p.action === 'string' ? p.action.trim() : 'list'
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const tag = typeof p.tag === 'string' ? p.tag.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+
+  const installErr = cliInstallError()
+  if (installErr) return installErr
+
+  if (!['list', 'add', 'remove'].includes(action)) {
+    return { ok: false, error: 'action must be one of: list, add, remove' }
+  }
+
+  const args: string[] = [action, repoId]
+  if (tag && action !== 'list') args.push(tag)
+  if (repoType !== 'model') args.push('--type', repoType)
+
+  const result = runHfCli('tag', args, true)
+
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `hf tag failed: ${result.stderr || result.stdout || 'unknown error'}`,
+      data: { action, repo_id: repoId, tag: tag || undefined, exit_code: result.exitCode },
+    }
+  }
+
+  let parsed: unknown = null
+  try { parsed = JSON.parse(result.stdout.trim()) } catch { /* keep raw */ }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      repo_id: repoId,
+      tag: tag || undefined,
+      output: parsed ?? result.stdout,
+    },
+  }
+}
+
+/** Format bytes to human-readable string. */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`
+}
+
+/** Count array items by a key. */
+function countBy(arr: Array<Record<string, unknown>>, key: string): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const item of arr) {
+    const val = String(item[key] ?? 'unknown')
+    counts[val] = (counts[val] ?? 0) + 1
+  }
+  return counts
 }
 
 // ===========================================================================
@@ -1772,6 +2131,11 @@ const HANDLERS: Record<string, LocalToolHandler> = {
   'instatic.huggingface:get_trending': handleHfGetTrending,
   'instatic.huggingface:list_collections': handleHfListCollections,
   'instatic.huggingface:list_repo_refs': handleHfListRepoRefs,
+  'instatic.huggingface:hf_space_manage': handleHfSpaceManage,
+  'instatic.huggingface:hf_endpoints_manage': handleHfEndpointsManage,
+  'instatic.huggingface:hf_cache_manage': handleHfCacheManage,
+  'instatic.huggingface:hf_repo_transfer': handleHfRepoTransfer,
+  'instatic.huggingface:hf_tag_manage': handleHfTagManage,
 }
 
 /**
