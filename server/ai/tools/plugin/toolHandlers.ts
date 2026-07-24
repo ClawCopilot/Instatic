@@ -730,18 +730,30 @@ async function handleHfSearchModels(input: unknown): Promise<unknown> {
   const limit = clampInt(p.limit, 1, 30, 10)
   const sort = typeof p.sort === 'string' ? p.sort : 'trending'
   const direction = sort === 'downloads' || sort === 'likes' || sort === 'trending' ? '-1' : '-1'
+  const full = p.full === true
+
+  // Build tag filters: tags=tag1&tags=tag2 for AND behavior
+  const tags = Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === 'string') : []
+  const tagFilters = tags.map((t) => `tags=${encodeURIComponent(t)}`).join('&')
+
+  const language = typeof p.language === 'string' ? p.language.trim() : undefined
 
   const query = buildQuery({
     search: typeof p.query === 'string' ? p.query : undefined,
     filter: typeof p.task === 'string' ? p.task : undefined,
     author: typeof p.author === 'string' ? p.author : undefined,
+    library: typeof p.library === 'string' ? p.library : undefined,
+    language,
     sort,
     direction,
     limit,
+    full: full ? 'full' : undefined,
   })
 
+  const url = `${HF_HUB_API}/models${query}${tagFilters ? (query ? '&' : '?') + tagFilters : ''}`
+
   try {
-    const res = await retryFetch(`${HF_HUB_API}/models${query}`, {
+    const res = await retryFetch(url, {
       headers: { Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -767,6 +779,7 @@ async function handleHfSearchModels(input: unknown): Promise<unknown> {
 async function handleHfGetModelInfo(input: unknown): Promise<unknown> {
   const p = (input ?? {}) as Record<string, unknown>
   const modelId = typeof p.model_id === 'string' ? p.model_id.trim() : ''
+  const withFiles = p.with_files !== false
   if (!modelId) return { ok: false, error: 'model_id is required' }
 
   try {
@@ -793,6 +806,28 @@ async function handleHfGetModelInfo(input: unknown): Promise<unknown> {
       // README is optional
     }
 
+    // Fetch sibling files (config.json, weights, tokenizer, etc.)
+    let siblings: Array<{ rfilename: string; size?: number }> = []
+    if (withFiles) {
+      try {
+        const sibRes = await retryFetch(
+          `${HF_HUB_API}/models/${encodeURIComponent(modelId)}/tree/main`,
+          { headers: { Accept: 'application/json' } },
+        )
+        if (sibRes.ok) {
+          const tree = (await sibRes.json()) as Array<Record<string, unknown>>
+          siblings = tree
+            .filter((item) => item.type === 'file')
+            .map((item) => ({
+              rfilename: (item.path as string) ?? '',
+              size: (item.size as number) ?? 0,
+            }))
+        }
+      } catch {
+        // siblings are optional
+      }
+    }
+
     return {
       ok: true,
       data: {
@@ -806,6 +841,8 @@ async function handleHfGetModelInfo(input: unknown): Promise<unknown> {
         last_modified: meta.lastModified ?? 'unknown',
         tags: (meta.tags as string[] | undefined)?.slice(0, 10) ?? [],
         config: meta.config ? { model_type: (meta.config as Record<string, unknown>).model_type ?? 'unknown' } : null,
+        siblings: siblings.slice(0, 30),
+        sibling_count: siblings.length,
         cardSnippet: readme,
         url: `https://huggingface.co/${modelId}`,
       },
@@ -821,16 +858,30 @@ async function handleHfSearchDatasets(input: unknown): Promise<unknown> {
   const limit = clampInt(p.limit, 1, 30, 10)
   const sort = typeof p.sort === 'string' ? p.sort : 'trending'
 
+  const tags = Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === 'string') : []
+  const tagFilters = tags.map((t) => `tags=${encodeURIComponent(t)}`).join('&')
+
+  const language = typeof p.language === 'string' ? p.language.trim() : undefined
+  const sizeCategory = typeof p.size_category === 'string' ? p.size_category.trim() : undefined
+
   const query = buildQuery({
     search: typeof p.query === 'string' ? p.query : undefined,
+    filter: typeof p.task === 'string' ? p.task : undefined,
     author: typeof p.author === 'string' ? p.author : undefined,
+    language,
     sort,
     direction: '-1',
     limit,
   })
 
+  // size_category is a dataset-specific tag filter
+  const sizeFilter = sizeCategory ? `size_categories=${encodeURIComponent(sizeCategory)}` : ''
+  const separator = tagFilters || sizeFilter ? (query ? '&' : '?') : ''
+  const extraFilters = [tagFilters, sizeFilter].filter(Boolean).join('&')
+  const url = `${HF_HUB_API}/datasets${query}${separator}${extraFilters}`
+
   try {
-    const res = await retryFetch(`${HF_HUB_API}/datasets${query}`, {
+    const res = await retryFetch(url, {
       headers: { Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -1099,6 +1150,14 @@ async function handleHfCreateRepo(input: unknown): Promise<unknown> {
   if (repoType === 'space' && sdk) {
     body.sdk = sdk
   }
+  const description = typeof p.description === 'string' ? p.description.trim() : undefined
+  if (description) {
+    body.description = description
+  }
+  const license = typeof p.license === 'string' ? p.license.trim() : undefined
+  if (license) {
+    body.license = license
+  }
 
   try {
     const res = await proxyFetch(`${HF_HUB_API}/repos/create`, {
@@ -1232,6 +1291,459 @@ async function handleHfGetRepoReadme(input: unknown): Promise<unknown> {
   }
 }
 
+/** Get current authenticated user info. */
+async function handleHfGetWhoami(): Promise<unknown> {
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  try {
+    const res = await retryFetch(`${HF_HUB_API}/whoami-v2`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const data = (await res.json()) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        username: data.name ?? 'unknown',
+        fullname: data.fullname ?? '',
+        email: data.email ?? '',
+        orgs: (data.orgs as Array<{ name: string }> | undefined)?.map((o) => o.name) ?? [],
+        token_type: data.type ?? 'unknown',
+        token_permission: data.auth?.accessToken?.role ?? 'unknown',
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to get user info: ${(err as Error).message}` }
+  }
+}
+
+/** Download a single file from a HuggingFace repository. */
+async function handleHfDownloadFile(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const path = typeof p.path === 'string' ? p.path.trim() : ''
+  const revision = typeof p.revision === 'string' ? p.revision.trim() : 'main'
+  const returnContent = p.return_content === true
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!path) return { ok: false, error: 'path is required' }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+  const url = `https://huggingface.co/${typePrefix}${encodeURIComponent(repoId)}/resolve/${encodeURIComponent(revision)}/${encodeURIComponent(path)}`
+
+  if (!returnContent) {
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        path,
+        revision,
+        download_url: url,
+        note: 'Use this URL to download the file. For large files or folders, use run_hf_command with hf download instead.',
+      },
+    }
+  }
+
+  try {
+    const res = await retryFetch(url, { headers: { Accept: '*/*' } })
+    if (!res.ok) {
+      return { ok: false, error: `Download failed: ${res.status} ${await res.text().catch(() => res.statusText)}` }
+    }
+    const contentType = res.headers.get('content-type') ?? ''
+    const isText = contentType.includes('text') || contentType.includes('json') || contentType.includes('xml')
+    if (isText) {
+      const text = await res.text()
+      return {
+        ok: true,
+        data: {
+          repo_id: repoId,
+          repo_type: repoType,
+          path,
+          revision,
+          content_type: contentType,
+          content: text,
+          size: text.length,
+          download_url: url,
+        },
+      }
+    }
+    // Binary file: return metadata + download URL
+    const blob = await res.blob()
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        path,
+        revision,
+        content_type: contentType,
+        size: blob.size,
+        is_binary: true,
+        download_url: url,
+        note: 'File is binary. Use the download_url to save it locally.',
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to download file: ${(err as Error).message}` }
+  }
+}
+
+/** Delete a file from a HuggingFace repository. */
+async function handleHfDeleteFile(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const pathInRepo = typeof p.path_in_repo === 'string' ? p.path_in_repo.trim() : ''
+  const message = typeof p.message === 'string' ? p.message.trim() : 'Delete file via Instatic'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!pathInRepo) return { ok: false, error: 'path_in_repo is required' }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+
+  try {
+    const res = await proxyFetch(
+      `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/commit/main`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          summary: message,
+          files_to_delete: [pathInRepo],
+        }),
+      },
+    )
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Delete file failed: ${res.status} ${errorText}` }
+    }
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        path: pathInRepo,
+        commit: data.commit ?? data,
+        url: `https://huggingface.co/${typePrefix}${repoId}/blob/main/${pathInRepo}`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to delete file: ${(err as Error).message}` }
+  }
+}
+
+/** Get trending models, datasets, or Spaces from HuggingFace Hub. */
+async function handleHfGetTrending(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const type = typeof p.type === 'string' ? p.type : 'model'
+  const period = typeof p.period === 'string' ? p.period : 'day'
+  const limit = clampInt(p.limit, 1, 30, 10)
+
+  if (!['model', 'dataset', 'space'].includes(type)) {
+    return { ok: false, error: 'type must be one of: model, dataset, space' }
+  }
+
+  const typePath = type === 'model' ? 'models' : `${type}s`
+  const periodParam = period === 'week' ? 'trendingWeek' : 'trending'
+
+  try {
+    const res = await retryFetch(
+      `${HF_HUB_API}/${typePath}?sort=${periodParam}&direction=-1&limit=${limit}`,
+      { headers: { Accept: 'application/json' } },
+    )
+    if (!res.ok) {
+      return { ok: false, error: `HuggingFace API returned ${res.status}` }
+    }
+    const items = (await res.json()) as Array<Record<string, unknown>>
+    const results = items.map((item) => ({
+      id: item.id ?? 'unknown',
+      likes: item.likes ?? 0,
+      downloads: item.downloads ?? 0,
+      tags: ((item.tags as string[] | undefined) ?? []).slice(0, 8),
+      url: `https://huggingface.co/${type === 'space' ? 'spaces/' : type === 'dataset' ? 'datasets/' : ''}${item.id ?? ''}`,
+    }))
+    return {
+      ok: true,
+      data: {
+        type,
+        period,
+        count: results.length,
+        items: results,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to get trending: ${(err as Error).message}` }
+  }
+}
+
+/** Search HuggingFace Collections (curated lists). */
+async function handleHfListCollections(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const query = typeof p.query === 'string' ? p.query.trim() : undefined
+  const author = typeof p.author === 'string' ? p.author.trim() : undefined
+  const limit = clampInt(p.limit, 1, 30, 10)
+
+  const q = buildQuery({
+    search: query,
+    author,
+    limit,
+  })
+
+  try {
+    const res = await retryFetch(`${HF_HUB_API}/collections${q}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `HuggingFace API returned ${res.status}` }
+    }
+    const collections = (await res.json()) as Array<Record<string, unknown>>
+    const results = collections.map((c) => ({
+      id: c.id ?? 'unknown',
+      title: c.title ?? 'Untitled',
+      owner: c.owner ?? 'unknown',
+      items: c.numItems ?? c.items_count ?? 0,
+      likes: c.likes ?? 0,
+      url: c.url ?? `https://huggingface.co/collections/${c.owner ?? ''}/${c.id ?? ''}`,
+    }))
+    return { ok: true, data: { count: results.length, collections: results } }
+  } catch (err) {
+    return { ok: false, error: `Failed to list collections: ${(err as Error).message}` }
+  }
+}
+
+/** List branches, tags, or commits in a HuggingFace repository. */
+async function handleHfListRepoRefs(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const include = typeof p.include === 'string' ? p.include : 'branches'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+  if (!['branches', 'tags', 'commits'].includes(include)) {
+    return { ok: false, error: 'include must be one of: branches, tags, commits' }
+  }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+
+  try {
+    let endpoint = ''
+    if (include === 'branches') {
+      endpoint = `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/branches`
+    } else if (include === 'tags') {
+      endpoint = `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/tags`
+    } else {
+      // commits — use the refs endpoint with branch=main
+      endpoint = `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/commits/main`
+    }
+
+    const res = await retryFetch(endpoint, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const data = (await res.json()) as Array<Record<string, unknown>> | Record<string, unknown>
+
+    let results: unknown[] = []
+    if (Array.isArray(data)) {
+      results = data.map((item) => ({
+        name: item.name ?? item.id ?? 'unknown',
+        target: item.target ?? item.commit_id ?? '',
+        date: item.date ?? '',
+      }))
+    } else if (include === 'commits' && data.commits && Array.isArray(data.commits)) {
+      results = (data.commits as Array<Record<string, unknown>>).map((c) => ({
+        id: c.id ?? 'unknown',
+        message: c.message ?? '',
+        date: c.date ?? '',
+        authors: c.authors ?? [],
+      }))
+    }
+
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        include,
+        count: results.length,
+        refs: results,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to list repo refs: ${(err as Error).message}` }
+  }
+}
+
+/** Delete a HuggingFace repository. */
+async function handleHfDeleteRepo(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  try {
+    const res = await proxyFetch(`${HF_HUB_API}/repos/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        repo_id: repoId,
+        type: repoType === 'model' ? 'model' : repoType,
+      }),
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Delete failed: ${res.status} ${errorText}` }
+    }
+
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        message: 'Repository deleted successfully.',
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to delete repo: ${(err as Error).message}` }
+  }
+}
+
+/** Execute a HuggingFace hf CLI command. */
+async function handleHfRunCommand(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const command = typeof p.command === 'string' ? p.command.trim() : ''
+  const args = Array.isArray(p.args) ? p.args.filter((a): a is string => typeof a === 'string') : []
+  const flags = typeof p.flags === 'object' && p.flags != null ? p.flags as Record<string, unknown> : {}
+  const jsonOutput = p.json_output !== false
+
+  if (!command) return { ok: false, error: 'command is required' }
+
+  // Check if hf CLI is available
+  try {
+    const check = Bun.spawnSync(['hf', '--version'], { stdout: 'ignore', stderr: 'ignore' })
+    if (check.exitCode !== 0) {
+      return {
+        ok: false,
+        error:
+          'hf CLI is not installed. Install it via: pip install -U "huggingface_hub" or follow https://huggingface.co/docs/huggingface_hub/guides/cli#getting-started',
+      }
+    }
+  } catch {
+    return {
+      ok: false,
+      error:
+        'hf CLI is not installed. Install it via: pip install -U "huggingface_hub" or follow https://huggingface.co/docs/huggingface_hub/guides/cli#getting-started',
+    }
+  }
+
+  // Build command arguments
+  const cmdArgs = command.split(/\s+/).concat(args)
+
+  // Inject token if available
+  const token = getHfToken()
+  if (token && !args.some((a) => a.startsWith('--token='))) {
+    cmdArgs.push(`--token=${token}`)
+  }
+
+  // Add --json for structured output
+  if (jsonOutput && !args.some((a) => a === '--json' || a.startsWith('--format='))) {
+    cmdArgs.push('--json')
+  }
+
+  // Add flags
+  for (const [key, val] of Object.entries(flags)) {
+    if (val === true) {
+      cmdArgs.push(`--${key}`)
+    } else if (val !== false && val != null) {
+      cmdArgs.push(`--${key}=${String(val)}`)
+    }
+  }
+
+  try {
+    const result = Bun.spawnSync(['hf', ...cmdArgs], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, ...(token ? { HF_TOKEN: token } : {}) },
+    })
+
+    const stdout = new TextDecoder().decode(result.stdout)
+    const stderr = new TextDecoder().decode(result.stderr)
+
+    if (result.exitCode !== 0) {
+      return {
+        ok: false,
+        error: `hf CLI exited with code ${result.exitCode}. stderr: ${stderr || stdout || 'unknown error'}`,
+      }
+    }
+
+    // Try to parse as JSON
+    let parsed: unknown = null
+    if (jsonOutput && stdout.trim()) {
+      try {
+        parsed = JSON.parse(stdout.trim())
+      } catch {
+        // Not valid JSON, keep raw output
+      }
+    }
+
+    return {
+      ok: true,
+      data: {
+        command: `hf ${command}`,
+        exit_code: result.exitCode,
+        output: parsed ?? stdout,
+        stderr: stderr || undefined,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to run hf command: ${(err as Error).message}` }
+  }
+}
+
 // ===========================================================================
 // Handler registry — keyed by `<pluginId>:<toolName>`
 // ===========================================================================
@@ -1252,6 +1764,14 @@ const HANDLERS: Record<string, LocalToolHandler> = {
   'instatic.huggingface:create_repo': handleHfCreateRepo,
   'instatic.huggingface:upload_file': handleHfUploadFile,
   'instatic.huggingface:get_repo_readme': handleHfGetRepoReadme,
+  'instatic.huggingface:get_whoami': handleHfGetWhoami,
+  'instatic.huggingface:download_file': handleHfDownloadFile,
+  'instatic.huggingface:delete_repo': handleHfDeleteRepo,
+  'instatic.huggingface:run_hf_command': handleHfRunCommand,
+  'instatic.huggingface:delete_file': handleHfDeleteFile,
+  'instatic.huggingface:get_trending': handleHfGetTrending,
+  'instatic.huggingface:list_collections': handleHfListCollections,
+  'instatic.huggingface:list_repo_refs': handleHfListRepoRefs,
 }
 
 /**

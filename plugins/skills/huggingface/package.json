@@ -35,7 +35,7 @@
     "aiTools": [
       {
         "name": "search_models",
-        "description": "Search the HuggingFace Hub for AI/ML models by keyword, task type, author, or sort by popularity (downloads, likes, trending). Returns model ID, downloads, likes, tags, and pipeline task.",
+        "description": "Search the HuggingFace Hub for AI/ML models by keyword, task type, author, tags, language, or sort by popularity (downloads, likes, trending). Returns model ID, downloads, likes, tags, and pipeline task. Supports advanced filtering by multiple tags and programming language.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -70,6 +70,20 @@
               "type": "string",
               "description": "Filter by author/organization (e.g. 'meta-llama', 'google', 'mistralai')"
             },
+            "library": {
+              "type": "string",
+              "description": "Filter by ML library: transformers, diffusers, timm, sentence-transformers, onnx, keras, safetensors, etc."
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Filter by tags (e.g. ['pytorch', 'safetensors', 'llama']). Models must have ALL specified tags.",
+              "default": []
+            },
+            "language": {
+              "type": "string",
+              "description": "Filter by language code (e.g. 'en', 'zh', 'fr', 'multilingual')"
+            },
             "sort": {
               "type": "string",
               "description": "Sort order",
@@ -82,19 +96,29 @@
               "minimum": 1,
               "maximum": 30,
               "default": 10
+            },
+            "full": {
+              "type": "boolean",
+              "description": "Return full model details including config, siblings, and card metadata. Slower but more complete.",
+              "default": false
             }
           }
         }
       },
       {
         "name": "get_model_info",
-        "description": "Get detailed information about a specific HuggingFace model: description, tags, pipeline type, downloads, likes, config, library, and a snippet of the model card (README).",
+        "description": "Get comprehensive information about a specific HuggingFace model: description, tags, pipeline type, downloads, likes, config, library, siblings (file list), and README snippet. Use this to deep-dive into a model's structure and capabilities.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "model_id": {
               "type": "string",
               "description": "Model ID on HuggingFace Hub (e.g. 'meta-llama/Llama-3.1-8B', 'bert-base-uncased')"
+            },
+            "with_files": {
+              "type": "boolean",
+              "description": "Include sibling files list (config.json, model weights, tokenizer files, etc.)",
+              "default": true
             }
           },
           "required": ["model_id"]
@@ -102,7 +126,7 @@
       },
       {
         "name": "search_datasets",
-        "description": "Search the HuggingFace Hub for datasets by keyword, task, or author. Returns dataset ID, downloads, likes, and tags.",
+        "description": "Search the HuggingFace Hub for datasets by keyword, task, author, tags, language, or size category. Returns dataset ID, downloads, likes, and tags.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -110,9 +134,28 @@
               "type": "string",
               "description": "Search query (e.g. 'imdb', 'cifar', 'wikipedia')"
             },
+            "task": {
+              "type": "string",
+              "description": "Filter by task type: text-classification, token-classification, question-answering, text-generation, summarization, translation, image-classification, object-detection, speech-recognition, etc."
+            },
             "author": {
               "type": "string",
               "description": "Filter by author/organization"
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Filter by tags (e.g. ['text', 'english', 'classification']). Datasets must have ALL specified tags.",
+              "default": []
+            },
+            "language": {
+              "type": "string",
+              "description": "Filter by language code (e.g. 'en', 'zh', 'fr', 'multilingual')"
+            },
+            "size_category": {
+              "type": "string",
+              "description": "Filter by dataset size: n<1K, 1K<n<10K, 10K<n<100K, 100K<n<1M, 1M<n<10M, 10M<n<100M, 100M<n<1B, n>1B",
+              "enum": ["n<1K", "1K<n<10K", "10K<n<100K", "100K<n<1M", "1M<n<10M", "10M<n<100M", "100M<n<1B", "n>1B"]
             },
             "sort": {
               "type": "string",
@@ -258,6 +301,14 @@
               "type": "string",
               "description": "For Spaces only: UI framework. Options: gradio, streamlit, static.",
               "enum": ["gradio", "streamlit", "static"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Repository description / README content (used as initial README.md)."
+            },
+            "license": {
+              "type": "string",
+              "description": "License identifier (e.g. 'mit', 'apache-2.0', 'cc-by-sa-4.0'). See https://huggingface.co/docs/hub/repositories-licenses"
             }
           },
           "required": ["name"]
@@ -315,8 +366,207 @@
           },
           "required": ["repo_id"]
         }
+      },
+      {
+        "name": "get_whoami",
+        "description": "Get the current authenticated HuggingFace user information: username, name, email, organizations, and token permissions. Useful for verifying that the API token is configured correctly.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "download_file",
+        "description": "Get a direct download link or raw content of a file from a HuggingFace repository (model, dataset, or Space). Supports downloading text files, config files, small dataset slices, etc. For large files or folders, use run_hf_command with 'hf download' instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "path": {
+              "type": "string",
+              "description": "File path inside the repository (e.g. 'config.json', 'data/train-00000-of-00001.parquet', 'README.md')"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Git revision: branch name, tag, or commit hash. Defaults to 'main'.",
+              "default": "main"
+            },
+            "return_content": {
+              "type": "boolean",
+              "description": "If true and file is text-based, return the file content. Otherwise return the download URL only.",
+              "default": false
+            }
+          },
+          "required": ["repo_id", "path"]
+        }
+      },
+      {
+        "name": "delete_repo",
+        "description": "Delete a HuggingFace repository (model, dataset, or Space). This action is irreversible. Requires a write-enabled API token with admin permissions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID to delete (e.g. 'username/my-repo')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "delete_file",
+        "description": "Delete a file from a HuggingFace repository (model, dataset, or Space). Requires a write-enabled API token. This action creates a new commit removing the file.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'username/my-dataset')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "path_in_repo": {
+              "type": "string",
+              "description": "File path inside the repository to delete (e.g. 'data/old.json', 'README.md')"
+            },
+            "message": {
+              "type": "string",
+              "description": "Git commit message",
+              "default": "Delete file via Instatic"
+            }
+          },
+          "required": ["repo_id", "path_in_repo"]
+        }
+      },
+      {
+        "name": "get_trending",
+        "description": "Get trending models, datasets, or Spaces from HuggingFace Hub. Returns the most popular items in the last 24 hours or 7 days.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "Type of item to get trending",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "period": {
+              "type": "string",
+              "description": "Trending period",
+              "enum": ["day", "week"],
+              "default": "day"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-30)",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        }
+      },
+      {
+        "name": "list_collections",
+        "description": "Search HuggingFace Collections (curated lists of models, datasets, and Spaces). Collections are user-curated groupings of related resources.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g. 'llama', 'diffusion', 'nlp')"
+            },
+            "author": {
+              "type": "string",
+              "description": "Filter by collection owner"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (1-30)",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        }
+      },
+      {
+        "name": "list_repo_refs",
+        "description": "List branches, tags, and commits in a HuggingFace repository. Useful for finding specific versions or tracking repository history.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "include": {
+              "type": "string",
+              "description": "What to include: branches, tags, or commits",
+              "enum": ["branches", "tags", "commits"],
+              "default": "branches"
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "run_hf_command",
+        "description": "Execute a HuggingFace hf CLI command for advanced operations not covered by REST API: download entire repositories/folders (hf download), upload folders (hf upload), list jobs (hf jobs), manage inference endpoints (hf endpoints), manage cache (hf cache), etc. Requires hf CLI to be installed. The token is automatically injected from plugin settings. Output is parsed as JSON when available.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "hf subcommand to run (e.g. 'download', 'upload', 'jobs ps', 'cache dir', 'auth whoami'). Do NOT include 'hf' prefix."
+            },
+            "args": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Additional positional arguments (e.g. repo_id, file paths).",
+              "default": []
+            },
+            "flags": {
+              "type": "object",
+              "description": "Additional flags as key-value pairs (e.g. {\"local-dir\": \"./models\", \"include\": \"*.safetensors\"}). Boolean flags use true as value.",
+              "default": {}
+            },
+            "json_output": {
+              "type": "boolean",
+              "description": "Add --json flag to get structured JSON output (recommended for agent parsing).",
+              "default": true
+            }
+          },
+          "required": ["command"]
+        }
       }
     ],
-    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces, inspect repository contents, create new repositories, upload files, and run inference on models.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type, author, or sort by popularity. Use this when users want to discover models for a task.\n- **get_model_info**: Get detailed info about a specific model (README snippet, tags, downloads, config). Use this after search to deep-dive.\n- **search_datasets**: Find datasets for training or evaluation. Sort by 'created' to find the newest datasets.\n- **get_dataset_info**: Get full dataset details including file tree and README. Use this to inspect a dataset's structure before downloading.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **list_repo_files**: List files in any repository (model/dataset/space). Use this to explore contents, check file sizes, or find specific files.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Requires a write-enabled API token.\n- **upload_file**: Upload a text file to a repository. Requires a write-enabled API token.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task filter first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading, provide the user with direct links: https://huggingface.co/datasets/{dataset_id}/resolve/main/{file_path}\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
+    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces, inspect repository contents, create/delete repositories, upload/download/delete files, run inference, discover trending items and collections, and execute advanced hf CLI commands.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type, library (transformers, diffusers, etc.), author, tags, or language. Sort by popularity. Use this when users want to discover models for a task. Set full=true for complete metadata.\n- **get_model_info**: Get comprehensive info about a specific model: README snippet, tags, downloads, config, library, and sibling files (config.json, weights, tokenizer). Use this after search to deep-dive into model structure.\n- **search_datasets**: Find datasets for training or evaluation. Filter by task, tags, language, or size category. Sort by 'created' to find the newest datasets.\n- **get_dataset_info**: Get full dataset details including file tree and README. Use this to inspect a dataset's structure before downloading.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **get_trending**: Discover trending models, datasets, or Spaces from the last 24 hours or 7 days.\n- **list_collections**: Search user-curated collections of related models, datasets, and Spaces.\n- **list_repo_files**: List files in any repository (model/dataset/space). Use this to explore contents, check file sizes, or find specific files.\n- **list_repo_refs**: List branches, tags, or commits in a repository. Useful for finding specific versions.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **download_file**: Get a direct download URL or raw content of a specific file in a repo.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Supports description and license. Requires a write-enabled API token.\n- **upload_file**: Upload a text file to a repository. Requires a write-enabled API token.\n- **delete_file**: Delete a file from a repository. Creates a new commit. Requires write token.\n- **delete_repo**: Delete a repository. Irreversible. Requires admin token.\n- **get_whoami**: Verify the configured API token and show current user info.\n- **run_hf_command**: Execute advanced hf CLI commands: download entire repos/folders, upload folders, manage jobs/endpoints/cache, etc. Requires hf CLI installation.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task and library filters first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading single files, use download_file. For downloading entire repos or folders, use run_hf_command with 'download'.\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'. You can also provide an initial description that becomes the README.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Before destructive operations (delete_repo, delete_file), confirm the user's intent.\n- For run_hf_command, prefer --json output for structured data. If hf CLI is not installed, guide the user to install it via 'pip install -U huggingface_hub' or 'curl -LsSf https://huggingface.co/cli/install.sh | bash'.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
   }
 }
