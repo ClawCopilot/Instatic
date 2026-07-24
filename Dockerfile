@@ -80,13 +80,14 @@ ENV UPLOADS_DIR=/app/uploads
 ENV INSTATIC_VERSION=${INSTATIC_VERSION}
 ENV INSTATIC_REVISION=${INSTATIC_REVISION}
 
-# Install bash (start.sh dependency), ca-certificates, python3
+# Install bash (start.sh dependency), ca-certificates, python3, git (HF CLI needs git)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip \
+    && apt-get install -y --no-install-recommends bash ca-certificates python3 python3-pip git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install huggingface_hub CLI（可选 HF Dataset 备份/恢复）
-RUN pip3 install --break-system-packages --no-cache-dir huggingface_hub[cli]>=0.31.1
+# Install huggingface_hub CLI (required by HuggingFace Skill for hf CLI tools)
+RUN pip3 install --break-system-packages --no-cache-dir "huggingface_hub[cli]>=0.31.1" \
+    && hf --version
 
 COPY --from=production-deps --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=build --chown=bun:bun /app/dist ./dist
@@ -94,6 +95,7 @@ COPY --chown=bun:bun package.json bun.lock ./
 COPY --chown=bun:bun tsconfig*.json ./
 COPY --chown=bun:bun server ./server
 COPY --chown=bun:bun src ./src
+COPY --chown=bun:bun plugins ./plugins
 
 # Copy cloudflared (核心) + sing-box (可选)
 COPY --from=cloudflared-layer /tmp/cloudflared /usr/local/bin/cloudflared
