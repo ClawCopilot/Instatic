@@ -101,7 +101,7 @@ function buildFakeDb(
     }
 
     // ── getDraftSite ───────────────────────────────────────────────────────
-    if (s.startsWith('select id, name, version, enabled, lifecycle_status')) {
+    if (s.includes('from installed_plugins')) {
       // Plugin listing for hook bus
       return { rows: [], rowCount: 0 }
     }

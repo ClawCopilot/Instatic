@@ -371,10 +371,10 @@ const manifestSchema = Type.Object({
       inputSchema: Type.Record(Type.String(), Type.Unknown()),
       mutates: Type.Optional(Type.Boolean()),
     }, { additionalProperties: false }),
-    { maxItems: 20 },
+    { maxItems: 35 },
   )),
   /** System prompt injected into AI conversations when this skill is active. */
-  systemPrompt: Type.Optional(Type.String({ maxLength: 4000 })),
+  systemPrompt: Type.Optional(Type.String({ maxLength: 12000 })),
   /** Conditions under which the system prompt is activated. */
   triggers: Type.Optional(Type.Array(
     Type.Object({

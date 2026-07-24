@@ -51,12 +51,12 @@ function makeFakeDb(pluginRows: FakePluginRow[]) {
     const sql = strings.reduce<string>((acc, s, i) => (i === 0 ? s : `${acc}$${i}${s}`), '')
     const norm = sql.replace(/\s+/g, ' ').trim().toLowerCase()
 
-    // listInstalledPlugins
-    if (norm.includes('select id, name, version, enabled') && !norm.includes('where id =')) {
+    // listInstalledPlugins (must start with select to avoid matching delete)
+    if (norm.includes('select') && norm.includes('from installed_plugins') && !norm.includes('where id =')) {
       return { rows: [...pluginRows] as Row[], rowCount: pluginRows.length }
     }
-    // getInstalledPlugin
-    if (norm.includes('select id, name, version, enabled') && norm.includes('where id =')) {
+    // getInstalledPlugin (must start with select to avoid matching delete)
+    if (norm.includes('select') && norm.includes('from installed_plugins') && norm.includes('where id =')) {
       const row = pluginRows.find((r) => r.id === values[0])
       return { rows: row ? [row as Row] : [], rowCount: row ? 1 : 0 }
     }
@@ -101,6 +101,7 @@ function makeValidRow(overrides: Partial<FakePluginRow> = {}): FakePluginRow {
     id: 'test.valid-plugin',
     name: 'Valid Plugin',
     version: '1.0.0',
+    source: 'user',
     enabled: true,
     lifecycle_status: 'active',
     last_error: null,
@@ -118,6 +119,7 @@ function makeBrokenRow(overrides: Partial<FakePluginRow> = {}): FakePluginRow {
     id: 'test.broken-plugin',
     name: 'Broken Plugin',
     version: '2.0.0',
+    source: 'user',
     enabled: true,
     lifecycle_status: 'active',
     last_error: null,

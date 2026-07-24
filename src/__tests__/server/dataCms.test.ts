@@ -337,7 +337,7 @@ describe('data CMS public routes', () => {
     // document.
     const db = makeDataFakeDb([
       (sql) => {
-        if (sql.startsWith('select id, name, version, enabled, lifecycle_status')) {
+        if (sql.includes('from installed_plugins')) {
           return { rows: [], rowCount: 0 }
         }
         return undefined

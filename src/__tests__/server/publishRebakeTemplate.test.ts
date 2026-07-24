@@ -52,7 +52,7 @@ function buildFakeDb(layout: Page, about: Page) {
   return createFakeDb(async (sql: string, params: unknown[]): Promise<DbResult> => {
     const s = sql.replace(/\s+/g, ' ').trim().toLowerCase()
 
-    if (s.startsWith('select id, name, version, enabled, lifecycle_status')) return { rows: [], rowCount: 0 }
+    if (s.includes('from installed_plugins')) return { rows: [], rowCount: 0 }
 
     if (s.includes('from site') && s.includes('select id')) {
       return {
