@@ -188,8 +188,135 @@
           },
           "required": ["model_id", "inputs"]
         }
+      },
+      {
+        "name": "get_dataset_info",
+        "description": "Get detailed information about a specific HuggingFace dataset: description, tags, download stats, file tree listing, and README content. Use this to inspect a dataset before downloading or to understand its structure.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "dataset_id": {
+              "type": "string",
+              "description": "Dataset ID on HuggingFace Hub (e.g. 'imdb', 'HuggingFaceFW/fineweb', 'wikitext')"
+            },
+            "with_files": {
+              "type": "boolean",
+              "description": "Include file tree listing",
+              "default": true
+            }
+          },
+          "required": ["dataset_id"]
+        }
+      },
+      {
+        "name": "list_repo_files",
+        "description": "List files and directories in a HuggingFace repository (model, dataset, or Space). Returns paths, types (file/directory), sizes, and LFS status. Useful for exploring repo contents before downloading or backing up.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B', 'imdb', 'stabilityai/stable-diffusion-xl-base-1.0')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "path": {
+              "type": "string",
+              "description": "Subdirectory path to list (e.g. 'data', 'configs', 'src'). Leave empty for root.",
+              "default": ""
+            }
+          },
+          "required": ["repo_id"]
+        }
+      },
+      {
+        "name": "create_repo",
+        "description": "Create a new repository on HuggingFace Hub: model, dataset, or Space. Requires a write-enabled API token (set in plugin settings or HUGGINGFACE_API_TOKEN env var). For Spaces, specify the SDK (gradio, streamlit, or static).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Repository name. For personal repos: 'my-repo'. For organization repos: 'org-name/repo-name'."
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type to create",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "private": {
+              "type": "boolean",
+              "description": "Create as private repository",
+              "default": false
+            },
+            "sdk": {
+              "type": "string",
+              "description": "For Spaces only: UI framework. Options: gradio, streamlit, static.",
+              "enum": ["gradio", "streamlit", "static"]
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "upload_file",
+        "description": "Upload a text file to a HuggingFace repository (model, dataset, or Space). Requires a write-enabled API token. Useful for uploading configs, README updates, code files, or small dataset files. For large binary files, use the HuggingFace CLI or Git LFS instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Target repository ID (e.g. 'username/my-dataset')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            },
+            "path_in_repo": {
+              "type": "string",
+              "description": "Target file path inside the repository (e.g. 'README.md', 'data/train.json', 'app.py')"
+            },
+            "content": {
+              "type": "string",
+              "description": "Text content to upload"
+            },
+            "message": {
+              "type": "string",
+              "description": "Git commit message",
+              "default": "Upload file via Instatic"
+            }
+          },
+          "required": ["repo_id", "path_in_repo", "content"]
+        }
+      },
+      {
+        "name": "get_repo_readme",
+        "description": "Fetch the README.md content of a HuggingFace repository (model, dataset, or Space). Returns the raw markdown text, useful for understanding what a repo does without browsing the website.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_id": {
+              "type": "string",
+              "description": "Repository ID (e.g. 'meta-llama/Llama-3.1-8B', 'imdb')"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository type",
+              "enum": ["model", "dataset", "space"],
+              "default": "model"
+            }
+          },
+          "required": ["repo_id"]
+        }
       }
     ],
-    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces on the HuggingFace Hub, get detailed model information, and run inference on models.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type (text-generation, image-classification, etc.), author, or sort by popularity. Use this when users want to discover models for a task.\n- **get_model_info**: Get detailed info about a specific model (README snippet, tags, downloads, config). Use this after search to deep-dive into a model.\n- **search_datasets**: Find datasets for training or evaluation.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **run_inference**: Run a model on input text. Requires an API token. Common tasks: text generation, classification, summarization, Q&A, NER, translation.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task filter first.\n- Always present model results in a clear format: model ID, task type, downloads, likes, and a brief description.\n- For inference, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
+    "systemPrompt": "You are a HuggingFace Hub integration assistant. You can search for AI/ML models, datasets, and Spaces, inspect repository contents, create new repositories, upload files, and run inference on models.\n\n## Capabilities\n- **search_models**: Find models by keyword, task type, author, or sort by popularity. Use this when users want to discover models for a task.\n- **get_model_info**: Get detailed info about a specific model (README snippet, tags, downloads, config). Use this after search to deep-dive.\n- **search_datasets**: Find datasets for training or evaluation. Sort by 'created' to find the newest datasets.\n- **get_dataset_info**: Get full dataset details including file tree and README. Use this to inspect a dataset's structure before downloading.\n- **search_spaces**: Find interactive ML app demos on HuggingFace Spaces.\n- **list_repo_files**: List files in any repository (model/dataset/space). Use this to explore contents, check file sizes, or find specific files.\n- **get_repo_readme**: Fetch the README markdown of any repository.\n- **run_inference**: Run a model on input text. Requires an API token.\n- **create_repo**: Create a new model, dataset, or Space repository. Requires a write-enabled API token.\n- **upload_file**: Upload a text file to a repository. Requires a write-enabled API token.\n\n## Guidelines\n- When a user asks about a task (e.g. 'I need a sentiment analysis model'), use search_models with the appropriate task filter first.\n- To find the latest datasets, use search_datasets with sort='created'.\n- To back up or inspect a dataset, first use get_dataset_info to see its structure, then use list_repo_files to explore subdirectories. For downloading, provide the user with direct links: https://huggingface.co/datasets/{dataset_id}/resolve/main/{file_path}\n- For creating Spaces: set repo_type='space' and choose sdk='gradio' (default UI), 'streamlit', or 'static'.\n- Always present model/dataset results in a clear format: ID, type, downloads, likes, and brief description.\n- For inference and write operations, ensure the user has set their HuggingFace API token in plugin settings. If no token is configured, inform them how to get one at https://huggingface.co/settings/tokens.\n- Popular model IDs for reference: meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct, bert-base-uncased, distilbert-base-uncased-finetuned-sst-2-english, google/flan-t5-large, sentence-transformers/all-MiniLM-L6-v2.\n- Respond in the language the user writes in."
   }
 }

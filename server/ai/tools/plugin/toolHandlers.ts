@@ -948,6 +948,290 @@ async function handleHfRunInference(input: unknown): Promise<unknown> {
   }
 }
 
+/** Get detailed information about a HuggingFace dataset. */
+async function handleHfGetDatasetInfo(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const datasetId = typeof p.dataset_id === 'string' ? p.dataset_id.trim() : ''
+  const withFiles = p.with_files !== false
+  if (!datasetId) return { ok: false, error: 'dataset_id is required' }
+
+  try {
+    // Fetch dataset metadata
+    const metaRes = await retryFetch(`${HF_HUB_API}/datasets/${encodeURIComponent(datasetId)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!metaRes.ok) {
+      return { ok: false, error: `Dataset not found or API returned ${metaRes.status}` }
+    }
+    const meta = (await metaRes.json()) as Record<string, unknown>
+
+    // Fetch file tree
+    let files: unknown[] = []
+    if (withFiles) {
+      try {
+        const treeRes = await retryFetch(
+          `${HF_HUB_API}/datasets/${encodeURIComponent(datasetId)}/tree/main`,
+          { headers: { Accept: 'application/json' } },
+        )
+        if (treeRes.ok) {
+          files = (await treeRes.json()) as unknown[]
+        }
+      } catch {
+        // File tree is optional
+      }
+    }
+
+    // Fetch README
+    let readme = ''
+    try {
+      const readmeRes = await proxyFetch(
+        `https://huggingface.co/datasets/${encodeURIComponent(datasetId)}/raw/main/README.md`,
+      )
+      if (readmeRes.ok) {
+        const fullReadme = await readmeRes.text()
+        readme = fullReadme.slice(0, 2000) + (fullReadme.length > 2000 ? '\n...(truncated)' : '')
+      }
+    } catch {
+      // README is optional
+    }
+
+    const fileList = (files as Array<Record<string, unknown>>).map((f) => ({
+      path: f.path ?? 'unknown',
+      type: f.type ?? 'file',
+      size: f.size ?? 0,
+      lfs: f.lfs != null,
+    }))
+
+    return {
+      ok: true,
+      data: {
+        id: meta.id ?? datasetId,
+        author: meta.author ?? datasetId.split('/')[0],
+        description: (meta.description as string) ?? '',
+        downloads: meta.downloads ?? 0,
+        likes: meta.likes ?? 0,
+        tags: (meta.tags as string[] | undefined)?.slice(0, 10) ?? [],
+        created: meta.createdAt ?? 'unknown',
+        last_modified: meta.lastModified ?? 'unknown',
+        private: meta.private ?? false,
+        files: fileList,
+        file_count: fileList.length,
+        readme,
+        url: `https://huggingface.co/datasets/${datasetId}`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to get dataset info: ${(err as Error).message}` }
+  }
+}
+
+/** List files in a HuggingFace repository. */
+async function handleHfListRepoFiles(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const path = typeof p.path === 'string' ? p.path.trim() : ''
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+  const treePath = path ? `/tree/main/${encodeURIComponent(path)}` : '/tree/main'
+
+  try {
+    const res = await retryFetch(`${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}${treePath}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) {
+      return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
+    }
+    const items = (await res.json()) as Array<Record<string, unknown>>
+    const results = items.map((item) => ({
+      path: item.path ?? 'unknown',
+      type: item.type ?? 'file',
+      size: item.size ?? 0,
+      lfs: item.lfs != null,
+      oid: item.oid ?? '',
+    }))
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        path: path || 'root',
+        count: results.length,
+        files: results,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to list repo files: ${(err as Error).message}` }
+  }
+}
+
+/** Create a new repository on HuggingFace Hub. */
+async function handleHfCreateRepo(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const name = typeof p.name === 'string' ? p.name.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const isPrivate = p.private === true
+  const sdk = typeof p.sdk === 'string' ? p.sdk : undefined
+
+  if (!name) return { ok: false, error: 'name is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  const body: Record<string, unknown> = {
+    name,
+    type: repoType === 'model' ? 'model' : repoType,
+    private: isPrivate,
+  }
+  if (repoType === 'space' && sdk) {
+    body.sdk = sdk
+  }
+
+  try {
+    const res = await proxyFetch(`${HF_HUB_API}/repos/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Create repo failed: ${res.status} ${errorText}` }
+    }
+
+    const data = (await res.json()) as Record<string, unknown>
+    const namespace = name.includes('/') ? name.split('/')[0] : (data.author as string) ?? 'user'
+    const repoName = name.includes('/') ? name.split('/')[1] : name
+    const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+
+    return {
+      ok: true,
+      data: {
+        name,
+        repo_type: repoType,
+        private: isPrivate,
+        url: `https://huggingface.co/${typePrefix}${namespace}/${repoName}`,
+        ...data,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to create repo: ${(err as Error).message}` }
+  }
+}
+
+/** Upload a text file to a HuggingFace repository. */
+async function handleHfUploadFile(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  const pathInRepo = typeof p.path_in_repo === 'string' ? p.path_in_repo.trim() : ''
+  const content = typeof p.content === 'string' ? p.content : ''
+  const message = typeof p.message === 'string' ? p.message.trim() : 'Upload file via Instatic'
+
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+  if (!pathInRepo) return { ok: false, error: 'path_in_repo is required' }
+  if (!['model', 'dataset', 'space'].includes(repoType)) {
+    return { ok: false, error: 'repo_type must be one of: model, dataset, space' }
+  }
+
+  const token = getHfToken()
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        'No HuggingFace API token found. Please either set HUGGINGFACE_API_TOKEN environment variable, or configure the token in the HuggingFace plugin settings panel. Get a free token at https://huggingface.co/settings/tokens',
+    }
+  }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+
+  try {
+    // Build multipart form data
+    const form = new FormData()
+    const blob = new Blob([content], { type: 'text/plain' })
+    form.append('file', blob, pathInRepo.split('/').pop() ?? 'file')
+
+    const res = await proxyFetch(
+      `${HF_HUB_API}/${typePrefix}${encodeURIComponent(repoId)}/upload/main/${encodeURIComponent(pathInRepo)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Commit-Message': message,
+        },
+        body: form,
+      },
+    )
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText)
+      return { ok: false, error: `Upload failed: ${res.status} ${errorText}` }
+    }
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        path: pathInRepo,
+        commit: data.commit ?? data,
+        url: `https://huggingface.co/${typePrefix}${repoId}/blob/main/${pathInRepo}`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to upload file: ${(err as Error).message}` }
+  }
+}
+
+/** Fetch the README.md of a HuggingFace repository. */
+async function handleHfGetRepoReadme(input: unknown): Promise<unknown> {
+  const p = (input ?? {}) as Record<string, unknown>
+  const repoId = typeof p.repo_id === 'string' ? p.repo_id.trim() : ''
+  const repoType = typeof p.repo_type === 'string' ? p.repo_type : 'model'
+  if (!repoId) return { ok: false, error: 'repo_id is required' }
+
+  const typePrefix = repoType === 'model' ? '' : `${repoType}s/`
+
+  try {
+    const res = await proxyFetch(
+      `https://huggingface.co/${typePrefix}${encodeURIComponent(repoId)}/raw/main/README.md`,
+    )
+    if (!res.ok) {
+      return { ok: false, error: `README not found or API returned ${res.status}` }
+    }
+    const readme = await res.text()
+    return {
+      ok: true,
+      data: {
+        repo_id: repoId,
+        repo_type: repoType,
+        content: readme,
+        length: readme.length,
+        url: `https://huggingface.co/${typePrefix}${repoId}#readme`,
+      },
+    }
+  } catch (err) {
+    return { ok: false, error: `Failed to fetch README: ${(err as Error).message}` }
+  }
+}
+
 // ===========================================================================
 // Handler registry — keyed by `<pluginId>:<toolName>`
 // ===========================================================================
@@ -963,6 +1247,11 @@ const HANDLERS: Record<string, LocalToolHandler> = {
   'instatic.huggingface:search_datasets': handleHfSearchDatasets,
   'instatic.huggingface:search_spaces': handleHfSearchSpaces,
   'instatic.huggingface:run_inference': handleHfRunInference,
+  'instatic.huggingface:get_dataset_info': handleHfGetDatasetInfo,
+  'instatic.huggingface:list_repo_files': handleHfListRepoFiles,
+  'instatic.huggingface:create_repo': handleHfCreateRepo,
+  'instatic.huggingface:upload_file': handleHfUploadFile,
+  'instatic.huggingface:get_repo_readme': handleHfGetRepoReadme,
 }
 
 /**
