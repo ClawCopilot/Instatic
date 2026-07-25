@@ -25,6 +25,10 @@ export function ConversationHistory() {
   const loadAgentConversation = useAgentStore((s) => s.loadAgentConversation)
   const startNewAgentConversation = useAgentStore((s) => s.startNewAgentConversation)
   const deleteAgentConversation = useAgentStore((s) => s.deleteAgentConversation)
+  const isStreaming = useAgentStore((s) => s.isAgentStreaming)
+  const conversationPending = useAgentStore((s) => s.isAgentConversationPending)
+  const providerPending = useAgentStore((s) => s.isAgentProviderPending)
+  const controlsDisabled = isStreaming || conversationPending || providerPending
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -43,6 +47,7 @@ export function ConversationHistory() {
         variant="ghost"
         size="xs"
         iconOnly
+        disabled={controlsDisabled}
         onClick={() => setOpen((v) => !v)}
         tooltip="Chat history"
         aria-haspopup="menu"
@@ -64,6 +69,7 @@ export function ConversationHistory() {
           onClose={() => setOpen(false)}
         >
           <ContextMenuItem
+            disabled={controlsDisabled}
             onClick={() => {
               startNewAgentConversation()
               setOpen(false)
@@ -87,6 +93,7 @@ export function ConversationHistory() {
                   role="menuitemradio"
                   aria-checked={isActive}
                   active={isActive}
+                  disabled={controlsDisabled}
                   onClick={() => {
                     if (!isActive) void loadAgentConversation(conv.id)
                     setOpen(false)
@@ -115,14 +122,17 @@ export function ConversationHistory() {
                         elements are invalid HTML + would trip BTN-3. */}
                     <span
                       role="button"
-                      tabIndex={0}
+                      tabIndex={controlsDisabled ? -1 : 0}
+                      aria-disabled={controlsDisabled}
                       className={styles.historyItemDelete}
                       aria-label={`Delete chat "${conv.title}"`}
                       onClick={(e) => {
                         e.stopPropagation()
+                        if (controlsDisabled) return
                         void deleteAgentConversation(conv.id)
                       }}
                       onKeyDown={(e) => {
+                        if (controlsDisabled) return
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
                           e.stopPropagation()

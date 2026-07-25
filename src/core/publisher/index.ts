@@ -42,7 +42,20 @@ export {
   generateClassCSS,
   isEmittableProperty,
 } from './classCss'
-export type { StyleRuleCssEmitter, ViewportContext } from './classCss'
+export type {
+  StyleRuleCssEmitter,
+  StyleRuleDeclarationLayers,
+  ViewportContext,
+} from './classCss'
+
+export {
+  collectBackgroundImagePaths,
+  collectBackgroundImagePathsFromStyleBag,
+  collectNodeBackgroundImagePaths,
+  collectSiteStyleBackgroundImagePaths,
+  responsiveBackgroundImage,
+} from './responsiveBackground'
+export type { ResponsiveCssOptions } from './responsiveBackground'
 
 export {
   collectBackgroundImagePaths,

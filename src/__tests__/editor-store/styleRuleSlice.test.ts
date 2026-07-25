@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { useEditorStore } from '@site/store/store'
+import type { NewStyleRule } from '@core/siteImport'
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -217,6 +218,50 @@ describe('styleRuleSlice.setClassContextStyles', () => {
     getStore().updateClassStyles(cls.id, { fontSize: '14px' })
     getStore().setClassContextStyles(cls.id, 'mobile', { fontSize: '12px' })
     expect(useEditorStore.getState().site!.styleRules[cls.id].styles.fontSize).toBe('14px')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// applyCssRules
+// ---------------------------------------------------------------------------
+
+describe('styleRuleSlice.applyCssRules', () => {
+  it('skips identical writes and prunes priority metadata when values are cleared', () => {
+    setupSite()
+    const incoming: NewStyleRule = {
+      name: 'priority',
+      kind: 'class',
+      selector: '.priority',
+      order: 0,
+      styles: { color: 'red' },
+      stylePriorities: { color: 'important' },
+      contextStyles: { mobile: { color: 'blue' } },
+      contextStylePriorities: { mobile: { color: 'important' } },
+    }
+
+    expect(getStore().applyCssRules([incoming], [], 'merge')).toEqual({
+      created: 1,
+      updated: 0,
+      blockedSelectors: [],
+    })
+    const rule = Object.values(useEditorStore.getState().site!.styleRules)
+      .find((candidate) => candidate.selector === '.priority')!
+    const historyBeforeNoop = historyLength()
+    const updatedAtBeforeNoop = rule.updatedAt
+
+    expect(getStore().applyCssRules([incoming], [], 'merge')).toEqual({
+      created: 0,
+      updated: 0,
+      blockedSelectors: [],
+    })
+    expect(historyLength()).toBe(historyBeforeNoop)
+    expect(useEditorStore.getState().site!.styleRules[rule.id].updatedAt).toBe(updatedAtBeforeNoop)
+
+    getStore().updateClassStyles(rule.id, { color: undefined })
+    getStore().setClassContextStyles(rule.id, 'mobile', { color: undefined })
+    const cleared = useEditorStore.getState().site!.styleRules[rule.id]
+    expect(cleared.stylePriorities).toBeUndefined()
+    expect(cleared.contextStylePriorities).toBeUndefined()
   })
 })
 

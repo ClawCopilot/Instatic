@@ -139,6 +139,17 @@ describe('cssToStyleRules — @media → contextStyles (matched)', () => {
     expect(rules[0].styles).toEqual({})
     expect(rules[0].contextStyles.mobile).toMatchObject({ color: 'blue' })
   })
+
+  it('preserves declaration priority in a matched context', () => {
+    const { rules } = cssToStyleRules(
+      '@media (max-width: 768px) { .foo { color: blue !important } }',
+      { breakpoints: [{ id: 'mobile', width: 768 }] },
+    )
+    expect(rules[0].contextStyles.mobile.color).toBe('blue')
+    expect(rules[0].contextStylePriorities).toEqual({
+      mobile: { color: 'important' },
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -449,6 +460,22 @@ describe('cssToStyleRules — duplicate class names', () => {
     expect(warnings).toHaveLength(1)
     expect(warnings[0].kind).toBe('duplicate-class')
     expect(warnings[0].selector).toBe('.foo')
+  })
+
+  it('an earlier important declaration resists a later normal declaration', () => {
+    const { rules } = cssToStyleRules(
+      '.foo { color: red !important } .foo { color: blue }',
+    )
+    expect(rules[0].styles.color).toBe('red')
+    expect(rules[0].stylePriorities).toEqual({ color: 'important' })
+  })
+
+  it('a later important declaration replaces an earlier normal declaration', () => {
+    const { rules } = cssToStyleRules(
+      '.foo { color: red } .foo { color: blue !important }',
+    )
+    expect(rules[0].styles.color).toBe('blue')
+    expect(rules[0].stylePriorities).toEqual({ color: 'important' })
   })
 
   it('ambient h1 duplicates are allowed (no dedup for ambient)', () => {

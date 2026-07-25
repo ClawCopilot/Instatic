@@ -285,6 +285,14 @@ export async function writeArtefact(
  *
  * Any leftover `current.tmp` from a previously-crashed publish is silently
  * removed before creating a new one.
+ *
+ * Windows note: `rename(2)` over an existing symlink is atomic on POSIX, but
+ * Win32 `MoveFile` refuses to replace an existing target (`EEXIST`/`EPERM`),
+ * leaving `current` stuck on the old slot and `current.tmp` orphaned. There we
+ * fall back to unlink-then-rename — a sub-millisecond window where `current` is
+ * absent, which `readArtefact` already treats as a miss and serves via the
+ * Layer B live-render path. Production runs Linux/Docker and always takes the
+ * atomic branch; the fallback is a dev-on-Windows affordance only.
  */
 export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<void> {
   const publishDir = getPublishedDir(uploadsDir)
@@ -294,21 +302,26 @@ export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<vo
   // Ensure the published/ directory exists (may be first ever publish)
   await mkdir(publishDir, { recursive: true })
 
-  // Remove any leftover tmp symlink/file from a previous crashed publish
+  // Remove any leftover tmp symlink from a previous crashed publish
   await removeSymlinkEntry(tmpPath)
 
+  // On Windows use a plain text file instead of a symlink (non-admin
+  // compatible). The readArtefact/readStaticAsset paths handle both formats.
   if (process.platform === 'win32') {
-    // Windows: use plain file instead of symlink (non-admin compatible)
     await writeFile(tmpPath, targetSlot, 'utf-8')
-    await removeSymlinkEntry(currentPath) // Remove old file/symlink
+    await removeSymlinkEntry(currentPath)
     await rename(tmpPath, currentPath)
   } else {
-    // POSIX: atomic symlink swap
+    // POSIX: create a new symlink, then atomically replace the old one.
     await symlink(targetSlot, tmpPath)
     try {
       await rename(tmpPath, currentPath)
-    } catch (_err) {
-      // Fallback for edge cases
+    } catch (err) {
+      // Windows-only fallback (reached on WSL or unusual edge cases).
+      // Win32 `MoveFile` won't replace an existing target (`EEXIST`/`EPERM`/`EISDIR`/`EACCES`).
+      if (process.platform !== 'win32') throw err
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST' && code !== 'EPERM' && code !== 'EISDIR' && code !== 'EACCES') throw err
       await removeSymlinkEntry(currentPath)
       await rename(tmpPath, currentPath)
     }
@@ -381,8 +394,8 @@ async function removeSymlinkEntry(path: string): Promise<void> {
  *   - The URL path escapes the published root (path safety).
  *   - Any other IO error occurs (treated as a miss, never thrown).
  *
- * Cheap enough to call on every no-query-string visitor request (Layer A fast
- * path: 1 syscall on cache hit, no DB).
+ * Cheap enough to call on every canonical-query-empty visitor request (Layer A
+ * fast path: 1 syscall on cache hit, no DB).
  */
 export async function readArtefact(uploadsDir: string, urlPath: string): Promise<string | null> {
   // Validate the URL and compute the relative disk path

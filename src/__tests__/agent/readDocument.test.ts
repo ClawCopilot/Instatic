@@ -71,12 +71,15 @@ describe('renderAgentDocument', () => {
     const longUrl = `https://cdn.example.com/assets/${'path-'.repeat(180)}hero.png?signature=${'b'.repeat(500)}`
     const page = makePage({
       root: { moduleId: 'base.body', children: ['inlineData', 'remoteImage'] },
+      // The base64 payload rides TEXT CONTENT — the one channel that still
+      // legitimately reaches the read surface (a pasted blob in a paragraph).
+      // URL-bearing attributes can no longer carry it: `isSafeUrl` rejects
+      // data: schemes in src/href, and sanitizeRenderableHtmlAttribute
+      // (@core/htmlAttributes) rejects data:-scheme values in custom
+      // attributes outright.
       inlineData: {
         moduleId: 'base.text',
-        props: {
-          text: `Embedded: data:image/png;base64,${longBase64}`,
-          tag: 'p',
-        },
+        props: { text: `Pasted blob: data:image/png;base64,${longBase64}`, tag: 'p' },
       },
       remoteImage: { moduleId: 'base.image', props: { src: longUrl } },
     })

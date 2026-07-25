@@ -20,6 +20,7 @@ import './matchers'  // Register toBeCleanHTML
 
 import { runModuleConformanceSuite, renderModule, withBannedGlobals } from './helpers'
 import { escapeProps } from '@core/publisher'
+import { CanvasDocumentContext } from '@site/canvas/CanvasContexts'
 
 // ---------------------------------------------------------------------------
 // Import base modules (self-register into global registry on import)
@@ -426,23 +427,45 @@ describe('base.body — render() specifics', () => {
 
   it('applies editor identity to the iframe body without wrapping children', () => {
     const editorDocument = document.implementation.createHTMLDocument('canvas')
+    editorDocument.body.className = 'frame-default'
+    editorDocument.body.dataset.breakpointId = 'desktop'
+    editorDocument.body.style.backgroundColor = 'rgb(1, 2, 3)'
     const mount = editorDocument.createElement('div')
     editorDocument.body.appendChild(mount)
 
-    const { container } = renderReact(
-      React.createElement(BodyModule.component, {
-        props: {},
-        nodeId: 'body-node',
-        isSelected: true,
-        mcClassName: 'ist-body',
-        nodeWrapperProps: {
-          'data-node-id': 'body-node',
-          'data-module-id': 'base.body',
-          'data-canvas-selected': 'true',
-          tabIndex: 0,
-        },
-        children: React.createElement('p', null, 'Body child'),
-      } as never),
+    const { container, unmount } = renderReact(
+      React.createElement(
+        CanvasDocumentContext.Provider,
+        { value: editorDocument },
+        React.createElement(BodyModule.component, {
+          props: {
+            htmlAttributes: {
+              id: 'site-body',
+              dir: 'rtl',
+              role: 'document',
+              'aria-pressed': 'false',
+              'data-theme': 'dark',
+              'data-breakpoint-id': 'forged',
+              tabindex: '9',
+              onclick: 'alert(1)',
+            },
+          },
+          nodeId: 'body-node',
+          isSelected: true,
+          mcClassName: 'ist-body',
+          nodeWrapperProps: {
+            'data-node-id': 'body-node',
+            'data-module-id': 'base.body',
+            'data-canvas-selected': 'true',
+            tabIndex: 0,
+            style: {
+              backgroundColor: 'rgb(9, 10, 11)',
+              backgroundImage: 'linear-gradient(red, blue)',
+            },
+          },
+          children: React.createElement('p', null, 'Body child'),
+        } as never),
+      ),
       { container: mount },
     )
 
@@ -450,10 +473,32 @@ describe('base.body — render() specifics', () => {
     expect(editorDocument.body.getAttribute('data-module-id')).toBe('base.body')
     expect(editorDocument.body.getAttribute('data-canvas-selected')).toBe('true')
     expect(editorDocument.body.getAttribute('tabindex')).toBe('0')
+    expect(editorDocument.body.getAttribute('id')).toBe('site-body')
+    expect(editorDocument.body.getAttribute('dir')).toBe('rtl')
+    expect(editorDocument.body.getAttribute('role')).toBe('document')
+    expect(editorDocument.body.getAttribute('aria-pressed')).toBe('false')
+    expect(editorDocument.body.getAttribute('data-theme')).toBe('dark')
+    expect(editorDocument.body.getAttribute('data-breakpoint-id')).toBe('desktop')
+    expect(editorDocument.body.hasAttribute('onclick')).toBe(false)
     expect(editorDocument.body.className).toBe('ist-body')
-    expect(container.querySelector('[data-instatic-body-probe]')?.getAttribute('aria-hidden')).toBe('true')
+    expect(editorDocument.body.style.backgroundColor).toBe('rgb(9, 10, 11)')
+    expect(editorDocument.body.style.backgroundImage).toBe('linear-gradient(red, blue)')
+    expect(container.querySelector('[data-instatic-body-probe]')).toBeNull()
     expect(container.querySelector('p')?.textContent).toBe('Body child')
-    expect(container.firstElementChild?.nextElementSibling?.tagName).toBe('P')
+    expect(container.children).toHaveLength(1)
+    expect(container.firstElementChild?.tagName).toBe('P')
+
+    unmount()
+    expect(editorDocument.body.className).toBe('frame-default')
+    expect(editorDocument.body.style.backgroundColor).toBe('rgb(1, 2, 3)')
+    expect(editorDocument.body.style.backgroundImage).toBe('')
+    expect(editorDocument.body.hasAttribute('id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-theme')).toBe(false)
+    expect(editorDocument.body.getAttribute('data-breakpoint-id')).toBe('desktop')
+    expect(editorDocument.body.hasAttribute('data-node-id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-module-id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-canvas-selected')).toBe(false)
+    expect(editorDocument.body.hasAttribute('tabindex')).toBe(false)
   })
 
   it('does not access DOM globals during publish render', () => {
@@ -868,13 +913,13 @@ describe('base.svg — render() specifics', () => {
       } as never),
     )
 
-    const wrapper = container.querySelector('span')
-    expect(wrapper?.getAttribute('role')).toBe('img')
-    expect(wrapper?.getAttribute('aria-label')).toBe('Preview mark')
-    expect(wrapper?.classList.contains('ist-svg')).toBe(true)
-    expect(wrapper?.querySelector('svg')).not.toBeNull()
-    expect(wrapper?.innerHTML.toLowerCase()).not.toContain('<script')
-    expect(wrapper?.innerHTML.toLowerCase()).not.toContain('onload')
+    const svg = container.querySelector('svg')
+    expect(container.querySelector('span')).toBeNull()
+    expect(svg?.getAttribute('role')).toBe('img')
+    expect(svg?.getAttribute('aria-label')).toBe('Preview mark')
+    expect(svg?.classList.contains('ist-svg')).toBe(true)
+    expect(svg?.innerHTML.toLowerCase()).not.toContain('<script')
+    expect(svg?.innerHTML.toLowerCase()).not.toContain('onload')
   })
 
   it('does not access DOM globals during publish render', () => {

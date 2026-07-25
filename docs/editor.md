@@ -9,11 +9,11 @@ The frontend is a single React 19 + Vite SPA mounted at `/admin`. Inside it, two
 ## TL;DR
 
 - **Entry:** `src/admin/main.tsx` mounts `<Router><AdminRoutes /></Router><AdminContextMenuGuard />` with React 19 root-level error callbacks. `flushSync` forces the initial render synchronous to cut LCP.
-- **Router:** `src/admin/lib/routing/` — in-house router replacing `react-router-dom`. 10 routes, all wrapped in a per-route `<ErrorBoundary>` and `<Suspense>`, plus a final `path="/admin/*"` catch-all redirecting unknown admin URLs to `/admin/dashboard` (login form when unauthenticated) instead of rendering an empty tree. Public-site 404s are NOT claimed — the publish pipeline's NotFound handling owns those.
+- **Router:** `src/admin/lib/routing/` — in-house router replacing `react-router-dom`. Ten workspace/page routes are wrapped in a per-route `<ErrorBoundary>` and `<Suspense>`, with root redirects plus a final `path="/admin/*"` catch-all redirecting unknown admin URLs to `/admin/dashboard` (login form when unauthenticated) instead of rendering an empty tree. Public-site 404s are NOT claimed — the publish pipeline's NotFound handling owns those.
 - **Cold path:** entry chunk is tiny. `AuthenticatedAdmin` is `React.lazy` and only loads post-login. Each workspace page is wrapped in `prewarmedLazy(...)`: the active page fires its import at module evaluation; the remaining pages pre-warm via `requestIdleCallback` after first paint so subsequent nav is synchronous (no Suspense flicker).
 - **Workspaces:** `dashboard`, `site` (the editor), `content`, `data`, `media`, `plugins`, `users`, `ai`, `account`, `pluginPage`. Capability-gated by `canAccessWorkspace`.
 - **Editor store** lives at `src/admin/pages/site/store/`. Zustand + Mutative (`zustand-mutative`) + `subscribeWithSelector`. 12 slices, one source of truth for the page tree. Undo/redo uses patch-based history (O(change) per step, not O(site)).
-- **Active tree routing:** `mutateActiveTree(fn)` in `siteSlice` is the **only** place that branches on page-mode vs. VC-mode. The 11 named mutation actions are one-liners that delegate to it.
+- **Active tree routing:** `mutateActiveTree(fn)` in `src/admin/pages/site/store/slices/site/helpers.ts` is the **only** place that branches on page-mode vs. VC-mode. The 11 named mutation actions are one-liners that delegate to it.
 - **Canvas:** `src/admin/pages/site/canvas/` renders the page tree into per-breakpoint `IframeFrameSurface` iframes. Two views: **design** (multiple breakpoints side-by-side with pan/zoom) and **live** (single real-size editable frame with normal scrolling). Design mode paints iframe shells with detailed skeletons first, mounts the active breakpoint's node tree after the first paint, then fills inactive breakpoint frames on idle time. Three canvas ring tokens: `--canvas-selection-ring` (neon green, selected node), `--canvas-hover-ring` (neon pink, hovered node), `--canvas-selector-ring` (neon orange, selector-panel match sweep).
 - **Spotlight:** Cmd+K palette at `src/admin/spotlight/`. Always available across workspaces. Owns its own command registry, providers, and scopes.
 
@@ -73,7 +73,7 @@ Why the split:
 
 ## Routing
 
-`src/admin/lib/routing/` contains the in-house router (`Router`, `Routes`, `Route`, `Navigate`, `Link`, `useLocation`, `useNavigate`, `useParams`). Replaces `react-router-dom` for the 10-route admin app.
+`src/admin/lib/routing/` contains the in-house router (`Router`, `MemoryRouter`, `Routes`, `Route`, `Navigate`, `Link`, `useLocation`, `useNavigate`, `useParams`, `useInRouterContext`). Replaces `react-router-dom` for the current admin route table.
 
 Use the in-house router for every internal admin navigation, including links rendered by the site editor. `react-router-dom` and raw `<a href="/admin...">` hard navigations are banned in admin UI by `admin-router-usage.test.ts`. `src/core/` and `src/modules/` stay router-free because they are shared engine / published-page code, not admin UI.
 
@@ -160,7 +160,7 @@ useUrlQuerySync(
 
 ## Auth and access
 
-After login, every route renders `<AuthenticatedAdmin section={...}>`. Before rendering the workspace, it calls `canAccessWorkspace(currentUser, section)`. If the user's capabilities don't include the workspace, it `<Navigate>`s to `firstAccessibleWorkspace(currentUser)` (e.g. a contributor with only `media.manage` lands on `/admin/media`).
+After login, every route renders `<AuthenticatedAdmin section={...}>`. Before rendering the workspace, it calls `canAccessWorkspace(currentUser, section)`. If the user's capabilities don't include the workspace, it `<Navigate>`s to `firstAccessibleWorkspace(currentUser)` (e.g. a contributor with only `media.read` lands on `/admin/media`).
 
 `src/admin/access.ts` owns the capability-to-workspace mapping. `src/admin/workspace.ts` owns the `AdminWorkspace` union and the workspace paths.
 
@@ -247,7 +247,7 @@ src/admin/
 - **`Panel`, `PanelHeader`, `SidebarResizeHandle`** — generic floating-panel chrome reused across the editor, content, and data workspaces.
 - **`StepUp`** — re-auth dialog gating sensitive actions.
 - **`AdminContextMenuGuard`** (`src/admin/shared/AdminContextMenuGuard/`) — mounted at root level in `main.tsx` alongside the router. Intercepts every native `contextmenu` event on the document. If the event was already `preventDefault`-ed by an app context menu (or fired inside a `[role="menu"]` element), the guard is silent. Otherwise it prevents the native browser menu and shows a small animated danger flash at the cursor to signal "no context menu here." App context menus (e.g. `DataRowContextMenu`, `DataTableContextMenu`) call `preventDefault()` at their source, so the guard only fires for truly unhandled right-clicks.
-- **`useAsyncResource`** (`src/admin/lib/useAsyncResource.ts`) — canonical hook for single-resource async loads. Runs `loader` on mount and whenever `deps` change, tracks `{ data, loading, error }`, discards superseded responses, and exposes a stable `refresh()`. The loader receives an `AbortSignal` for in-flight cancellation. Reach for this first when a screen loads one resource. For the full decision guide — when to use it and what patterns intentionally don't use it (optimistic collections, multi-fetch orchestrators, module-level cached loads, non-fetch effects) — see [`docs/reference/use-async-resource.md`](../reference/use-async-resource.md).
+- **`useAsyncResource`** (`src/admin/lib/useAsyncResource.ts`) — canonical hook for single-resource async loads. Runs `loader` on mount and whenever `deps` change, tracks `{ data, loading, error }`, discards superseded responses, and exposes a stable `refresh()`. The loader receives an `AbortSignal` for in-flight cancellation. Reach for this first when a screen loads one resource. For the full decision guide — when to use it and what patterns intentionally don't use it (optimistic collections, multi-fetch orchestrators, module-level cached loads, non-fetch effects) — see [`docs/reference/use-async-resource.md`](reference/use-async-resource.md).
 
 ---
 
@@ -323,9 +323,9 @@ Organization is persisted in `site.explorer` on the site shell. Folders are deco
 
 ### Editor store
 
-`src/admin/pages/site/store/` is the central state for the editor. Zustand with the `mutative` middleware from `zustand-mutative` (mutations are written as direct draft-mutation; Mutative produces structural sharing) and `subscribeWithSelector` (granular subscriptions without React context re-renders). `enableAutoFreeze: true` mirrors Immer's dev guard against accidental external mutation.
+`src/admin/pages/site/store/` is the central state for the editor. Zustand with the `mutative` middleware from `zustand-mutative` (mutations are written as direct draft-mutation; Mutative produces structural sharing) and `subscribeWithSelector` (granular subscriptions without React context re-renders). `enableAutoFreeze: true` keeps a dev guard against accidental external mutation.
 
-**Undo/redo** uses patch-based history: every undoable mutation captures Mutative `[next, forward, inverse]` patch pairs scoped to the `SiteDocument`. Undo applies `entry.inverse`, redo applies `entry.forward` — O(change) in both time and memory, not O(site). A 50-deep history holds kilobytes of patches instead of hundreds of megabytes of full-site clones. See [`docs/reference/editor-history.md`](../reference/editor-history.md).
+**Undo/redo** uses patch-based history: every undoable mutation captures Mutative `[next, forward, inverse]` patch pairs scoped to the `SiteDocument`. Undo applies `entry.inverse`, redo applies `entry.forward` — O(change) in both time and memory, not O(site). A 50-deep history holds kilobytes of patches instead of hundreds of megabytes of full-site clones. See [`docs/reference/editor-history.md`](reference/editor-history.md).
 
 The store is composed of **12 slices**, each created by a factory in `store/slices/`:
 
@@ -350,7 +350,7 @@ The combined `EditorStore` type lives at `store/types.ts` so each slice can impo
 
 ### `mutateActiveTree` — the only mode-aware function
 
-The store routes mutations to the **active tree** (page in page-mode, VC in VC-mode) through one function in `slices/site/`:
+The store routes mutations to the **active tree** (page in page-mode, VC in VC-mode) through one function in `src/admin/pages/site/store/slices/site/helpers.ts`:
 
 ```ts
 function mutateActiveTree(fn: (tree: NodeTree<PageNode>) => void): void {
@@ -433,7 +433,7 @@ The **unlayered-vs-layered** split is the cascade isolation mechanism: CSS rules
 
 `EditorChromeInjector` targets chrome elements via **stable data-attribute selectors** (`data-canvas-module-placeholder`, `data-instatic-slot-instance`, `data-instatic-unknown-module`, etc.) rather than hashed CSS-Module class names, which only exist in the parent document. At mount, it copies the required safe design tokens (`--text-subtle`, `--canvas-placeholder-bg`, `--radius`, etc.) from the parent document's `:root` onto the iframe's `:root` so `var(...)` references resolve correctly inside the iframe. Admin font, text-size, and spacing tokens are remapped to `--chrome-font-sans`, `--chrome-text-*`, and `--chrome-space-*` before use; they are never copied as `--font-sans`, `--text-*`, or `--space-*`, because those short names belong to the rendered site's Framework tokens inside the canvas.
 
-Full details: [`docs/features/canvas-iframe-per-frame.md`](../features/canvas-iframe-per-frame.md).
+Full details: [`docs/features/canvas-iframe-per-frame.md`](features/canvas-iframe-per-frame.md).
 
 ### 3. Canvas stacking context isolation
 
@@ -695,6 +695,7 @@ See [docs/features/plugin-system.md](features/plugin-system.md) for the plugin S
 2. Bind it to a node prop via the module's schema (`src/core/module-engine/`).
 3. Use existing UI primitives (`Input`, `Select`, `Switch`, `ColorInput`, etc.).
 4. If the control needs token-aware autocomplete (resolving framework variables like `var(--space-md)` from a typed step label), use `TokenAwareInput` from `@site/property-controls/TokenAwareInput` — pass a `tokens` array from `useSpacingTokens()` or `useTypographyTokens()` in `tokenUtils.ts`. The component handles suggestion filtering, commit-on-Enter/Tab/blur, live-preview-on-hover (gated by the `hoverPreview` editor preference), and the Suggested/All dropdown sections. For narrow overlaid inputs (like spacing box sides), use `fieldSize="xs"`, `overlay`, and `tooltipOnOverflow`.
+5. Number-backed CSS controls rendered through `ClassPropertyRow` keep the user's focused text in a lexical draft. `src/admin/pages/site/panels/PropertiesPanel/ClassPropertyRow.tsx` persists only finite numbers, so transient input such as `0.` or `-` remains typeable without entering `CSSPropertyBag`; blur restores the canonical stored value.
 
 ## Adding a new spotlight command
 
@@ -734,7 +735,8 @@ See [docs/features/plugin-system.md](features/plugin-system.md) for the plugin S
   - `src/admin/layouts/AdminCanvasLayout/AdminCanvasEditorBody.tsx` — post-paint editor body
   - `src/admin/pages/site/store/store.ts` — editor store assembly
   - `src/admin/pages/site/layout/siteEditorLayoutPersistence.ts` — Site editor layout persistence mapping
-  - `src/admin/pages/site/store/slices/site/nodeActions.ts` — `mutateActiveTree`
+  - `src/admin/pages/site/store/slices/site/helpers.ts` — `mutateActiveTree`, `resolveActiveTreeTarget`
+  - `src/admin/pages/site/store/slices/site/nodeActions.ts` — tree mutation actions that call `mutateActiveTree`
   - `src/admin/pages/site/canvas/CanvasRoot.tsx` — canvas mount
   - `src/admin/spotlight/SpotlightRoot.tsx` — Cmd+K palette
   - `src/admin/pages/site/panels/PropertiesPanel/PropertiesPanelBody.tsx` — branch router for selector, multi-select, VC, and selected-node inspector surfaces; owns the node-level Styles/Attributes switch

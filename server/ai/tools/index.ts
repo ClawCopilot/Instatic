@@ -50,7 +50,7 @@ function scopeToolset(scope: ToolScope): AiTool[] {
  * Returns the tools available for one chat scope, filtered against the
  * caller's capability set. The runtime hands this array to the driver
  * verbatim; drivers translate each `AiTool.inputSchema` (TypeBox) into
- * their SDK's native tool format.
+ * the provider-native tool format.
  *
  * Filtering (see `toolAllowedForCapabilities`, the single gate):
  *   - a caller without `ai.tools.write` does not see tools tagged
@@ -66,5 +66,3 @@ export function selectToolsForScope(
 ): AiTool[] {
   return scopeToolset(scope).filter((t) => toolAllowedForCapabilities(t, capabilities))
 }
-
-

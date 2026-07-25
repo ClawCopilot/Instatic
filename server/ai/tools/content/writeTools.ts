@@ -52,8 +52,8 @@ const DocumentStatus = Type.Union([
 const CreateDocumentInput = Type.Object({
   tableId: Type.String({ minLength: 1 }),
   fields: Type.Optional(FieldsRecord),
-  status: Type.Optional(DocumentStatus),
 })
+
 
 const DeleteDocumentInput = Type.Object({
   documentId: Type.String({ minLength: 1 }),

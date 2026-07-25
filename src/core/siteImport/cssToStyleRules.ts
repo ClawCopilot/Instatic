@@ -41,8 +41,14 @@ import type { StyleRuleKind, Condition, ConditionDef } from '@core/page-tree'
 import { conditionId, makeConditionDef } from '@core/page-tree'
 import { formatVariant } from '@core/fonts'
 import { processKeyframesRule } from './keyframesToStyleRule'
-import { encodeSubstitutionDeclarations, readCssDeclarationBag } from '@core/css-substitution'
+import { encodeSubstitutionDeclarations } from '@core/css-substitution'
 import { matchMediaQueryToViewport } from './mediaQueryMatch'
+import {
+  mergeRuleBaseDeclarations,
+  mergeRuleContextDeclarations,
+  sparsePriorities,
+} from './declarationCascade'
+import { parseStyleDeclarations } from './cssDeclarationReader'
 import type {
   ImportWarning,
   BreakpointHint,
@@ -167,34 +173,6 @@ function extractUrlPayloads(value: string): string[] {
     if (rawUrl) result.push(rawUrl)
   }
   return result
-}
-
-/**
- * Parse all declarations from a CSSStyleDeclaration into a camelCase Record.
- *
- * Phase 1a: the property gate is permissive — `isEmittableProperty` accepts
- * any valid CSS property name except a tiny denylist. So a real-site import
- * keeps every standard property (`flex-grow`, `grid-auto-flow`, …) instead of
- * dropping it. The only declarations dropped here are the genuinely
- * dead/dangerous denied names, surfaced as a (rare) `blocked-property`
- * warning rather than the old flood of `unknown-property`.
- *
- * The brief specifies using `.length` + index access (not `for...of`) since
- * CSSStyleDeclaration doesn't enumerate properties via Symbol.iterator.
- */
-function parseDeclarations(
-  style: CSSStyleDeclaration,
-  selectorForWarning: string,
-  warnings: ImportWarning[],
-): Record<string, unknown> {
-  return readCssDeclarationBag(style, (camel, kebab) => {
-    warnings.push({
-      kind: 'blocked-property',
-      message: `Property "${camel}" (${kebab}) is blocked for security and was dropped`,
-      selector: selectorForWarning,
-      property: camel,
-    })
-  })
 }
 
 /**
@@ -410,7 +388,8 @@ function processTopLevelRule(
       // by `animation-name`. They must publish globally or animation-start
       // states like `opacity: 0` never resolve to their final frame.
       processKeyframesRule(rule as CSSKeyframesRule, rules, warnings, assetRefs, {
-        parseDeclarations,
+        parseDeclarations: (style, selector, keyframeWarnings) =>
+          parseStyleDeclarations(style, selector, keyframeWarnings).styles,
         collectAssetRefsFromDecls,
       })
       return
@@ -553,7 +532,7 @@ function processBaseStyleRule(
 ): void {
   const selector = rule.selectorText.trim()
   const classified = classifySelector(selector)
-  const decls = parseDeclarations(rule.style, selector, warnings)
+  const declarations = parseStyleDeclarations(rule.style, selector, warnings)
 
   if (classified.kind === 'class') {
     if (seenClassSelectors.has(selector)) {
@@ -564,10 +543,9 @@ function processBaseStyleRule(
         selector,
       })
       const existingIdx = selectorToLastIndex.get(selector)!
-      // Overwrite base styles with the new declarations (last-write-wins)
-      Object.assign(rules[existingIdx].styles, decls)
+      mergeRuleBaseDeclarations(rules[existingIdx], declarations)
       // Collect any new asset refs from the updated declarations
-      collectAssetRefsFromDecls(decls, existingIdx, undefined, assetRefs)
+      collectAssetRefsFromDecls(declarations.styles, existingIdx, undefined, assetRefs)
       return
     }
     seenClassSelectors.add(selector)
@@ -579,11 +557,14 @@ function processBaseStyleRule(
     kind: classified.kind,
     selector,
     order: idx,
-    styles: decls,
+    styles: declarations.styles,
+    ...(sparsePriorities(declarations.priorities)
+      ? { stylePriorities: declarations.priorities }
+      : {}),
     contextStyles: {},
   })
   selectorToLastIndex.set(selector, idx)
-  collectAssetRefsFromDecls(decls, idx, undefined, assetRefs)
+  collectAssetRefsFromDecls(declarations.styles, idx, undefined, assetRefs)
 }
 
 // ---------------------------------------------------------------------------
@@ -680,7 +661,7 @@ function processConditionInner(
 
     const innerStyle = inner as CSSStyleRule
     const selector = innerStyle.selectorText.trim()
-    const decls = parseDeclarations(innerStyle.style, selector, warnings)
+    const declarations = parseStyleDeclarations(innerStyle.style, selector, warnings)
 
     // Find or create the rule for this selector
     let idx: number
@@ -701,8 +682,7 @@ function processConditionInner(
       if (classified.kind === 'class') seenClassSelectors.add(selector)
     }
 
-    const existing = (rules[idx].contextStyles[contextId] ?? {}) as Record<string, unknown>
-    rules[idx].contextStyles[contextId] = { ...existing, ...decls }
-    collectAssetRefsFromDecls(decls, idx, contextId, assetRefs)
+    mergeRuleContextDeclarations(rules[idx], contextId, declarations)
+    collectAssetRefsFromDecls(declarations.styles, idx, contextId, assetRefs)
   }
 }

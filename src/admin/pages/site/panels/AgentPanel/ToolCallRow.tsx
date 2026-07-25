@@ -1,7 +1,8 @@
 /**
  * ToolCallRow — one agent tool call rendered as a compact row: category icon,
  * human title · muted detail, status glyph, plus optional colour-token
- * swatches, a captured preview screenshot, and an inline error message.
+ * swatches and an inline error message. Captured images are grouped by the
+ * parent turn so they share the conversation gallery and preview window.
  */
 import { useState, useCallback, type CSSProperties } from 'react'
 import type { AgentToolCall } from '@admin/pages/site/agent/types'
@@ -115,14 +116,6 @@ export function ToolCallRow({ toolCall, onScreenshotClick }: { toolCall: AgentTo
             </Tooltip>
           ))}
         </div>
-      )}
-      {toolCall.screenshotDataUrl && (
-        <img
-          className={cn(styles.toolCallScreenshot, onScreenshotClick && styles.toolCallScreenshotClickable)}
-          src={toolCall.screenshotDataUrl}
-          alt={`Preview the agent captured while running ${display.title}`}
-          onClick={onScreenshotClick ? () => onScreenshotClick(toolCall.screenshotDataUrl!) : undefined}
-        />
       )}
       {errorMessage && (
         <p role="alert" className={styles.toolCallError}>

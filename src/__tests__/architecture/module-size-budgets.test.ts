@@ -109,13 +109,25 @@ const GRANDFATHERED: Record<string, number> = {
   'src/core/page-tree/mutations.ts': 760,
   // server/plugins/host/handlers/content.ts graduated (786 → 661) when the
   // DB→wire projection helpers moved to contentProjection.ts.
-  'src/core/siteImport/cssToStyleRules.ts': 708,
   'src/admin/pages/site/panels/TypographyPanel/FontsSection/AddGoogleFontDialog.tsx': 751,
   // Plugin manifest parser — central schema definition for plugin/skill manifests.
   // Splitting would fracture the schema; kept as a single source of truth.
   'src/core/plugins/manifest.ts': 725,
   'src/core/markdown/markdownDocument.ts': 748,
   'src/admin/pages/dashboard/DashboardPage.tsx': 732,
+  // Agent slice — upstream merged comprehensive AI assistant UX enhancements
+  // (image attachments, skill injection, provider management) growing the slice
+  // from 529 to 777 lines. Splitting would scatter tightly-coupled agent state.
+  'src/admin/pages/site/agent/agentSlice.ts': 777,
+  // AgentPanel — upstream added QuickActions, SkillSelector, image gallery,
+  // context meter, and tool-call display; our Skill dropdown added further.
+  // Component is heavily contextual; sub-extraction would require prop-drilling
+  // an excessive shared state surface.
+  'src/admin/pages/site/panels/AgentPanel/AgentPanel.tsx': 877,
+  // Plugin toolHandlers — HuggingFace Skill registers 35 AI tools (REST API +
+  // hf CLI) whose handlers live in this file. Each handler is a self-contained
+  // switch-case branch; extracting per-plugin files would break the O(1) lookup.
+  'server/ai/tools/plugin/toolHandlers.ts': 2618,
 }
 
 // ---------------------------------------------------------------------------

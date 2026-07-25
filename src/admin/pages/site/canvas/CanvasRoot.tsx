@@ -34,6 +34,7 @@ import { useCanvas } from '@site/hooks/useCanvas'
 import { useEditorPermissions } from '@site/editorPermissionsContext'
 import { CanvasTransformLayer } from './CanvasTransformLayer'
 import { CanvasLiveSurface } from './CanvasLiveSurface'
+import { AgentSnapshotFrame } from './AgentSnapshotFrame'
 import { useRuntimeScriptBuild } from './useRuntimeScriptBuild'
 import { CanvasNotch } from './CanvasNotch'
 import { CanvasModeToggle } from './CanvasModeToggle'
@@ -87,6 +88,7 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   const breakpoints = useEditorStore((s) => s.site?.breakpoints ?? EMPTY_BREAKPOINTS)
   const activeBreakpointId = useEditorStore((s) => s.activeBreakpointId)
   const canvasView = useEditorStore((s) => s.canvasView)
+  const agentSnapshotCaptureRequest = useEditorStore((s) => s.agentSnapshotCaptureRequest)
   const rightSidebarExpanded = useEditorStore(selectRightSidebarExpanded)
   const isLive = canvasView === 'live'
   const runScripts = useEditorStore((s) => s.runScripts)
@@ -118,8 +120,11 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   const activeDocument = useEditorStore((s) => s.activeDocument)
   const {
     context: templatePreviewContext,
-    loading: _templatePreviewContextLoading,
+    loading: templatePreviewContextLoading,
   } = useTemplatePreviewContext(canvasPage)
+  const agentSnapshotBreakpoint = agentSnapshotCaptureRequest
+    ? breakpoints.find((breakpoint) => breakpoint.id === agentSnapshotCaptureRequest.breakpointId) ?? null
+    : null
   // Permission context — gates canvas affordances:
   //   canEditContent → double-click inline text editing
   //   canEditStyle / canEditStructure → properties sidebar
@@ -554,6 +559,17 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
               onClose={renameDialog.close}
             />
           )}
+
+          {agentSnapshotCaptureRequest && canvasPage && agentSnapshotBreakpoint ? (
+            <AgentSnapshotFrame
+              key={agentSnapshotCaptureRequest.requestId}
+              requestId={agentSnapshotCaptureRequest.requestId}
+              page={canvasPage}
+              breakpoint={agentSnapshotBreakpoint}
+              templateContext={templatePreviewContext}
+              templateContextLoading={templatePreviewContextLoading}
+            />
+          ) : null}
         </div>
       </CanvasSelectionContext.Provider>
     </CanvasViewportActionsContext.Provider>

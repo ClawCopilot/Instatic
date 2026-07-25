@@ -73,6 +73,17 @@ describe('bagToCSS', () => {
     expect(css).toBe('  font-size: 16px;')
   })
 
+  it('emits sparse declaration priority separately from the property value', () => {
+    const css = bagToCSS(
+      { color: 'red', display: 'block' },
+      {},
+      { color: 'important' },
+    )
+    expect(css).toContain('color: red !important;')
+    expect(css).toContain('display: block;')
+    expect(css).not.toContain('display: block !important')
+  })
+
   it('converts camelCase to kebab-case', () => {
     const css = bagToCSS({ backgroundColor: '#fff', borderTopLeftRadius: '4px' })
     expect(css).toContain('background-color: #fff;')
@@ -300,6 +311,27 @@ describe('bagToCSS', () => {
     expect(css).not.toContain('margin-left')
   })
 
+  it('collapses sides only when all four declaration priorities match', () => {
+    const styles = {
+      paddingTop: '8px',
+      paddingRight: '8px',
+      paddingBottom: '8px',
+      paddingLeft: '8px',
+    }
+    const allImportant = bagToCSS(styles, {}, {
+      paddingTop: 'important',
+      paddingRight: 'important',
+      paddingBottom: 'important',
+      paddingLeft: 'important',
+    })
+    expect(allImportant).toBe('  padding: 8px !important;')
+
+    const mixed = bagToCSS(styles, {}, { paddingTop: 'important' })
+    expect(mixed).not.toMatch(/^\s*padding:/m)
+    expect(mixed).toContain('padding-top: 8px !important;')
+    expect(mixed).toContain('padding-right: 8px;')
+  })
+
   it('refuses to collapse when a side is dropped by the sanitiser', () => {
     // expression(...) is sanitised to null → the collapse must abort and the
     // remaining safe sides emit as longhand instead.
@@ -396,6 +428,18 @@ describe('generateClassCSS', () => {
     expect(css).toContain('color: #fff;')
     expect(css).toContain('font-size: 16px;')
     expect(css).toContain('}')
+  })
+
+  it('emits base and context priorities from the style rule metadata', () => {
+    const rule = makeClass('notice', { color: 'red' }, {
+      mobile: { color: 'blue' },
+    })
+    rule.stylePriorities = { color: 'important' }
+    rule.contextStylePriorities = { mobile: { color: 'important' } }
+
+    const css = generateClassCSS({ notice: rule }, BREAKPOINTS)
+    expect(css).toContain('color: red !important;')
+    expect(css).toContain('color: blue !important;')
   })
 
   it('uses the class name in the selector, not the generated id', () => {

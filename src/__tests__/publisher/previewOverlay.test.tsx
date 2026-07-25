@@ -160,20 +160,20 @@ describe('PreviewOverlay — DOM rendering', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog).toBeDefined()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    await act(async () => {})
+    await screen.findByTestId('preview-iframe')
   })
 
   it('renders the preview iframe inside the dialog', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
-    const iframe = await screen.findByTestId('preview-iframe') as HTMLIFrameElement
+    const iframe = await screen.findByTestId('preview-iframe')
     expect(iframe).not.toBeNull()
   })
 
   it('iframe has a non-empty srcdoc attribute', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
-    const iframe = await screen.findByTestId('preview-iframe') as HTMLIFrameElement
+    const iframe = await screen.findByTestId('preview-iframe')
     const srcdoc = iframe.getAttribute('srcdoc') ?? ''
     expect(srcdoc.length).toBeGreaterThan(0)
     expect(srcdoc).toContain('<!DOCTYPE html>')
@@ -182,21 +182,39 @@ describe('PreviewOverlay — DOM rendering', () => {
   it('iframe srcdoc contains the page title', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
-    const iframe = await screen.findByTestId('preview-iframe') as HTMLIFrameElement
+    const iframe = await screen.findByTestId('preview-iframe')
     const srcdoc = iframe.getAttribute('srcdoc') ?? ''
+    // The site name "Test Site" should appear as the page title
     expect(srcdoc).toMatch(/<title>[^<]*<\/title>/)
   })
 
+  it('renders server-resolved loop content from the current draft (ISS-234)', async () => {
+    runtimePreviewHtml = '<!DOCTYPE html><html><body><p>ISS-234 LOOP ROW</p></body></html>'
+    openPreviewWithSite()
+    const currentSite = useEditorStore.getState().site
+    render(<PreviewOverlay />)
+
+    const iframe = await screen.findByTestId('preview-iframe')
+    expect(iframe.getAttribute('srcdoc')).toContain('ISS-234 LOOP ROW')
+    expect(runtimePreviewCalls).toHaveLength(1)
+    expect(runtimePreviewCalls[0]?.input).toBe('/admin/api/cms/runtime/preview')
+    expect(JSON.parse(String(runtimePreviewCalls[0]?.init?.body))).toMatchObject({
+      site: currentSite,
+      pageId: 'page-1',
+    })
+  })
   it('close button has aria-label="Close preview"', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
     const closeBtn = screen.getByLabelText('Close preview')
     expect(closeBtn).toBeDefined()
+    await screen.findByTestId('preview-iframe')
   })
 
   it('clicking the close button closes the overlay (sets previewOpen=false)', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
+    await screen.findByTestId('preview-iframe')
     const closeBtn = screen.getByLabelText('Close preview')
     fireEvent.click(closeBtn)
     expect(useEditorStore.getState().previewOpen).toBe(false)
@@ -205,6 +223,7 @@ describe('PreviewOverlay — DOM rendering', () => {
   it('pressing Escape closes the overlay', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
+    await screen.findByTestId('preview-iframe')
     const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' })
     expect(useEditorStore.getState().previewOpen).toBe(false)
@@ -213,6 +232,7 @@ describe('PreviewOverlay — DOM rendering', () => {
   it('clicking the backdrop closes the overlay', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
+    await screen.findByTestId('preview-iframe')
     // Backdrop is the first aria-hidden element
     const backdrop = document.querySelector('[aria-hidden="true"]') as HTMLElement | null
     expect(backdrop).not.toBeNull()
@@ -225,6 +245,7 @@ describe('PreviewOverlay — DOM rendering', () => {
     render(<PreviewOverlay />)
     // Header reads "Preview — {page.title}"
     expect(document.body.textContent).toContain('Preview — Home')
+    await screen.findByTestId('preview-iframe')
   })
 
   it('calls the runtime preview endpoint on open', async () => {
@@ -291,8 +312,9 @@ describe('PreviewOverlay — source enforcement', () => {
     expect(overlaySrc).toContain('aria-hidden="true"')
   })
 
-  it('calls buildCmsRuntimePreview to generate iframe content', () => {
-    expect(overlaySrc).toContain('buildCmsRuntimePreview')
+  it('uses the CMS runtime preview boundary instead of bypassing server prefetch', () => {
+    expect(overlaySrc).toContain('buildCmsRuntimePreview(')
+    expect(overlaySrc).not.toContain('publishPage(')
   })
 })
 

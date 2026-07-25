@@ -384,6 +384,7 @@ Every interactive control in the admin and editor goes through a primitive from 
 |----------------------|-----------------------------------------------------------------------------|
 | `Button`             | Every action button. Variants for primary / secondary / ghost / danger.     |
 | `Input`              | Single-line text input. Pill radius, transparent fill, bordered.            |
+| `FormField`          | Label + description shell for form controls.                               |
 | `Switch`             | Boolean toggle.                                                             |
 | `Checkbox`           | Boolean within a list / form.                                               |
 | `Select`             | Dropdown selection of fixed options.                                        |
@@ -394,19 +395,23 @@ Every interactive control in the admin and editor goes through a primitive from 
 | `RangeTabs`          | Tabbed numeric range selectors (e.g. spacing scales).                       |
 | `SegmentedControl`   | A few mutually exclusive options shown inline.                              |
 | `Tabs`               | Top-level tab navigation within a workspace.                                |
+| `Stack`              | Small flex layouts for host/admin and plugin UI.                            |
 | `Separator`          | Visual divider between sections.                                            |
 | `Section`            | Titled section block in panels.                                             |
 | `ControlRow`         | Standard label + control row in property panels.                            |
+| `Card`               | Token-backed panel surface for grouped host/admin content.                  |
 | `ContextMenu`        | Right-click and `…` overflow menus.                                         |
 | `FilterBar`          | Compound filter row (type + folder + date + query).                         |
 | `TagPill`            | Compact tinted labels, selector chips, removable tag pills. It derives a token-backed tint from the first meaningful alphanumeric character. |
 | `FloatingActionBar`  | Multi-select bulk-action bar.                                               |
 | `EmptyState`         | Empty-list / empty-page placeholder.                                        |
+| `Alert`              | Inline non-blocking status/error message.                                   |
 | `Dialog`             | Modal dialog with a title and content.                                      |
 | `Tooltip`            | Hover and cursor-anchored tooltips. Replaces the native `title` attribute (gated). |
 | `Toast`              | Transient confirmation / error notifications.                               |
-| `DataTable`          | Tabular data with sorting and selection.                                    |
-| `Widget`, `WidgetList`| Borderless tile card (the dashboard pattern). Accepts a `tint`.            |
+| `DataTable`          | Token-backed table shell; callers own row state, sorting, and selection.    |
+| `Widget`, `WidgetSkeleton`, `WidgetList` | Borderless tile card and dashboard/widget list helpers. Accepts a `tint`. |
+| `Heading`, `Text`, `Code` | Typography primitives for host/admin and plugin UI.                   |
 | `Image`              | Image with built-in blurhash fallback.                                      |
 | `CanvasModulePlaceholder`| Diagonal-stripe placeholder for empty modules.                          |
 | `ErrorBoundary`      | Component-level error containment.                                          |
@@ -577,7 +582,7 @@ The HTML `title` attribute is banned for hover hints — gated by `no-native-tit
 ## Adding a new UI primitive
 
 1. Create `src/ui/components/<Name>/<Name>.tsx`, `<Name>.module.css`, and `index.ts`.
-2. Re-export from `src/ui/components/index.ts` so consumers import from `@ui/components`.
+2. Export from the primitive folder's `index.ts` so consumers import from `@ui/components/<Name>`.
 3. The primitive must work with the existing tokens — do not introduce new colors, radii, font sizes, or spacing values to support it. If you need new tokens, see "Adding a new design token" first.
 4. If it replaces a bare HTML control (`button`, `input`, etc.), update the matching architecture test's allowlist or gate.
 5. Document it in the components table above and (if it has non-obvious usage) write a short [docs/reference/ui-primitives.md](reference/ui-primitives.md) entry.

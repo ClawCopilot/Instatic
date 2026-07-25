@@ -182,6 +182,94 @@
   position: relative;
 }
 
+.attachmentGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2xs);
+}
+
+.attachmentGrid[data-count="1"] {
+  grid-template-columns: minmax(0, 96px);
+}
+
+.attachmentGrid[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.attachmentCard {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  box-shadow: inset 0 0 0 1px var(--overlay-10);
+}
+
+.attachmentPreviewButton {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.attachmentPreview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.attachmentPreviewPlaceholder {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.attachmentStatus {
+  position: absolute;
+  inset: auto var(--space-3xs) var(--space-3xs);
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - var(--space-s));
+  padding: var(--space-px) var(--space-3xs);
+  border-radius: var(--radius-sm);
+  background: var(--scrim-60);
+  color: var(--text-bright);
+  font-size: var(--text-3xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentRemove {
+  position: absolute;
+  top: var(--space-3xs);
+  right: var(--space-3xs);
+  z-index: 2;
+  background: var(--scrim-60);
+  color: var(--text-bright);
+}
+
+.attachmentNotice,
+.attachmentWarning {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.attachmentNotice {
+  color: var(--text-muted);
+}
+
+.attachmentWarning {
+  color: var(--warning-text);
+}
+
 /* Controls row under the textarea: model picker on the left, minimal
    icon-only send/stop button on the right. Keeps both on one line so the
    input bar stays compact. */
@@ -190,12 +278,20 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-s);
+  min-width: 0;
 }
 
 /* The picker takes the leftover width but never crowds out the button. */
 .inputControlsPicker {
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+}
+
+.inputControlActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 0 0 auto;
 }
 
 /* ── Message turn — role label + full-width text, no bubble ───────────────── */
@@ -763,7 +859,7 @@
   border-radius: var(--radius);
   background: var(--bg-surface-2);
   border: 1px solid var(--overlay-20);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px var(--scrim-30);
 }
 
 .skillDropdownItem {

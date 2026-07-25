@@ -12,6 +12,7 @@
 import { apply } from 'mutative'
 import { clonePackageJson } from '@core/site-dependencies/manifest'
 import { cloneSiteRuntimeConfig } from '@core/site-runtime'
+import { pruneCanvasSelectionDraft } from '../selectionSlice'
 import { collectDirtyFromSitePatches, mergeDirtyMarks } from './dirtyTracking'
 import { pruneCanvasSelectionDraft } from '../selectionSlice'
 import type { SiteSlice, SiteSliceHelpers } from './types'

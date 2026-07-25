@@ -24,6 +24,8 @@
  */
 
 import type {
+  AiContentBlock,
+  AiMessage,
   AiStreamEvent,
   AiTool,
   AiToolOutput,
@@ -31,7 +33,10 @@ import type {
 import type { AiStreamRequest } from '../types'
 import { parseSseStream, type SseFrame } from './sse'
 import { executeAiTool } from './execTool'
-import { isAbortError, classifyHttpError } from './errors'
+import { isAbortError, classifyHttpFailure } from './errors'
+
+export const PROVIDER_RETRY_IMAGE_OMITTED =
+  '[Earlier attached images omitted after the provider rejected the full conversation context.]'
 
 /** A resolved tool call the model issued this turn. */
 export interface TurnToolCall {
@@ -106,8 +111,10 @@ export async function* runToolLoop<TMessage>(
   req: AiStreamRequest,
 ): AsyncIterable<AiStreamEvent> {
   const toolsByName = new Map<string, AiTool>(req.tools.map((t) => [t.name, t]))
-  const messages = adapter.mapHistory(req)
+  let messages = adapter.mapHistory(req)
   const headers = adapter.buildHeaders(req)
+  let initialProviderRound = true
+  let replayOverflowRetried = false
 
   // Track tool-result messages that carry heavy evidence (screenshots,
   // full-page HTML/CSS). Once superseded they describe stale page state and are
@@ -124,6 +131,15 @@ export async function* runToolLoop<TMessage>(
   let cacheReadTokens = 0
   let cacheCreationTokens = 0
   let costUsd: number | undefined
+
+  const aggregateUsageEvent = (): Extract<AiStreamEvent, { type: 'usage' }> => ({
+    type: 'usage',
+    promptTokens,
+    completionTokens,
+    costUsd,
+    cacheReadTokens: cacheReadTokens || undefined,
+    cacheCreationTokens: cacheCreationTokens || undefined,
+  })
 
   for (;;) {
     if (req.signal.aborted) return
@@ -147,7 +163,16 @@ export async function* runToolLoop<TMessage>(
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
       console.error(`[ai/${adapter.label.toLowerCase()}] HTTP ${res.status}:`, bodyText.slice(0, 500))
-      yield { type: 'error', message: classifyHttpError(adapter.label, res.status, bodyText) }
+      const failure = classifyHttpFailure(adapter.label, res.status, bodyText)
+      if (initialProviderRound && !replayOverflowRetried && failure.kind === 'replayOverflow') {
+        const projected = elideHistoricalUserImages(req.messages)
+        if (projected) {
+          replayOverflowRetried = true
+          messages = adapter.mapHistory({ ...req, messages: projected })
+          continue
+        }
+      }
+      yield { type: 'error', message: failure.message }
       return
     }
 
@@ -170,6 +195,7 @@ export async function* runToolLoop<TMessage>(
     if (req.signal.aborted) return
 
     const turn = translator.finish()
+    initialProviderRound = false
     if (turn.usage) {
       promptTokens += turn.usage.promptTokens
       completionTokens += turn.usage.completionTokens
@@ -202,29 +228,43 @@ export async function* runToolLoop<TMessage>(
     for (const call of turn.toolCalls) {
       const tool = toolsByName.get(call.name)
       const input = prepareToolInput(call, req)
-
-      if (tool && DANGEROUS_TOOL_PATTERNS.test(call.name)) {
-        yield {
-          type: 'toolConfirm',
-          toolCallId: call.id,
-          toolName: call.name,
-          input: call.input,
-          message: `The AI wants to execute "${call.name}". This may modify or delete content. Confirm to proceed.`,
-        }
-      }
-
-      let output: AiToolOutput = tool
-        ? await executeAiTool(tool, input, req.bridge, req.signal, req.toolContextBase)
-        : { ok: false, error: `Unknown tool: ${call.name}` }
-
-      // Self-healing: retry once for transient errors
-      if (!output.ok && isRetryableError(output.error)) {
-        await new Promise((r) => setTimeout(r, 500))
+      let output: AiToolOutput
+      try {
         output = tool
           ? await executeAiTool(tool, input, req.bridge, req.signal, req.toolContextBase)
-          : output
-      }
+          : { ok: false, error: `Unknown tool: ${call.name}` }
 
+        // Self-healing: retry once for transient errors
+        if (!output.ok && isRetryableError(output.error)) {
+          await new Promise((r) => setTimeout(r, 500))
+          output = tool
+            ? await executeAiTool(tool, input, req.bridge, req.signal, req.toolContextBase)
+            : output
+        }
+      } catch (err) {
+        // Browser tools communicate domain failures by resolving an
+        // `AiToolOutput`. Rejection means the bridge transport disappeared
+        // (timeout, server reload, closed stream). Retrying within this turn
+        // would hit the same dead bridge and can burn repeated provider rounds.
+        if (req.signal.aborted) return
+        const detail = err instanceof Error ? err.message : String(err)
+        yield {
+          type: 'toolResult',
+          toolCallId: call.id,
+          toolName: call.name,
+          ok: false,
+          error: detail,
+        }
+        // The provider already completed and billed this round before the
+        // bridge failed. Persist its accumulated usage before the terminal
+        // error so conversation totals and the failed-turn audit stay honest.
+        yield aggregateUsageEvent()
+        yield {
+          type: 'error',
+          message: `Browser tool transport failed: ${detail}`,
+        }
+        return
+      }
       yield {
         type: 'toolResult',
         toolCallId: call.id,
@@ -243,14 +283,43 @@ export async function* runToolLoop<TMessage>(
     }
   }
 
-  yield {
-    type: 'usage',
-    promptTokens,
-    completionTokens,
-    costUsd,
-    cacheReadTokens: cacheReadTokens || undefined,
-    cacheCreationTokens: cacheCreationTokens || undefined,
+  yield aggregateUsageEvent()
+}
+
+/**
+ * One provider-directed retry projection: retain the newest/current user
+ * turn verbatim and replace images on earlier user turns with one breadcrumb
+ * per turn. Persistence and the caller-owned history remain untouched.
+ */
+function elideHistoricalUserImages(messages: readonly AiMessage[]): AiMessage[] | null {
+  let newestUserIndex = -1
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') {
+      newestUserIndex = index
+      break
+    }
   }
+  if (newestUserIndex <= 0) return null
+
+  let changed = false
+  const projected = messages.map((message, messageIndex): AiMessage => {
+    if (messageIndex >= newestUserIndex || message.role !== 'user') return message
+    if (!message.content.some((block) => block.kind === 'image')) return message
+
+    changed = true
+    let breadcrumbAdded = false
+    const content: AiContentBlock[] = []
+    for (const block of message.content) {
+      if (block.kind !== 'image') {
+        content.push(block)
+      } else if (!breadcrumbAdded) {
+        content.push({ kind: 'text', text: PROVIDER_RETRY_IMAGE_OMITTED })
+        breadcrumbAdded = true
+      }
+    }
+    return { role: 'user', content }
+  })
+  return changed ? projected : null
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +335,11 @@ export async function* runToolLoop<TMessage>(
 function prepareToolInput(call: TurnToolCall, req: AiStreamRequest): unknown {
   if (call.name === 'site_render_snapshot') {
     const base = call.input && typeof call.input === 'object' ? call.input : {}
-    return { ...base, captureScreenshot: req.modelCapabilities.visionInput }
+    return {
+      ...base,
+      captureScreenshot:
+        req.modelCapabilities.visionInput && req.modelCapabilities.toolResultImages,
+    }
   }
   return call.input
 }
@@ -299,8 +372,6 @@ function isRetryableError(error?: string): boolean {
  * model has since mutated — useless to re-send. Any result with an image
  * attachment is heavy regardless of tool name.
  */
-const DANGEROUS_TOOL_PATTERNS = /delete|remove|clear|drop|overwrite|reset|destroy/i
-
 const HEAVY_TOOL_NAMES = new Set(['site_render_snapshot', 'site_read_document', 'site_get_node_html'])
 
 function isHeavyResult(r: TurnToolResult): boolean {

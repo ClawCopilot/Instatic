@@ -11,7 +11,12 @@
  * return 404).
  */
 
+import {
+  AI_USER_IMAGE_MAX_BASE64_CHARS,
+  AI_USER_IMAGE_MAX_BYTES,
+} from '@core/ai'
 import { Type } from '@core/utils/typeboxHelpers'
+import { binaryResponse } from '../../binary'
 import { jsonResponse, readValidatedBody, badRequest } from '../../http'
 import { requireCapability } from '../../auth/authz'
 import type { DbClient } from '../../db/client'
@@ -20,6 +25,7 @@ import {
   forkConversation,
   listConversationsForUserScope,
   listMessagesForConversation,
+  readMessageForUser,
   readConversationForUser,
   softDeleteConversationForUser,
   toConversationDetailView,
@@ -57,15 +63,79 @@ export function tryHandleAiConversations(
   if (pathname === '/admin/api/ai/conversations') {
     return dispatchCollection(req, db, url)
   }
-  const itemMatch = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)$/)
-  if (itemMatch) {
-    return dispatchItem(req, db, itemMatch[1]!)
+  const imageMatch = pathname.match(
+    /^\/admin\/api\/ai\/conversations\/([^/]+)\/messages\/([^/]+)\/images\/(\d+)$/,
+  )
+  if (imageMatch) {
+    return handleMessageImage(
+      req,
+      db,
+      imageMatch[1]!,
+      imageMatch[2]!,
+      Number(imageMatch[3]),
+    )
   }
   const forkMatch = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)\/fork$/)
   if (forkMatch) {
     return handleFork(req, db, forkMatch[1]!)
   }
+  const itemMatch = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)$/)
+  if (itemMatch) {
+    return dispatchItem(req, db, itemMatch[1]!)
+  }
   return null
+}
+
+async function handleMessageImage(
+  req: Request,
+  db: DbClient,
+  conversationId: string,
+  messageId: string,
+  blockIndex: number,
+): Promise<Response> {
+  if (req.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, { status: 405 })
+  }
+  const userOrResponse = await requireCapability(req, db, 'ai.chat')
+  if (userOrResponse instanceof Response) return userOrResponse
+
+  const message = await readMessageForUser(
+    db,
+    userOrResponse.id,
+    conversationId,
+    messageId,
+  )
+  const block = message?.content[blockIndex]
+  if (block?.kind !== 'image' || block.mimeType !== 'image/jpeg') return imageNotFound()
+
+  const bytes = decodeStoredJpeg(block.data)
+  if (!bytes) return imageNotFound()
+  return binaryResponse(bytes, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': String(bytes.byteLength),
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+}
+
+function decodeStoredJpeg(data: string): Buffer | null {
+  if (!data || data.length > AI_USER_IMAGE_MAX_BASE64_CHARS || data.length % 4 !== 0) return null
+  const bytes = Buffer.from(data, 'base64')
+  if (
+    bytes.byteLength === 0
+    || bytes.byteLength > AI_USER_IMAGE_MAX_BYTES
+    || bytes.toString('base64') !== data
+    || bytes[0] !== 0xff
+    || bytes[1] !== 0xd8
+    || bytes[2] !== 0xff
+  ) return null
+  return bytes
+}
+
+function imageNotFound(): Response {
+  return jsonResponse({ error: 'Conversation image not found' }, { status: 404 })
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +197,24 @@ async function handleRead(req: Request, db: DbClient, id: string): Promise<Respo
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 })
 
   const messages = await listMessagesForConversation(db, id)
-  return jsonResponse({ conversation: toConversationDetailView(conv, messages) })
+  return jsonResponse(
+    {
+      conversation: toConversationDetailView(
+        conv,
+        messages,
+        (messageId, blockIndex) => conversationImageUrl(id, messageId, blockIndex),
+      ),
+    },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  )
+}
+
+function conversationImageUrl(
+  conversationId: string,
+  messageId: string,
+  blockIndex: number,
+): string {
+  return `/admin/api/ai/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/images/${blockIndex}`
 }
 
 async function handleUpdate(req: Request, db: DbClient, id: string): Promise<Response> {

@@ -32,6 +32,7 @@ import {
   RenameNodeInputSchema,
   DuplicateNodeInputSchema,
   ApplyCssInputSchema,
+  ApplyCssExecutionInputSchema,
   AssignClassInputSchema,
   RemoveClassInputSchema,
   ListCodeAssetsInputSchema,
@@ -56,7 +57,6 @@ import {
   type MoveNodeInput,
   type RenameNodeInput,
   type DuplicateNodeInput,
-  type ApplyCssInput,
   type AssignClassInput,
   type RemoveClassInput,
   type AddPageInput,
@@ -70,9 +70,7 @@ import type { EditorStore } from '@site/store/types'
 import { registry } from '@core/module-engine'
 import { sanitizeRichtext, isRichtextPropKey } from '@core/sanitize'
 import { importHtml } from '@core/htmlImport'
-import { cssToStyleRules } from '@core/siteImport'
-import type { NewStyleRule } from '@core/siteImport'
-import type { BaseNode, ConditionDef, PageTemplateConfig } from '@core/page-tree'
+import type { BaseNode, PageTemplateConfig } from '@core/page-tree'
 import { renderNode, type RenderConfig, type RenderAccumulators } from '@core/publisher'
 import { getAgentStoreApi } from './storeRef'
 import {
@@ -88,7 +86,8 @@ import {
   runReadCodeAsset,
   runWriteCodeAsset,
 } from './codeAssetTools'
-import { runRenderSnapshot } from './renderSnapshotTool'
+import { runRenderSnapshotAtBreakpoint } from './renderSnapshotAtBreakpoint'
+import { parseImportedStyleCss, runApplyCss } from './cssTools'
 import {
   activeDocumentNodes,
   activeRenderPage,
@@ -104,39 +103,19 @@ import { getErrorMessage } from '@core/utils/errorMessage'
 // has no static import edge back into `editor-store/store.ts`.
 const getStoreState = (): EditorStore => getAgentStoreApi<EditorStore>().getState()
 
-/**
- * Parse the CSS harvested from `<style>` blocks in an agent-supplied HTML
- * snippet into registry rules. Uses the live site's viewport contexts so any
- * matching `@media` folds into that viewport's contextStyles;
- * unmatched conditions round-trip as reusable site conditions. Returns empty
- * arrays for an empty/whitespace-only snippet.
- */
-function parseImportedStyleCss(styleCss: string): {
-  rules: NewStyleRule[]
-  conditions: ConditionDef[]
-} {
-  if (!styleCss.trim()) return { rules: [], conditions: [] }
-  const site = getStoreState().site
-  const breakpoints = site
-    ? site.breakpoints.map((b) => ({ id: b.id, width: b.width, mediaQuery: b.mediaQuery }))
-    : []
-  const { rules, conditions } = cssToStyleRules(styleCss, { breakpoints })
-  return { rules, conditions }
-}
-
 // ---------------------------------------------------------------------------
 // Tool input validation
 //
-// The per-tool input schemas are the single source of truth in `@core/ai`
-// (`src/core/ai/toolSchemas.ts`) — the SAME schemas the server advertises as
-// each tool's `inputSchema` in `server/ai/tools/site/writeTools.ts`. The
-// executor imports them and re-validates each `toolRequest` payload here with
-// `parseValue` — defence-in-depth at the store boundary (Constraint #272).
+// The provider-facing and execution input schemas have one source in `@core/ai`
+// (`src/core/ai/toolSchemas.ts`). The executor imports them and validates each
+// `toolRequest` payload here with `parseValue` — defence-in-depth at the store
+// boundary (Constraint #272). Most tools use one schema for both layers.
 //
-// `site_render_snapshot` is the one divergence: the model-facing schema carries only
-// `breakpointId`/`nodeId`, so we compose the server-set `captureScreenshot`
-// flag (chosen from the model's vision capability — non-vision models skip the
-// expensive html-to-image capture) on top of the shared shape here.
+// Two deliberate provider-boundary layers live here:
+// - `site_render_snapshot` composes the server-set `captureScreenshot` flag
+//   onto its model-facing schema.
+// - `site_apply_css` advertises a flat provider-compatible object, then uses
+//   `ApplyCssExecutionInputSchema` here for exact operation-specific fields.
 // ---------------------------------------------------------------------------
 
 const renderSnapshotSchema = Type.Composite([
@@ -264,8 +243,13 @@ function runInsertHtml(input: InsertHtmlInput): AiToolOutput {
     // `site_apply_css` tool is the canonical path for this; insertHtml stays forgiving
     // when a CSS-only payload arrives here.)
     if (rules.length > 0 || conditions.length > 0) {
-      const { created, updated } = getStoreState().upsertCssRules(rules, conditions)
-      return aiToolOk({ cssRulesCreated: created, cssRulesUpdated: updated })
+      const result = getStoreState().applyCssRules(rules, conditions, 'merge')
+      if (result.blockedSelectors.length > 0) {
+        return aiToolError(
+          `Framework-generated CSS selectors are locked: ${result.blockedSelectors.join(', ')}`,
+        )
+      }
+      return aiToolOk({ cssRulesCreated: result.created, cssRulesUpdated: result.updated })
     }
     const scriptHint = stripped.scripts > 0 || stripped.inlineHandlers > 0
       ? ' Scripts and inline event handlers are stripped from HTML imports; create runtime behavior with site_write_code_asset({ type:"script", ... }) instead.'
@@ -380,8 +364,13 @@ function runReplaceNodeHtml(input: ReplaceNodeHtmlInput): AiToolOutput {
     // the subtree intact and just upsert its rules — same forgiving behaviour
     // as insertHtml. Wiping children to insert nothing would be surprising.
     if (rules.length > 0 || conditions.length > 0) {
-      const { created, updated } = getStoreState().upsertCssRules(rules, conditions)
-      return aiToolOk({ cssRulesCreated: created, cssRulesUpdated: updated })
+      const result = getStoreState().applyCssRules(rules, conditions, 'merge')
+      if (result.blockedSelectors.length > 0) {
+        return aiToolError(
+          `Framework-generated CSS selectors are locked: ${result.blockedSelectors.join(', ')}`,
+        )
+      }
+      return aiToolOk({ cssRulesCreated: result.created, cssRulesUpdated: result.updated })
     }
     const scriptHint = stripped.scripts > 0 || stripped.inlineHandlers > 0
       ? ' Scripts and inline event handlers are stripped from HTML imports; create runtime behavior with site_write_code_asset({ type:"script", ... }) instead.'
@@ -464,29 +453,6 @@ function runMoveNode(input: MoveNodeInput): AiToolOutput {
 function runRenameNode(input: RenameNodeInput): AiToolOutput {
   getStoreState().renameNode(input.nodeId, input.label)
   return aiToolOk()
-}
-
-/**
- * Apply authored CSS text to the site's style registry.
- *
- * The single styling-by-CSS tool: parse the CSS with the SAME engine the HTML
- * importer uses (`cssToStyleRules` via `parseImportedStyleCss`), then UPSERT
- * every rule — a bare `.foo {}` selector creates/edits a reusable class, any
- * other selector (`.hero a`, `a:hover`, `nav > li`, `::before`) creates/edits
- * an ambient rule, and `@media` folds into per-breakpoint/condition overrides.
- * Re-applying an existing selector EDITS it; this is what `updateClassStyles`
- * could not do for descendant/pseudo selectors.
- */
-function runApplyCss(input: ApplyCssInput): AiToolOutput {
-  const { rules, conditions } = parseImportedStyleCss(input.css)
-  if (rules.length === 0 && conditions.length === 0) {
-    return aiToolError(
-      'No CSS rules parsed. Provide CSS like ".hero { color: var(--primary) }" or ' +
-        '"nav a:hover { text-decoration: underline }".',
-    )
-  }
-  const { created, updated } = getStoreState().upsertCssRules(rules, conditions)
-  return aiToolOk({ cssRulesCreated: created, cssRulesUpdated: updated })
 }
 
 function runAssignClass(input: AssignClassInput): AiToolOutput {
@@ -642,8 +608,10 @@ export async function executeAgentTool(
         return runMoveNode(parseValue(MoveNodeInputSchema, rawInput))
       case 'site_rename_node':
         return runRenameNode(parseValue(RenameNodeInputSchema, rawInput))
-      case 'site_apply_css':
-        return runApplyCss(parseValue(ApplyCssInputSchema, rawInput))
+      case 'site_apply_css': {
+        const providerInput = parseValue(ApplyCssInputSchema, rawInput)
+        return runApplyCss(parseValue(ApplyCssExecutionInputSchema, providerInput))
+      }
       case 'site_list_code_assets':
         return await runListCodeAssets(parseValue(ListCodeAssetsInputSchema, rawInput))
       case 'site_read_code_asset':
@@ -685,7 +653,7 @@ export async function executeAgentTool(
         // Default to the breakpoint the user is actually viewing, not the first
         // frame in the DOM (which is mobile in a mobile-first canvas layout).
         const breakpointId = parsed.breakpointId ?? getStoreState().activeBreakpointId
-        return await runRenderSnapshot({ ...parsed, breakpointId })
+        return await runRenderSnapshotAtBreakpoint({ ...parsed, breakpointId })
       }
       default:
         return aiToolError(`Unknown instatic tool: ${toolName}`)

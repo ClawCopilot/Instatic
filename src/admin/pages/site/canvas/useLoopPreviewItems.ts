@@ -34,7 +34,7 @@
  * `site`, and only when such a source is selected.
  */
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useEditorStore } from '@site/store/store'
 import { loopSourceRegistry } from '@core/loops/registry'
 import { type LoopItem, pageToLoopItem, filterPagesForLoop } from '@core/loops'
@@ -43,6 +43,7 @@ import type { Page, PageNode } from '@core/page-tree'
 import { getCmsDataTable, previewCmsDataLoopItems } from '@core/persistence/cmsData'
 import { listCmsMediaAssets, type CmsMediaAsset } from '@core/persistence/cmsMedia'
 import { dataTablePreviewToLoopItem } from '@core/templates/templatePreviewData'
+import { CanvasPreviewReadinessContext } from './CanvasPreviewReadiness'
 
 // ---------------------------------------------------------------------------
 // Loop prop reader
@@ -226,10 +227,11 @@ export function selectSitePagesLoopItems(node: PageNode, pages: readonly Page[] 
 const BUILT_IN_SOURCE_IDS = new Set(['data.rows', 'site.media', 'site.pages'])
 
 export function useLoopPreviewItems(node: PageNode): LoopItem[] {
+  const previewReadiness = use(CanvasPreviewReadinessContext)
   // `readLoopProps()` reuses the shared `EMPTY_FILTERS` sentinel when the
   // node has no filters set, so `filters` identity is stable across renders
   // for the no-filter case. When filters ARE set, the value comes straight
-  // from `node.props.filters`, which the editor store (zustand + immer)
+  // from `node.props.filters`, which the editor store (Zustand + Mutative)
   // keeps referentially stable until the user actually edits it. Either way
   // the downstream memo can depend on `filters` directly without thrashing.
   const { sourceId, filters, orderBy, direction, offset, limit } = readLoopProps(node)
@@ -269,14 +271,14 @@ export function useLoopPreviewItems(node: PageNode): LoopItem[] {
     // (which would violate react-hooks/set-state-in-effect).
     if (sourceId !== 'data.rows' || !tableId) return
     let cancelled = false
-    getCmsDataTable(tableId)
+    const tableRequest = getCmsDataTable(tableId)
       .then((table) => {
         if (!cancelled) setAsyncDataTable(table)
       })
       .catch(() => {
         if (!cancelled) setAsyncDataTable(null)
       })
-    previewCmsDataLoopItems(tableId, {
+    const rowsRequest = previewCmsDataLoopItems(tableId, {
       orderBy: orderBy || 'publishedAt',
       direction,
       limit,
@@ -288,16 +290,17 @@ export function useLoopPreviewItems(node: PageNode): LoopItem[] {
       .catch(() => {
         if (!cancelled) setAsyncDataRowItems([])
       })
+    previewReadiness?.track(Promise.all([tableRequest, rowsRequest]))
     return () => {
       cancelled = true
     }
-  }, [sourceId, tableId, orderBy, direction, limit, offset])
+  }, [sourceId, tableId, orderBy, direction, limit, offset, previewReadiness])
 
   // ── Async fetch: site.media ─────────────────────────────────────────
   useEffect(() => {
     if (sourceId !== 'site.media') return
     let cancelled = false
-    listCmsMediaAssets()
+    const request = listCmsMediaAssets()
       .then((assets) => {
         if (cancelled) return
         setAsyncMedia(assets)
@@ -305,10 +308,11 @@ export function useLoopPreviewItems(node: PageNode): LoopItem[] {
       .catch(() => {
         if (!cancelled) setAsyncMedia([])
       })
+    previewReadiness?.track(request)
     return () => {
       cancelled = true
     }
-  }, [sourceId])
+  }, [sourceId, previewReadiness])
 
   // ── Sort + offset + limit pipeline ──────────────────────────────────
   if (!sourceId) return EMPTY_ITEMS

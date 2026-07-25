@@ -16,16 +16,22 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import type { DbClient } from '../../db/client'
 import type { CoreCapability } from '@core/capabilities'
-import type { AiBrowserBridge, AiTool } from '../runtime/types'
+import { getErrorMessage } from '@core/utils/errorMessage'
+import type { AiBrowserBridge, AiTool, AiToolOutput } from '../runtime/types'
 import { executeAiTool } from '../drivers/http/execTool'
 import { mcpToolsForCapabilities } from './registry'
-import { getEditorBridgeForUser } from './editorBridge'
+import { authorizeMcpContentTool } from './contentAuthorization'
+import {
+  getEditorBridgeForUser,
+  type EditorBridgeScope,
+} from './editorBridge'
 
 export interface McpServerContext {
   db: DbClient
   userId: string
   connectorId: string
   capabilities: readonly CoreCapability[]
+  uploadsDir?: string
 }
 
 // Used for server-resolved tools, which never call the bridge.
@@ -35,8 +41,10 @@ const NOOP_BRIDGE: AiBrowserBridge = {
   },
 }
 
-const NO_EDITOR_MESSAGE =
-  'This tool runs in the Instatic editor. Open the site editor in a browser (signed in as the connector owner) and try again.'
+const NO_WORKSPACE_MESSAGE: Record<EditorBridgeScope, string> = {
+  site: 'This tool runs in the Instatic Site editor. Open the Site editor in a browser (signed in as the connector owner) and try again.',
+  content: 'This tool runs in the Instatic Content workspace. Open the Content workspace in a browser (signed in as the connector owner) and try again.',
+}
 
 export function buildMcpServer(ctx: McpServerContext): Server {
   const server = new Server(
@@ -44,7 +52,12 @@ export function buildMcpServer(ctx: McpServerContext): Server {
     { capabilities: { tools: {} } },
   )
 
-  const tools = mcpToolsForCapabilities(ctx.capabilities)
+  const tools = mcpToolsForCapabilities(
+    ctx.capabilities,
+    ctx.uploadsDir
+      ? { connectorId: ctx.connectorId, uploadsDir: ctx.uploadsDir }
+      : undefined,
+  )
   const byName = new Map<string, AiTool>(tools.map((t) => [t.name, t]))
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -67,25 +80,64 @@ export function buildMcpServer(ctx: McpServerContext): Server {
     }
 
     // Server-resolved tools run in-process; browser tools are relayed to the
-    // connector owner's open editor. No editor → a clear, actionable error.
+    // connector owner's matching open workspace. No workspace → a clear,
+    // actionable error. Browser tools currently belong only to Site or
+    // Content; keep that invariant explicit instead of guessing a bridge.
     let bridge = NOOP_BRIDGE
     if (tool.execution === 'browser') {
-      const live = getEditorBridgeForUser(ctx.userId)
-      if (!live) {
-        return { isError: true, content: [{ type: 'text', text: NO_EDITOR_MESSAGE }] }
+      if (tool.scope !== 'site' && tool.scope !== 'content') {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Browser tool "${tool.name}" has unsupported scope "${tool.scope}".` }],
+        }
       }
-      bridge = live
+      const browserScope: EditorBridgeScope = tool.scope
+      const live = getEditorBridgeForUser(ctx.userId, browserScope)
+      if (!live) {
+        return { isError: true, content: [{ type: 'text', text: NO_WORKSPACE_MESSAGE[browserScope] }] }
+      }
+      bridge = browserScope === 'content'
+        ? {
+            callBrowser: async (toolName, input) => {
+              await authorizeMcpContentTool(
+                ctx.db,
+                ctx.userId,
+                ctx.capabilities,
+                toolName,
+                input,
+              )
+              const current = getEditorBridgeForUser(ctx.userId, browserScope)
+              if (!current) throw new Error(NO_WORKSPACE_MESSAGE[browserScope])
+              return current.callBrowser(toolName, input)
+            },
+          }
+        : live
     }
 
     const controller = new AbortController()
-    const output = await executeAiTool(tool, args ?? {}, bridge, controller.signal, {
-      db: ctx.db,
-      userId: ctx.userId,
-      capabilities: ctx.capabilities,
-      scope: tool.scope === 'shared' ? 'content' : tool.scope,
-      conversationId: `mcp:${ctx.connectorId}`,
-      snapshot: null,
-    })
+    let output: AiToolOutput
+    try {
+      output = await executeAiTool(tool, args ?? {}, bridge, controller.signal, {
+        db: ctx.db,
+        userId: ctx.userId,
+        capabilities: ctx.capabilities,
+        scope: tool.scope === 'shared' ? 'content' : tool.scope,
+        conversationId: `mcp:${ctx.connectorId}`,
+        snapshot: null,
+      })
+    } catch (err) {
+      // Browser bridge rejection is terminal for a chat turn, but MCP has no
+      // surrounding provider loop to terminate. Translate the same transport
+      // failure into the protocol's normal tool-error result instead of
+      // letting the request handler reject with an internal MCP error.
+      return {
+        isError: true,
+        content: [{
+          type: 'text',
+          text: getErrorMessage(err, `Browser tool "${tool.name}" could not return a result.`),
+        }],
+      }
+    }
 
     if (!output.ok) {
       return { isError: true, content: [{ type: 'text', text: output.error ?? 'Tool failed.' }] }

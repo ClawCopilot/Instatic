@@ -1,5 +1,5 @@
 import type { EditorStoreSliceCreator } from '@site/store/types'
-import type { AiToolOutput } from '@core/ai'
+import type { AiToolOutput, AiUserContentBlock } from '@core/ai'
 import type { ConversationView } from '@admin/ai/api'
 import type { InstalledPlugin } from '@core/plugin-sdk'
 import type { AgentMessage, AgentToolScope } from './types'
@@ -42,6 +42,25 @@ export interface AgentSliceConfig {
   canRedo?(): boolean
 }
 
+/**
+ * Usage attached to the active conversation.
+ *
+ * `contextTokens` is the latest provider round's input size, while the other
+ * fields are cumulative billing totals across every round in the conversation.
+ * Keeping both in one snapshot makes that distinction explicit at call sites.
+ */
+export interface AgentConversationUsage {
+  contextTokens: number | null
+  /** Selection that produced `contextTokens`; null until the first measured round. */
+  contextCredentialId: string | null
+  contextModelId: string | null
+  promptTokens: number
+  completionTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+}
+
 export interface AgentSlice {
   isAgentOpen: boolean
   isAgentStreaming: boolean
@@ -56,11 +75,18 @@ export interface AgentSlice {
   agentSkills: InstalledPlugin[]
   /** IDs of skills the user has opted-in to for the current conversation. */
   agentActiveSkillIds: string[]
+  agentUsage: AgentConversationUsage
+  /** True while a history load/delete can replace the active conversation. */
+  isAgentConversationPending: boolean
+  /** True while an existing conversation's provider/model update is pending. */
+  isAgentProviderPending: boolean
+  /** Remounts local composer drafts on explicit conversation replacement. */
+  agentComposerEpoch: number
 
   openAgent(): void
   closeAgent(): void
   toggleAgent(): void
-  sendAgentMessage(content: string): Promise<void>
+  sendAgentMessage(content: AiUserContentBlock[]): Promise<{ accepted: boolean }>
   abortAgent(): void
   clearAgentMessages(): void
   loadAgentConversations(): Promise<void>

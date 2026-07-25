@@ -3,14 +3,14 @@
  * a live mutation against the content workspace via the registered
  * `ContentBridgeHandle`.
  *
- * The chat panel's stream loop calls `executeContentTool(name, input)`
- * when scope === 'content'; the result is POSTed to /admin/api/ai/tool-result.
+ * Both the chat panel and the workspace-scoped MCP relay call
+ * `executeContentTool(name, input)` for content tools; each result is posted
+ * back through the shared tool-result endpoint.
  *
  * Per-tool inputs are re-validated against TypeBox at this boundary —
- * defence in depth. The server already validated against the same schema
- * (via Anthropic Zod or OpenAI JSON Schema) but the canonical TypeBox
- * shape is the single source of truth and may carry stricter constraints
- * the SDK translation drops.
+ * defence in depth. The server advertises matching TypeBox schemas to the
+ * provider as JSON Schema, and this browser bridge validates the payload
+ * again before touching live draft state.
  *
  * Mirrors `src/admin/pages/site/agent/executor.ts` — same canonical
  * `AiToolOutput` return type, plugged into the same stream-event processor in
@@ -38,7 +38,6 @@ const StatusUnion = Type.Union([
 const CreateDocumentSchema = Type.Object({
   tableId: Type.String({ minLength: 1 }),
   fields: Type.Optional(FieldsRecord),
-  status: Type.Optional(StatusUnion),
 })
 
 const DeleteDocumentSchema = Type.Object({
@@ -129,7 +128,6 @@ async function handleCreateDocument(
   const documentId = await handle.createDocument({
     tableId: input.tableId,
     fields: input.fields,
-    status: input.status,
   })
   return aiToolOk({ documentId })
 }

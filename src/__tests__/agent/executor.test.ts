@@ -991,9 +991,36 @@ const findRule = (predicate: (c: { name: string; kind?: string; selector: string
   Object.values(useEditorStore.getState().site!.styleRules).find(predicate)
 
 describe('executeAgentTool — applyCss', () => {
+  it('requires an explicit operation instead of inferring destructive intent', async () => {
+    freshStore()
+    const result = await executeAgentTool('site_apply_css', {
+      css: '.legacy-shape { color: red; }',
+    })
+    expectToolError(result)
+    expect(findRule((rule) => rule.selector === '.legacy-shape')).toBeUndefined()
+  })
+
+  it('enforces required fields while tolerating optional siblings from the flat provider schema', async () => {
+    freshStore()
+    expectToolError(await executeAgentTool('site_apply_css', { operation: 'merge' }))
+    expectToolError(await executeAgentTool('site_apply_css', { operation: 'delete' }))
+    expectToolError(await executeAgentTool('site_apply_css', {
+      operation: 'remove-properties',
+      selectors: ['.card'],
+    }))
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'replace',
+      css: '.card { color: red; }',
+      selectors: ['.card'],
+    })
+    expectToolData(result)
+    expect(findRule((rule) => rule.selector === '.card')?.styles.color).toBe('red')
+  })
+
   it('creates a reusable class from a bare `.foo` selector', async () => {
     freshStore()
     const result = await executeAgentTool('site_apply_css', {
+      operation: 'merge',
       css: '.btn-primary { font-size: 14px; color: var(--primary); }',
     })
     const data = expectToolData<{ cssRulesCreated: number; cssRulesUpdated: number }>(result)
@@ -1008,8 +1035,9 @@ describe('executeAgentTool — applyCss', () => {
 
   it('EDITS an existing class when its selector is re-applied (upsert, not duplicate)', async () => {
     freshStore()
-    await executeAgentTool('site_apply_css', { css: '.card { color: red; }' })
+    await executeAgentTool('site_apply_css', { operation: 'merge', css: '.card { color: red; }' })
     const result = await executeAgentTool('site_apply_css', {
+      operation: 'merge',
       css: '.card { color: blue; font-size: 20px; }',
     })
     const data = expectToolData<{ cssRulesCreated: number; cssRulesUpdated: number }>(result)
@@ -1024,7 +1052,10 @@ describe('executeAgentTool — applyCss', () => {
 
   it('creates an ambient rule from a descendant selector', async () => {
     freshStore()
-    await executeAgentTool('site_apply_css', { css: '.hero a { color: tomato; }' })
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.hero a { color: tomato; }',
+    })
     const ambient = findRule((c) => c.kind === 'ambient' && c.selector === '.hero a')!
     expect(ambient).toBeDefined()
     expect(ambient.styles.color).toBe('tomato')
@@ -1032,8 +1063,12 @@ describe('executeAgentTool — applyCss', () => {
 
   it('EDITS an existing ambient descendant/pseudo rule — the case updateClassStyles could not express', async () => {
     freshStore()
-    await executeAgentTool('site_apply_css', { css: '.hero a:hover { color: red; }' })
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.hero a:hover { color: red; }',
+    })
     const result = await executeAgentTool('site_apply_css', {
+      operation: 'merge',
       css: '.hero a:hover { color: var(--primary); text-decoration: underline; }',
     })
     const data = expectToolData<{ cssRulesCreated: number; cssRulesUpdated: number }>(result)
@@ -1050,6 +1085,7 @@ describe('executeAgentTool — applyCss', () => {
   it('folds a matching @media block into the rule contextStyles', async () => {
     freshStore()
     await executeAgentTool('site_apply_css', {
+      operation: 'merge',
       css:
         '.hero-title { font-size: 56px; }' +
         '@media (max-width: 375px) { .hero-title { font-size: 32px; } }',
@@ -1059,9 +1095,193 @@ describe('executeAgentTool — applyCss', () => {
     expect(cls.contextStyles.mobile.fontSize).toBe('32px')
   })
 
+  it('replace makes one selector payload authoritative without changing its identity or assignment', async () => {
+    const { rootId } = freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css:
+        '.card { color: red; background: var(--surface); }' +
+        '@media (max-width: 375px) { .card { color: orange; } }',
+    })
+    const before = findRule((rule) => rule.selector === '.card')!
+    const nodeId = expectNodeIds(await executeAgentTool('site_insert_html', {
+      parentId: rootId,
+      html: '<div class="card">Card</div>',
+    }))[0]
+
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'replace',
+      css: '.card { color: blue; }',
+    })
+
+    const data = expectToolData<{ cssRulesCreated: number; cssRulesUpdated: number }>(result)
+    expect(data).toEqual({ cssRulesCreated: 0, cssRulesUpdated: 1 })
+    const after = findRule((rule) => rule.selector === '.card')!
+    expect(after.id).toBe(before.id)
+    expect(after.order).toBe(before.order)
+    expect(after.styles).toEqual({ color: 'blue' })
+    expect(after.contextStyles).toEqual({})
+    expect(activePage().nodes[nodeId].classIds).toContain(after.id)
+  })
+
+  it('replace accepts an empty rule to clear declarations without detaching the class', async () => {
+    const { rootId } = freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.clear-me { color: red; }',
+    })
+    const nodeId = expectNodeIds(await executeAgentTool('site_insert_html', {
+      parentId: rootId,
+      html: '<p class="clear-me">Text</p>',
+    }))[0]
+
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'replace',
+      css: '.clear-me {}',
+    })
+
+    expectToolOk(result)
+    const rule = findRule((candidate) => candidate.selector === '.clear-me')!
+    expect(rule.styles).toEqual({})
+    expect(activePage().nodes[nodeId].classIds).toContain(rule.id)
+  })
+
+  it('merge reorders touched declarations so a longhand authored after a shorthand wins', async () => {
+    freshStore()
+    const rule = useEditorStore.getState().createClass('grad', {
+      backgroundClip: 'text',
+      background: 'linear-gradient(var(--primary), var(--accent))',
+    })
+
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css:
+        '.grad {' +
+        'background: linear-gradient(var(--primary), var(--accent));' +
+        'background-clip: text;' +
+        '}',
+    })
+
+    const keys = Object.keys(useEditorStore.getState().site!.styleRules[rule.id].styles)
+    expect(keys.indexOf('background')).toBeLessThan(keys.indexOf('backgroundClip'))
+  })
+
+  it('preserves important priority and lets a later normal merge remove it explicitly', async () => {
+    freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.priority { color: red !important; }',
+    })
+    let rule = findRule((candidate) => candidate.selector === '.priority')!
+    expect(rule.stylePriorities).toEqual({ color: 'important' })
+
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.priority { color: blue; }',
+    })
+    rule = findRule((candidate) => candidate.selector === '.priority')!
+    expect(rule.styles.color).toBe('blue')
+    expect(rule.stylePriorities).toBeUndefined()
+  })
+
+  it('delete removes every exact selector match and detaches deleted classes', async () => {
+    const { rootId } = freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.doomed { color: red; }',
+    })
+    const classRule = findRule((rule) => rule.selector === '.doomed')!
+    const nodeId = expectNodeIds(await executeAgentTool('site_insert_html', {
+      parentId: rootId,
+      html: '<p class="doomed">Text</p>',
+    }))[0]
+    useEditorStore.getState().createAmbientRule({ selector: '.hero span', styles: { color: 'red' } })
+    useEditorStore.getState().createAmbientRule({ selector: '.hero span', styles: { color: 'blue' } })
+
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'delete',
+      selectors: ['.doomed', '.hero span'],
+    })
+
+    const data = expectToolData<{ cssRulesDeleted: number }>(result)
+    expect(data.cssRulesDeleted).toBe(3)
+    expect(useEditorStore.getState().site!.styleRules[classRule.id]).toBeUndefined()
+    expect(activePage().nodes[nodeId].classIds).not.toContain(classRule.id)
+    expect(Object.values(useEditorStore.getState().site!.styleRules).some(
+      (rule) => rule.selector === '.hero span',
+    )).toBe(false)
+  })
+
+  it('remove-properties clears base/context declarations, vendor/custom names, and collapsed sides', async () => {
+    freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css:
+        '.mask {' +
+        'background: linear-gradient(var(--primary), var(--accent));' +
+        '-webkit-text-fill-color: transparent;' +
+        '--mask-token: gold;' +
+        'padding: 4px 8px;' +
+        'color: transparent;' +
+        '}' +
+        '@media (max-width: 375px) {' +
+        '.mask { background: var(--surface); -webkit-text-fill-color: currentColor; }' +
+        '}',
+    })
+
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'remove-properties',
+      selectors: ['.mask'],
+      properties: ['background', '-webkit-text-fill-color', '--mask-token', 'padding'],
+    })
+
+    const data = expectToolData<{ cssRulesUpdated: number; cssPropertiesRemoved: number }>(result)
+    expect(data.cssRulesUpdated).toBe(1)
+    expect(data.cssPropertiesRemoved).toBeGreaterThan(4)
+    const rule = findRule((candidate) => candidate.selector === '.mask')!
+    expect(rule.styles.color).toBe('transparent')
+    for (const bag of [rule.styles, ...Object.values(rule.contextStyles)]) {
+      expect('background' in bag).toBe(false)
+      expect('WebkitTextFillColor' in bag).toBe(false)
+      expect('--mask-token' in bag).toBe(false)
+      expect('padding' in bag).toBe(false)
+      expect('paddingTop' in bag).toBe(false)
+      expect('paddingRight' in bag).toBe(false)
+      expect('paddingBottom' in bag).toBe(false)
+      expect('paddingLeft' in bag).toBe(false)
+    }
+  })
+
+  it('destructive operations fail atomically when any selector or property is missing', async () => {
+    freshStore()
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.safe { color: red; background: var(--surface); }',
+    })
+
+    const deleteResult = await executeAgentTool('site_apply_css', {
+      operation: 'delete',
+      selectors: ['.safe', '.missing'],
+    })
+    expectToolError(deleteResult)
+    expect(findRule((rule) => rule.selector === '.safe')).toBeDefined()
+
+    const removeResult = await executeAgentTool('site_apply_css', {
+      operation: 'remove-properties',
+      selectors: ['.safe'],
+      properties: ['background', 'border-image-source'],
+    })
+    expectToolError(removeResult)
+    const rule = findRule((candidate) => candidate.selector === '.safe')!
+    expect(rule.styles.background).toBe('var(--surface)')
+  })
+
   it('returns an error for CSS that parses to no rules', async () => {
     freshStore()
-    const result = await executeAgentTool('site_apply_css', { css: '/* just a comment */' })
+    const result = await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '/* just a comment */',
+    })
     expectToolError(result)
     expect(result.error).toContain('No CSS rules parsed')
   })
@@ -1108,7 +1328,10 @@ describe('executeAgentTool — class identifier resolution', () => {
       html: '<button>Click</button>',
     })
     const nodeId = expectNodeIds(insertResult)[0]
-    await executeAgentTool('site_apply_css', { css: '.btn-hero { color: #fff; }' })
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.btn-hero { color: #fff; }',
+    })
 
     const result = await executeAgentTool('site_assign_class', { nodeId, classId: 'btn-hero' })
     expectToolOk(result)
@@ -1138,7 +1361,10 @@ describe('executeAgentTool — class identifier resolution', () => {
       html: '<button>Click</button>',
     })
     const nodeId = expectNodeIds(insertResult)[0]
-    await executeAgentTool('site_apply_css', { css: '.removable { color: #fff; }' })
+    await executeAgentTool('site_apply_css', {
+      operation: 'merge',
+      css: '.removable { color: #fff; }',
+    })
     await executeAgentTool('site_assign_class', { nodeId, classId: 'removable' })
 
     const result = await executeAgentTool('site_remove_class', { nodeId, classId: 'removable' })

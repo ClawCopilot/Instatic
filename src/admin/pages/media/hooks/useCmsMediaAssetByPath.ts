@@ -15,8 +15,9 @@
  * invalidates on `refreshCmsMediaAssetCache()` — call after a replace /
  * delete so stale rows don't linger.
  */
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { listCmsMediaAssets, type CmsMediaAsset } from '@core/persistence/cmsMedia'
+import { CanvasPreviewReadinessContext } from '@site/canvas/CanvasPreviewReadiness'
 
 // Module-level cache, shared across every consumer. CmsMediaAsset objects
 // are small (< 1 KB each), so a Map of every asset the user has touched
@@ -97,6 +98,7 @@ export function useCmsMediaAssetByPath(publicPath: string | null | undefined): C
 }
 
 export function useCmsMediaAssetsByPath(publicPaths: readonly string[]): ReadonlyMap<string, CmsMediaAsset> {
+  const previewReadiness = use(CanvasPreviewReadinessContext)
   const key = publicPathsKey(publicPaths)
   const [snapshot, setSnapshot] = useState<CachedAssetSnapshot>(() => ({
     key,
@@ -118,7 +120,9 @@ export function useCmsMediaAssetsByPath(publicPaths: readonly string[]): Readonl
     subscribers.add(updateSnapshot)
 
     if (!paths.every((path) => cache.has(path))) {
-      void ensureList()
+      const request = ensureList()
+      previewReadiness?.track(request)
+      void request
         .then(updateSnapshot)
         .catch(() => { /* swallow — editor still renders raw urls */ })
     }
@@ -127,7 +131,7 @@ export function useCmsMediaAssetsByPath(publicPaths: readonly string[]): Readonl
       canceled = true
       subscribers.delete(updateSnapshot)
     }
-  }, [key])
+  }, [key, previewReadiness])
 
   return currentAssets
 }

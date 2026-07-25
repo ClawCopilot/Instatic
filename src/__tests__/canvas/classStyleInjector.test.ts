@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   createCanvasClassCssMemo,
+  generateAmbientPlaceholderSuppressionCSS,
   generateCanvasClassCSS,
   generateForcedStateCSS,
 } from '@site/canvas/canvasClassCss'
@@ -42,6 +43,26 @@ function resolvedMedia(path = '/uploads/hero.png'): RenderResolvedMedia {
     posterPath: null,
   }
 }
+
+function makeAmbient(
+  id: string,
+  selector: string,
+  styles: StyleRule['styles'],
+  contextStyles: StyleRule['contextStyles'] = {},
+): StyleRule {
+  return {
+    id,
+    name: selector,
+    kind: 'ambient',
+    selector,
+    order: 0,
+    styles,
+    contextStyles,
+    createdAt: 0,
+    updatedAt: 0,
+  }
+}
+
 
 describe('generateCanvasClassCSS', () => {
   it('prepends the unscoped publisher reset so the iframe cascade matches the published page', () => {
@@ -111,6 +132,15 @@ describe('generateCanvasClassCSS', () => {
     expect(css).toContain('url("/uploads/hero-w1024.webp") 1x')
     expect(css).not.toContain('/uploads/hero.png')
   })
+
+  it('uses the same declaration priorities as published CSS', () => {
+    const rule = makeClass('notice', { color: 'red' })
+    rule.stylePriorities = { color: 'important' }
+    expect(generateCanvasClassCSS({ notice: rule }, [])).toContain(
+      'color: red !important;',
+    )
+  })
+
 
   it('emits sanitized raw @keyframes rules, matching the published output', () => {
     // Regression: the canvas used to skip `rawCss` rules entirely, so
@@ -190,6 +220,63 @@ describe('generateCanvasClassCSS', () => {
     expect(css).toContain('--primary: hsla(238, 100%, 62%, 1);')
     expect(css).toContain('.text-primary')
     expect(css).toContain('color: var(--primary);')
+  })
+})
+
+describe('generateAmbientPlaceholderSuppressionCSS', () => {
+  it('suppresses empty-container chrome for a matching ambient descendant selector', () => {
+    const css = generateAmbientPlaceholderSuppressionCSS({
+      dots: makeAmbient('dots', '.dots i', {
+        width: '12px',
+        height: '12px',
+        backgroundColor: 'red',
+      }),
+    })
+
+    expect(css).toBe(
+      ':is(.dots i) > [data-canvas-module-placeholder] { display: none; }',
+    )
+  })
+
+  it('keeps comma-separated selectors scoped before appending the placeholder child', () => {
+    const css = generateAmbientPlaceholderSuppressionCSS({
+      dots: makeAmbient('dots', '.dots i, .status-dot', { width: '12px' }),
+    })
+
+    expect(css).toContain(
+      ':is(.dots i, .status-dot) > [data-canvas-module-placeholder]',
+    )
+    expect(css).not.toContain('.dots i, .status-dot >')
+  })
+
+  it('matches :empty against the authored element rather than its canvas-only child', () => {
+    const css = generateAmbientPlaceholderSuppressionCSS({
+      empty: makeAmbient('empty', '.dots i:empty', { width: '12px' }),
+    })
+
+    expect(css).toContain(
+      '.dots i:has(> [data-canvas-module-placeholder]:only-child)',
+    )
+  })
+
+  it('ignores ambient entries that do not emit selector declarations', () => {
+    const rawRule = makeAmbient('keyframes', '@keyframes pulse', {})
+    rawRule.rawCss = '@keyframes pulse { from { opacity: 0; } }'
+
+    expect(generateAmbientPlaceholderSuppressionCSS({
+      empty: makeAmbient('empty', '.empty', {}),
+      raw: rawRule,
+    })).toBe('')
+  })
+
+  it('suppresses for context-only authored styling', () => {
+    const css = generateAmbientPlaceholderSuppressionCSS({
+      responsive: makeAmbient('responsive', '.dots i', {}, {
+        mobile: { width: '8px' },
+      }),
+    })
+
+    expect(css).toContain(':is(.dots i)')
   })
 })
 
@@ -282,6 +369,19 @@ describe('generateForcedStateCSS', () => {
     expect(css).toContain('[data-node-id="node-1"][data-node-id="node-1"]')
     expect(css).toContain('color: red')
     expect(css).toContain('font-weight: 700')
+  })
+
+  it('keeps important declarations in forced-state previews', () => {
+    const rule = hoverRule({ color: 'red' }, { mobile: { color: 'blue' } })
+    rule.stylePriorities = { color: 'important' }
+    rule.contextStylePriorities = { mobile: { color: 'important' } }
+    const css = generateForcedStateCSS(
+      'node-1',
+      rule,
+      [{ id: 'mobile', width: 375 }],
+    )
+    expect(css).toContain('color: red !important;')
+    expect(css).toContain('color: blue !important;')
   })
 
   it('emits per-breakpoint overrides under the breakpoint media query, node-scoped', () => {

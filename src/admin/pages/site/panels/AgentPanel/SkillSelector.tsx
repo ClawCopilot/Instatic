@@ -8,6 +8,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { InstalledPlugin } from '@core/plugin-sdk'
+import { Button } from '@ui/components/Button'
 import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { SparklesSolidIcon } from 'pixel-art-icons/icons/sparkles-solid'
 import styles from './AgentPanel.module.css'
@@ -50,8 +51,10 @@ export function SkillSelector({ skills, activeIds, onToggle }: SkillSelectorProp
       className={styles.skillDropdown}
       onKeyDown={handleKeyDown}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         className={styles.skillDropdownTrigger}
         data-active={activeCount > 0}
         aria-haspopup="listbox"
@@ -60,7 +63,7 @@ export function SkillSelector({ skills, activeIds, onToggle }: SkillSelectorProp
       >
         <SparklesSolidIcon size={12} aria-hidden="true" />
         <span>{triggerLabel}</span>
-      </button>
+      </Button>
 
       {open && (
         <ul className={styles.skillDropdownMenu} role="listbox" aria-label="Active skills">
