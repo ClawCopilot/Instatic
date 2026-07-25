@@ -16,6 +16,9 @@
     "description": "Per-IP and per-user rate limiting. Sliding-window counters. Defends login/signup/API against brute force.",
     "permissions": [
       "cms.migrations",
+      "cms.routes",
+      "cms.routes.public",
+      "cms.publicRoutes",
       "cms.httpMiddleware"
     ],
     "entrypoints": {

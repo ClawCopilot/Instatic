@@ -22,6 +22,7 @@
       "cms.routes",
       "cms.routes.public",
       "cms.publicRoutes",
+      "cms.hooks",
       "network.outbound"
     ],
     "entrypoints": {

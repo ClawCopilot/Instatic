@@ -87,7 +87,12 @@ export async function seedBuiltinPlugins(db: DbClient): Promise<void> {
   for (const dir of dirs) {
     const manifest = readPluginManifest(dir)
     const grantedPermissions: PluginPermission[] = manifest.grantedPermissions ?? manifest.permissions ?? []
-    const manifestToStore = { ...manifest, grantedPermissions }
+
+    // Built-in plugins live in the project source tree, not in uploadsDir.
+    // Inject a `/builtin/plugins/{id}/{version}` assetBasePath so the
+    // activation loop can locate their server entrypoints on disk.
+    const builtinAssetBasePath = `/builtin/plugins/${manifest.id}/${manifest.version}`
+    const manifestToStore = { ...manifest, assetBasePath: builtinAssetBasePath, grantedPermissions }
     const now = new Date().toISOString()
 
     const sql = `

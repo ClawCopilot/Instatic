@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 /**
- * Build all 8 plugins as standalone .js bundles.
+ * Build all built-in plugins and skills as standalone .js bundles.
  *
- * Output: plugins/<name>/dist/index.js
+ * Output:
+ *   - plugins/<name>/dist/index.js   (main plugins)
+ *   - plugins/skills/<name>/dist/index.js  (skills)
+ *
  * Usage: bun run scripts/build-plugins.ts
  *
  * The plugins are SELF-CONTAINED: the SDK is inlined via esbuild's default
@@ -10,13 +13,12 @@
  * or run directly via `bun run plugins/<name>/dist/index.js`.
  */
 
-import { Glob as _Glob } from 'bun'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dir, '..')
 const PLUGINS_DIR = join(ROOT, 'plugins')
 
-const plugins = [
+const mainPlugins = [
   'api-keys',
   'public-auth',
   'membership',
@@ -27,12 +29,45 @@ const plugins = [
   'rate-limit',
 ]
 
+const skills = [
+  'agent-bridge',
+  'code-helper',
+  'comment-system',
+  'content-assistant',
+  'design-advisor',
+  'graphic-designer',
+  'huggingface',
+  'humanizer',
+  'image-generator',
+  'layout-builder',
+  'site-api',
+  'social-media',
+  'weather',
+  'web-research',
+  'youtube-summarizer',
+]
+
+type BuildEntry = { name: string; entry: string; outdir: string; kind: string }
+
+const entries: BuildEntry[] = [
+  ...mainPlugins.map((name) => ({
+    name,
+    entry: join(PLUGINS_DIR, name, 'src/index.ts'),
+    outdir: join(PLUGINS_DIR, name, 'dist'),
+    kind: 'plugin',
+  })),
+  ...skills.map((name) => ({
+    name,
+    entry: join(PLUGINS_DIR, 'skills', name, 'src/index.ts'),
+    outdir: join(PLUGINS_DIR, 'skills', name, 'dist'),
+    kind: 'skill',
+  })),
+]
+
 let failed = 0
 
-for (const name of plugins) {
-  const entry = join(PLUGINS_DIR, name, 'src/index.ts')
-  const outdir = join(PLUGINS_DIR, name, 'dist')
-  process.stdout.write(`  ${name.padEnd(20)} `)
+for (const { name, entry, outdir, kind } of entries) {
+  process.stdout.write(`  [${kind}] ${name.padEnd(20)} `)
   try {
     const result = await Bun.build({
       entrypoints: [entry],
@@ -63,7 +98,7 @@ for (const name of plugins) {
 }
 
 if (failed > 0) {
-  console.error(`\n${failed} plugin(s) failed to build`)
+  console.error(`\n${failed} bundle(s) failed to build`)
   process.exit(1)
 }
-console.log(`\nAll ${plugins.length} plugins built successfully`)
+console.log(`\nAll ${entries.length} bundles built successfully (${mainPlugins.length} plugins + ${skills.length} skills)`)

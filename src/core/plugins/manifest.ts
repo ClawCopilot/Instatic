@@ -43,8 +43,12 @@ const SAFE_ASSET_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9._/-
 // — including `..` traversal, empty segments, or non-uploads paths —
 // is rejected at the schema boundary so it can't reach the filesystem
 // sinks (`loadServerPluginModule`, `removePluginAssets`).
+// Matches both user-installed (`/uploads/plugins/...`) and built-in
+// (`/builtin/plugins/...`) asset base paths.  Built-in plugins live
+// directly in the source tree (`<project>/plugins/...`) and use the
+// `/builtin/` prefix to distinguish their resolution at runtime.
 const ASSET_BASE_PATH_PATTERN =
-  /^\/uploads\/plugins\/[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+\/\d+\.\d+\.\d+(?:[-+][0-9a-zA-Z.-]+)?\/?$/
+  /^\/(?:uploads|builtin)\/plugins\/[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+\/\d+\.\d+\.\d+(?:[-+][0-9a-zA-Z.-]+)?\/?$/
 // `adminPages[].content.assetPath` (app pages) — must look like an uploads
 // path with no `.`/`..` segments. The post-check in `parsePluginManifest`
 // further pins it to the declaring plugin's own asset subtree.
@@ -437,11 +441,12 @@ export function parsePluginManifest(input: unknown): PluginManifest {
   // let one plugin manifest target another plugin's files at the filesystem
   // sinks (`loadServerPluginModule`, `removePluginAssets`).
   if (data.assetBasePath) {
-    const expected = `/uploads/plugins/${data.id}/${data.version}`
     const normalized = data.assetBasePath.replace(/\/+$/, '')
-    if (normalized !== expected) {
+    const uploadsExpected = `/uploads/plugins/${data.id}/${data.version}`
+    const builtinExpected = `/builtin/plugins/${data.id}/${data.version}`
+    if (normalized !== uploadsExpected && normalized !== builtinExpected) {
       throw new Error(
-        `Invalid plugin manifest: assetBasePath must equal "${expected}"`,
+        `Invalid plugin manifest: assetBasePath must equal "${uploadsExpected}" (user-installed) or "${builtinExpected}" (built-in)`,
       )
     }
   }

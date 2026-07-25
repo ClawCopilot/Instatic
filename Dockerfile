@@ -21,6 +21,7 @@ COPY vendor ./vendor
 RUN bun install
 COPY . .
 RUN bun run build
+RUN bun run build:plugins
 
 FROM oven/bun:1.3.14 AS production-deps
 WORKDIR /app
@@ -95,7 +96,7 @@ COPY --chown=bun:bun package.json bun.lock ./
 COPY --chown=bun:bun tsconfig*.json ./
 COPY --chown=bun:bun server ./server
 COPY --chown=bun:bun src ./src
-COPY --chown=bun:bun plugins ./plugins
+COPY --from=build --chown=bun:bun /app/plugins ./plugins
 
 # Copy cloudflared (核心) + sing-box (可选)
 COPY --from=cloudflared-layer /tmp/cloudflared /usr/local/bin/cloudflared

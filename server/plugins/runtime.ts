@@ -96,14 +96,28 @@ interface ResolvedEntrypoint {
   entryPath: string
 }
 
+// Project root — the directory containing `plugins/` and `server/`.
+// Used to resolve built-in plugin entrypoints from their
+// `/builtin/plugins/{id}/{version}` assetBasePath.
+const PROJECT_ROOT = join(import.meta.dir, '..', '..')
+
 function resolvePluginServerEntrypoint(
   manifest: PluginManifest,
   uploadsDir: string,
 ): ResolvedEntrypoint | null {
   if (!manifest.assetBasePath || !manifest.entrypoints?.server) return null
-  const relativeBase = manifest.assetBasePath.replace(/^\/uploads\/?/, '')
-  const entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.server)
-  assertPathWithin(uploadsDir, entryPath)
+
+  const relativeBase = manifest.assetBasePath.replace(/^\/(?:uploads|builtin)\/?/, '')
+
+  let entryPath: string
+  if (manifest.assetBasePath.startsWith('/builtin/')) {
+    // Built-in plugins: resolve against the project root's `plugins/` dir.
+    entryPath = join(PROJECT_ROOT, 'plugins', relativeBase, manifest.entrypoints.server)
+  } else {
+    // User-installed plugins: resolve against uploadsDir.
+    entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.server)
+    assertPathWithin(uploadsDir, entryPath)
+  }
   return { entryPath }
 }
 
@@ -195,9 +209,15 @@ export async function loadPluginModulePack(
   uploadsDir?: string,
 ): Promise<ModulePackVm | null> {
   if (!uploadsDir || !manifest.assetBasePath || !manifest.entrypoints?.modules) return null
-  const relativeBase = manifest.assetBasePath.replace(/^\/uploads\/?/, '')
-  const entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.modules)
-  assertPathWithin(uploadsDir, entryPath)
+  const relativeBase = manifest.assetBasePath.replace(/^\/(?:uploads|builtin)\/?/, '')
+
+  let entryPath: string
+  if (manifest.assetBasePath.startsWith('/builtin/')) {
+    entryPath = join(PROJECT_ROOT, 'plugins', relativeBase, manifest.entrypoints.modules)
+  } else {
+    entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.modules)
+    assertPathWithin(uploadsDir, entryPath)
+  }
   const packSource = await readFile(entryPath, 'utf-8')
   return await createModulePackVm({ pluginId: manifest.id, packSource })
 }
