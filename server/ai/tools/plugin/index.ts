@@ -112,7 +112,7 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
     }
 
     // 收集元数据用于自动推荐
-    const keywords = extractSkillKeywords(manifest, skillAiTools)
+    const keywords = extractSkillKeywords(manifest, [...skillAiTools])
     metas.push({
       id: pluginId,
       name: manifest.name,

@@ -1310,6 +1310,8 @@ async function handleHfGetWhoami(): Promise<unknown> {
       return { ok: false, error: `API returned ${res.status}: ${await res.text().catch(() => res.statusText)}` }
     }
     const data = (await res.json()) as Record<string, unknown>
+    const auth = data.auth as Record<string, unknown> | undefined
+    const accessToken = auth?.accessToken as Record<string, unknown> | undefined
     return {
       ok: true,
       data: {
@@ -1318,7 +1320,7 @@ async function handleHfGetWhoami(): Promise<unknown> {
         email: data.email ?? '',
         orgs: (data.orgs as Array<{ name: string }> | undefined)?.map((o) => o.name) ?? [],
         token_type: data.type ?? 'unknown',
-        token_permission: data.auth?.accessToken?.role ?? 'unknown',
+        token_permission: accessToken?.role ?? 'unknown',
       },
     }
   } catch (err) {

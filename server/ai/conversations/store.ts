@@ -361,8 +361,8 @@ export async function forkConversation(
     await appendMessage(db, newId, {
       role: msg.role,
       content: msg.content,
-      toolCallId: msg.toolCallId,
-      toolName: msg.toolName,
+      toolCallId: msg.toolCallId ?? undefined,
+      toolName: msg.toolName ?? undefined,
     })
   }
 

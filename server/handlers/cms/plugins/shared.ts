@@ -121,6 +121,7 @@ function brokenPluginStub(
     id: result.id,
     name: result.name,
     version: result.version,
+    source: 'user',
     enabled: false,
     lifecycleStatus: 'error',
     lastError: result.reason,
