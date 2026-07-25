@@ -319,7 +319,7 @@ export async function swapSlot(uploadsDir: string, targetSlot: Slot): Promise<vo
     } catch (err) {
       // Windows-only fallback (reached on WSL or unusual edge cases).
       // Win32 `MoveFile` won't replace an existing target (`EEXIST`/`EPERM`/`EISDIR`/`EACCES`).
-      if (process.platform !== 'win32') throw err
+      if ((process.platform as string) !== 'win32') throw err
       const code = (err as NodeJS.ErrnoException).code
       if (code !== 'EEXIST' && code !== 'EPERM' && code !== 'EISDIR' && code !== 'EACCES') throw err
       await removeSymlinkEntry(currentPath)
@@ -343,7 +343,7 @@ async function removeSymlinkEntry(path: string): Promise<void> {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code
     if (code === 'ENOENT') return
-    if (process.platform !== 'win32') throw err
+    if ((process.platform as string) !== 'win32') throw err
     try {
       await rmdir(path)
     } catch (err2) {

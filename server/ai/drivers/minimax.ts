@@ -60,21 +60,21 @@ const FALLBACK_MODELS: AiProviderModel[] = [
     label: 'MiniMax-M3',
     tier: 'smart',
     catalogueSource: 'fallback',
-    capabilities: { toolCalling: true, visionInput: true, promptCache: false, streaming: true },
+    capabilities: { toolCalling: true, visionInput: true, promptCache: false, streaming: true, toolResultImages: false },
   },
   {
     id: 'MiniMax-M2.7',
     label: 'MiniMax-M2.7',
     tier: 'smart',
     catalogueSource: 'fallback',
-    capabilities: { toolCalling: false, visionInput: false, promptCache: false, streaming: true },
+    capabilities: { toolCalling: false, visionInput: false, promptCache: false, streaming: true, toolResultImages: false },
   },
   {
     id: 'MiniMax-M2.5',
     label: 'MiniMax-M2.5',
     tier: 'fast',
     catalogueSource: 'fallback',
-    capabilities: { toolCalling: false, visionInput: false, promptCache: false, streaming: true },
+    capabilities: { toolCalling: false, visionInput: false, promptCache: false, streaming: true, toolResultImages: false },
   },
 ]
 
@@ -90,6 +90,7 @@ export const minimaxDriver: AiProvider = {
       visionInput: false,
       promptCache: false,
       streaming: true,
+      toolResultImages: false,
     }
   },
 
@@ -178,6 +179,7 @@ async function fetchMinimaxModels(apiKey: string): Promise<AiProviderModel[]> {
             visionInput: isM3,
             promptCache: false,
             streaming: true,
+            toolResultImages: false,
           },
         }
       })

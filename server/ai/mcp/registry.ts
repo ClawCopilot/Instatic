@@ -68,5 +68,5 @@ export function mcpToolsForCapabilities(
   capabilities: readonly CoreCapability[],
   runtime?: McpPublishRuntime,
 ): AiTool[] {
-  return allMcpTools(runtime).filter((t) => toolAllowedForCapabilities(t, capabilities)))
+  return allMcpTools(runtime).filter((t) => toolAllowedForCapabilities(t, capabilities))
 }

@@ -25,7 +25,6 @@ import {
   listConversations,
   getConversation,
   deleteConversation,
-  updateConversationProvider,
   forkConversation,
 } from '@admin/ai/api'
 import { listCmsPlugins } from '@core/persistence'

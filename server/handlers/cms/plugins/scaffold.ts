@@ -147,7 +147,7 @@ function buildZipResponse(files: Record<string, string>, pluginId: string): Resp
   const zipBytes = zipSync(zippable, { level: 9 })
   const filename = `${pluginId.replace(/\./g, '-')}.zip`
 
-  const res = new Response(zipBytes, { status: 200 })
+  const res = new Response(zipBytes.buffer as ArrayBuffer, { status: 200 })
   res.headers.set('content-type', 'application/zip')
   res.headers.set('content-disposition', `attachment; filename="${filename}"`)
   res.headers.set('content-length', String(zipBytes.byteLength))

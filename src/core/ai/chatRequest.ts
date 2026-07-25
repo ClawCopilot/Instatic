@@ -52,6 +52,7 @@ export const AiChatRequestBodySchema = Type.Object(
     content: AiUserContentSchema,
     // Scope-specific shape. The scope prompt builder validates it separately.
     snapshot: Type.Optional(Type.Unknown()),
+    skillIds: Type.Optional(Type.Array(Type.String())),
   },
   { additionalProperties: false },
 )

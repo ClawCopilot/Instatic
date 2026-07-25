@@ -6,6 +6,7 @@
  */
 import { createContext, useContext } from 'react'
 import { useStore } from 'zustand'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { AgentSlice } from '@site/agent'
 
 /**
@@ -56,7 +57,9 @@ export function useAgentStoreApi(): AgentStoreApi {
  * AgentStoreProvider — the panel components rely on a host being
  * mounted; an unprovided render is a wiring bug, not a missing-data case.
  */
-export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
+export function useAgentStore<U>(selector: (slice: AgentSlice) => U, equalityFn?: (a: U, b: U) => boolean): U {
   const api = useAgentStoreApi()
-  return useStore(api, selector)
+  return equalityFn
+    ? useStoreWithEqualityFn(api, selector, equalityFn)
+    : useStore(api, selector)
 }

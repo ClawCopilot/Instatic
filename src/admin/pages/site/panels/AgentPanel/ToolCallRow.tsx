@@ -37,7 +37,7 @@ import { getToolCallDisplay, extractColorSwatches, isDangerousTool, type ToolCal
 import styles from './AgentPanel.module.css'
 import confirmationStyles from './ConfirmationOverlay.module.css'
 
-export function ToolCallRow({ toolCall, onScreenshotClick }: { toolCall: AgentToolCall; onScreenshotClick?: (dataUrl: string) => void }) {
+export function ToolCallRow({ toolCall, onScreenshotClick: _onScreenshotClick }: { toolCall: AgentToolCall; onScreenshotClick?: (dataUrl: string) => void }) {
   const isPending = toolCall.status === 'pending'
   const isSuccess = toolCall.status === 'success'
   const isError = toolCall.status === 'error'

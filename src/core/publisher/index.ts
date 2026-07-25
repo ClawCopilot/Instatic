@@ -57,15 +57,6 @@ export {
 } from './responsiveBackground'
 export type { ResponsiveCssOptions } from './responsiveBackground'
 
-export {
-  collectBackgroundImagePaths,
-  collectBackgroundImagePathsFromStyleBag,
-  collectNodeBackgroundImagePaths,
-  collectSiteStyleBackgroundImagePaths,
-  responsiveBackgroundImage,
-} from './responsiveBackground'
-export type { ResponsiveCssOptions } from './responsiveBackground'
-
 export { collectClassCSS, CssCollector, sanitizeModuleCSS } from './cssCollector'
 
 export { buildSiteFrameworkCss, generateFrameworkCss } from './frameworkCss'
