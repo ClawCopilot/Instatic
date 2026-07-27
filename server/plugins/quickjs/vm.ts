@@ -356,12 +356,7 @@ export async function createPluginVm(args: {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         console.error(`[plugin:${pluginId}] __hostCallSync(${target}) failed: ${message}`)
-        // Re-throw inside the VM so plugin code sees the error.
-        const errHandle = ctx.newError(message)
         // In QuickJS, throwing from a host function propagates to the caller.
-        // We use ctx.unwrapResult to convert the error handle to a throw.
-        // Actually, the simplest approach is to return an error string and
-        // let the shim throw. But for correctness, we throw directly.
         throw err
       }
     })
