@@ -98,7 +98,7 @@ interface ResolvedEntrypoint {
 
 // Project root — the directory containing `plugins/` and `server/`.
 // Used to resolve built-in plugin entrypoints from their
-// `/builtin/plugins/{id}/{version}` assetBasePath.
+// `/builtin/{dirName}/{version}` assetBasePath.
 const PROJECT_ROOT = join(import.meta.dir, '..', '..')
 
 function resolvePluginServerEntrypoint(
