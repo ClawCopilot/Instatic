@@ -10,12 +10,17 @@
  * unified shim handles every export form for BOTH global names so the two can
  * never drift again.
  *
+ * The import-rewriting block locks the bridged-module mapping: `crypto` /
+ * `net` / `util` imports become `const` bindings against host-provided
+ * globals, so plugin bundles built with `target: 'bun'` (which leave those
+ * imports external) load cleanly inside QuickJS.
+ *
  * Each case runs the produced IIFE against an isolated `globalThis` stand-in
  * (a plain object passed as the `globalThis` parameter, shadowing the real
  * global) and inspects what the shim attached.
  */
 import { describe, expect, it } from 'bun:test'
-import { wrapEsmAsGlobal } from '../../../server/plugins/quickjs/esmShim'
+import { wrapEsmAsGlobal, BRIDGED_MODULE_GLOBALS } from '../../../server/plugins/quickjs/esmShim'
 
 type Sandbox = Record<string, unknown>
 
@@ -129,5 +134,101 @@ describe('wrapEsmAsGlobal — stack-trace line numbers', () => {
   it('still evaluates correctly with the single-line prelude', () => {
     const out = run(wrapEsmAsGlobal(`// leading comment\nexport const x = 41 + 1;`, '__plugin_exports'))
     expect((out.__plugin_exports as Sandbox).x).toBe(42)
+  })
+})
+
+describe('wrapEsmAsGlobal — import rewriting (bridged modules)', () => {
+  // The sandbox stand-in pre-populates the three bridged globals so the
+  // rewritten `const { … } = globalThis.__module_X` bindings resolve.
+  function runWithShims(source: string): Sandbox {
+    const sandbox: Sandbox = {
+      __module_crypto: { createHash: () => 'hash', randomBytes: () => 'rb' },
+      __module_net: { createConnection: () => 'conn' },
+      __module_util: { promisify: () => 'prom' },
+    }
+    new Function('globalThis', source)(sandbox)
+    return sandbox
+  }
+
+  it('BRIDGED_MODULE_GLOBALS maps crypto / net / util (both bare and node: forms)', () => {
+    expect(BRIDGED_MODULE_GLOBALS.get('crypto')).toBe('__module_crypto')
+    expect(BRIDGED_MODULE_GLOBALS.get('node:crypto')).toBe('__module_crypto')
+    expect(BRIDGED_MODULE_GLOBALS.get('net')).toBe('__module_net')
+    expect(BRIDGED_MODULE_GLOBALS.get('node:net')).toBe('__module_net')
+    expect(BRIDGED_MODULE_GLOBALS.get('util')).toBe('__module_util')
+    expect(BRIDGED_MODULE_GLOBALS.get('node:util')).toBe('__module_util')
+  })
+
+  it('rewrites named imports from "crypto" to const destructure', () => {
+    const src = `import { createHash, randomBytes } from "crypto";\nexport const h = createHash();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).h).toBe('hash')
+  })
+
+  it('rewrites named imports from "node:crypto" (prefixed form)', () => {
+    const src = `import { createHash } from "node:crypto";\nexport const h = createHash();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).h).toBe('hash')
+  })
+
+  it('rewrites `import * as ns from "crypto"` to namespace binding', () => {
+    const src = `import * as crypto from "crypto";\nexport const r = crypto.randomBytes();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).r).toBe('rb')
+  })
+
+  it('rewrites `import def from "crypto"` to default binding', () => {
+    const src = `import crypto from "crypto";\nexport const h = crypto.createHash();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).h).toBe('hash')
+  })
+
+  it('rewrites combined default + named imports', () => {
+    const src = `import crypto, { randomBytes } from "crypto";\nexport const pair = [crypto.createHash(), randomBytes()];`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).pair).toEqual(['hash', 'rb'])
+  })
+
+  it('handles `as` renaming in named imports', () => {
+    const src = `import { createHash as ch } from "crypto";\nexport const h = ch();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).h).toBe('hash')
+  })
+
+  it('removes side-effect-only imports of bridged modules', () => {
+    const src = `import "crypto";\nexport const x = 1;`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).x).toBe(1)
+  })
+
+  it('rewrites util imports', () => {
+    const src = `import { promisify } from "util";\nexport const p = promisify();`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    expect((out.__plugin_exports as Sandbox).p).toBe('prom')
+  })
+
+  it('leaves unknown-module imports untouched (QuickJS will surface the error)', () => {
+    const src = `import { readFile } from "fs";\nexport const x = 1;`
+    const wrapped = wrapEsmAsGlobal(src, '__plugin_exports')
+    // The import line must survive so QuickJS throws a clear SyntaxError,
+    // rather than silently miscompiling into a broken binding.
+    expect(wrapped).toContain('import { readFile } from "fs"')
+  })
+
+  it('preserves indentation of rewritten import lines', () => {
+    const src = `  import { createHash } from "crypto";\nexport const h = createHash();`
+    const wrapped = wrapEsmAsGlobal(src, '__plugin_exports')
+    expect(wrapped).toContain('  const { createHash } = globalThis.__module_crypto;')
+  })
+
+  it('import rewriting + export rewriting compose on the same bundle', () => {
+    // Realistic shape: a plugin that imports crypto AND exports a lifecycle hook.
+    const src =
+      `import { createHash } from "crypto";\n` +
+      `export function activate() { return createHash(); }`
+    const out = runWithShims(wrapEsmAsGlobal(src, '__plugin_exports'))
+    const exports = out.__plugin_exports as Sandbox
+    expect(typeof exports.activate).toBe('function')
+    expect((exports.activate as () => unknown)()).toBe('hash')
   })
 })

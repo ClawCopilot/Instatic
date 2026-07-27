@@ -11,8 +11,11 @@
  *
  * Execution order matters: polyfills must be defined before the API layer
  * references them (URL, TextEncoder, AbortController, crypto.subtle, fetch),
- * and the shared base64 codec must precede crypto, fetch, and the bundled
- * runtime — all three move binary payloads through it.
+ * the shared base64 codec must precede crypto, fetch, and the bundled
+ * runtime — all three move binary payloads through it — and the Node
+ * built-in shims (`__module_crypto`, `__module_net`, `__module_util`) must
+ * precede plugin code so `import { createHash } from "crypto"` rewrites
+ * performed by `esmShim.ts` resolve to populated globals.
  * The leading `'use strict';` makes the entire evaluated program — including
  * the bundled IIFE — strict.
  */
@@ -22,6 +25,7 @@ import { TIMERS_SOURCE } from './timers'
 import { BASE64_SHIM } from './base64'
 import { CRYPTO_SUBTLE_SHIM } from './crypto'
 import { FETCH_SHIM } from './fetch'
+import { NODE_CRYPTO_SHIM } from './nodeCryptoShim'
 import { PLUGIN_BOOTSTRAP_SOURCE } from './generated/pluginBootstrap'
 
 export const BOOTSTRAP_SOURCE =
@@ -34,4 +38,5 @@ export const BOOTSTRAP_SOURCE =
   BASE64_SHIM +
   CRYPTO_SUBTLE_SHIM +
   FETCH_SHIM +
+  NODE_CRYPTO_SHIM +
   PLUGIN_BOOTSTRAP_SOURCE

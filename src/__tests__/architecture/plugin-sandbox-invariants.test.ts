@@ -206,7 +206,10 @@ describe('plugin sandbox invariants', () => {
       'cms.storage.list',
       'cms.storage.update',
       'crypto.digest',
+      'crypto.generateKeyPair',
+      'crypto.publicKeyToJwk',
       'crypto.signHmac',
+      'crypto.signRsa',
       'network.abort',
       'network.fetch',
     ])

@@ -100,6 +100,9 @@ const UNGATED_TARGETS = [
   'network.abort',
   'crypto.digest',
   'crypto.signHmac',
+  'crypto.generateKeyPair',
+  'crypto.signRsa',
+  'crypto.publicKeyToJwk',
 ]
 
 describe('plugin RPC target registry', () => {

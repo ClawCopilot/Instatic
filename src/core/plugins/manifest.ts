@@ -43,8 +43,11 @@ const SAFE_ASSET_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9._/-
 // — including `..` traversal, empty segments, or non-uploads paths —
 // is rejected at the schema boundary so it can't reach the filesystem
 // sinks (`loadServerPluginModule`, `removePluginAssets`).
+// Supports both user-installed (`/uploads/plugins/{id}/{version}`)
+// and built-in (`/builtin/{dir}/{version}` or `/builtin/skills/{dir}/{version}`)
+// asset base paths.
 const ASSET_BASE_PATH_PATTERN =
-  /^\/uploads\/plugins\/[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+\/\d+\.\d+\.\d+(?:[-+][0-9a-zA-Z.-]+)?\/?$/
+  /^\/(?:uploads\/plugins|builtin(?:\/skills)?)\/[a-zA-Z0-9._-]+\/\d+\.\d+\.\d+(?:[-+][0-9a-zA-Z.-]+)?\/?$/
 // `adminPages[].content.assetPath` (app pages) — must look like an uploads
 // path with no `.`/`..` segments. The post-check in `parsePluginManifest`
 // further pins it to the declaring plugin's own asset subtree.
@@ -437,12 +440,24 @@ export function parsePluginManifest(input: unknown): PluginManifest {
   // let one plugin manifest target another plugin's files at the filesystem
   // sinks (`loadServerPluginModule`, `removePluginAssets`).
   if (data.assetBasePath) {
-    const expected = `/uploads/plugins/${data.id}/${data.version}`
     const normalized = data.assetBasePath.replace(/\/+$/, '')
-    if (normalized !== expected) {
-      throw new Error(
-        `Invalid plugin manifest: assetBasePath must equal "${expected}"`,
-      )
+    if (normalized.startsWith('/builtin/')) {
+      // Built-in plugins: validate the version tail matches; the directory
+      // prefix is host-controlled and may differ from the plugin id.
+      const versionTail = `/${data.version}`
+      if (!normalized.endsWith(versionTail)) {
+        throw new Error(
+          `Invalid plugin manifest: built-in assetBasePath must end with "${versionTail}"`,
+        )
+      }
+    } else {
+      // User-installed plugins: strict path pinning to this plugin's subtree.
+      const expected = `/uploads/plugins/${data.id}/${data.version}`
+      if (normalized !== expected) {
+        throw new Error(
+          `Invalid plugin manifest: assetBasePath must equal "${expected}"`,
+        )
+      }
     }
   }
 

@@ -28,7 +28,7 @@ import {
   RegisterUrlTransformerArgSchema,
   RegisterVariantDelegateArgSchema,
 } from './schemas/media'
-import { CryptoDigestArgSchema, CryptoSignHmacArgSchema } from './schemas/crypto'
+import { CryptoDigestArgSchema, CryptoSignHmacArgSchema, CryptoGenerateKeyPairArgSchema, CryptoSignRsaArgSchema, CryptoPublicKeyToJwkArgSchema } from './schemas/crypto'
 import {
   MigrationsRegisterArgSchema,
   PublicRoutesRegisterArgSchema,
@@ -147,6 +147,9 @@ export const ApiCallSchemas = {
   'cms.content.republishAll': apiCallSchema('cms.content.republishAll', ContentRepublishAllArgsSchema),
   'crypto.digest': apiCallSchema('crypto.digest', Type.Tuple([CryptoDigestArgSchema])),
   'crypto.signHmac': apiCallSchema('crypto.signHmac', Type.Tuple([CryptoSignHmacArgSchema])),
+  'crypto.generateKeyPair': apiCallSchema('crypto.generateKeyPair', Type.Tuple([CryptoGenerateKeyPairArgSchema])),
+  'crypto.signRsa': apiCallSchema('crypto.signRsa', Type.Tuple([CryptoSignRsaArgSchema])),
+  'crypto.publicKeyToJwk': apiCallSchema('crypto.publicKeyToJwk', Type.Tuple([CryptoPublicKeyToJwkArgSchema])),
   // ─── Extension points ────────────────────────────────────────────────────
   // Each target registers one piece of capability that a plugin needs
   // beyond the built-in admin-plugin-runtime surface. The host stores

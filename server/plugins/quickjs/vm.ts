@@ -29,6 +29,14 @@
  */
 
 import { getQuickJS, type QuickJSContext, type QuickJSHandle, type QuickJSWASMModule } from 'quickjs-emscripten'
+import {
+  createHash as nodeCreateHash,
+  createHmac as nodeCreateHmac,
+  randomBytes as nodeRandomBytes,
+  generateKeyPairSync as nodeGenerateKeyPairSync,
+  createSign as nodeCreateSign,
+  createPublicKey as nodeCreatePublicKey,
+} from 'node:crypto'
 import { BOOTSTRAP_SOURCE } from './bootstrap/index'
 import { DEFAULT_EVAL_TIMEOUT_MS, DEFAULT_MEMORY_LIMIT_BYTES, DEFAULT_STACK_SIZE_BYTES } from './limits'
 import { jsToHandle } from './marshal'
@@ -276,6 +284,89 @@ export async function createPluginVm(args: {
     })
     ctx.setProp(ctx.global, '__log', logHandle)
     hostFunctionHandles.push(logHandle)
+
+    // 2b. Wire __hostCallSync — synchronous host bridge for Node crypto
+    //     compatibility. Plugin code calls createHash().digest() and
+    //     randomBytes() synchronously, so the bridge must return a value
+    //     (not a Promise). Only crypto.* targets are supported here; all
+    //     other targets fall through to the async __hostCall.
+    const hostCallSyncHandle = ctx.newFunction('__hostCallSync', (targetHandle, argsHandle) => {
+      const target = ctx.getString(targetHandle)
+      const dumpedArgs = ctx.dump(argsHandle) as unknown
+      const argsArray = Array.isArray(dumpedArgs) ? dumpedArgs : []
+      const pluginId = args.env.pluginId
+
+      try {
+        if (target === 'crypto.digest') {
+          const [{ algorithm, data }] = argsArray as [{ algorithm: string; data: string }]
+          const algo = algorithm.toUpperCase().replace('-', '')
+          const buf = Buffer.from(data, 'base64')
+          const hash = nodeCreateHash(algo).update(buf).digest()
+          return ctx.newString(hash.toString('base64'))
+        }
+        if (target === 'crypto.signHmac') {
+          const [{ hash: hashAlgo, key, data }] = argsArray as [{ hash: string; key: string; data: string }]
+          const algo = hashAlgo.toUpperCase().replace('-', '')
+          const keyBuf = Buffer.from(key, 'base64')
+          const dataBuf = Buffer.from(data, 'base64')
+          const sig = nodeCreateHmac(algo, keyBuf).update(dataBuf).digest()
+          return ctx.newString(sig.toString('base64'))
+        }
+        if (target === 'crypto.randomBytes') {
+          const [{ size }] = argsArray as [{ size: number }]
+          const bytes = nodeRandomBytes(size)
+          return ctx.newString(bytes.toString('base64'))
+        }
+        if (target === 'crypto.generateKeyPair') {
+          const [{ type: keyType, modulusLength, publicKeyEncoding, privateKeyEncoding }] =
+            argsArray as [{
+              type: string
+              modulusLength: number
+              publicKeyEncoding: { type: string; format: string }
+              privateKeyEncoding: { type: string; format: string }
+            }]
+          // Only 'rsa' is supported (schema-enforced). Bridge to Node's
+          // generateKeyPairSync — RSA keygen is fast enough for the sync
+          // bridge (~50-200ms for 2048-bit on modern hardware).
+          const { publicKey, privateKey } = nodeGenerateKeyPairSync(keyType as 'rsa', {
+            modulusLength,
+            publicKeyEncoding: publicKeyEncoding as { type: 'spki'; format: 'pem' },
+            privateKeyEncoding: privateKeyEncoding as { type: 'pkcs8'; format: 'pem' },
+          })
+          // Return as JSON string — the shim parses it into the KeyPair shape.
+          const result = JSON.stringify({ publicKey: String(publicKey), privateKey: String(privateKey) })
+          return ctx.newString(result)
+        }
+        if (target === 'crypto.signRsa') {
+          const [{ algorithm, privateKeyPem, data }] =
+            argsArray as [{ algorithm: string; privateKeyPem: string; data: string }]
+          const dataBuf = Buffer.from(data, 'base64')
+          const signer = nodeCreateSign(algorithm)
+          signer.update(dataBuf)
+          const signature = signer.sign(privateKeyPem)
+          return ctx.newString(signature.toString('base64'))
+        }
+        if (target === 'crypto.publicKeyToJwk') {
+          const [{ publicKeyPem }] = argsArray as [{ publicKeyPem: string }]
+          const keyObj = nodeCreatePublicKey(publicKeyPem)
+          const jwk = keyObj.export({ format: 'jwk' })
+          return ctx.newString(JSON.stringify(jwk))
+        }
+        throw new Error(`__hostCallSync: unsupported target "${target}". Only crypto.* sync targets are supported.`)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error(`[plugin:${pluginId}] __hostCallSync(${target}) failed: ${message}`)
+        // Re-throw inside the VM so plugin code sees the error.
+        const errHandle = ctx.newError(message)
+        // In QuickJS, throwing from a host function propagates to the caller.
+        // We use ctx.unwrapResult to convert the error handle to a throw.
+        // Actually, the simplest approach is to return an error string and
+        // let the shim throw. But for correctness, we throw directly.
+        throw err
+      }
+    })
+    ctx.setProp(ctx.global, '__hostCallSync', hostCallSyncHandle)
+    hostFunctionHandles.push(hostCallSyncHandle)
 
     // 3. Wire meta + settings as VM globals.
     //

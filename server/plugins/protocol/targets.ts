@@ -22,8 +22,9 @@
  *   - `cms.settings.replace` — any active plugin may update its own settings.
  *   - `network.abort`        — a plugin without `network.outbound` can never
  *                              mint a live abortId, so the lookup just no-ops.
- *   - `crypto.digest` / `crypto.signHmac` — pure computation, no I/O, no
- *                              privilege escalation (same model as `Math`/`JSON`).
+ *   - `crypto.digest` / `crypto.signHmac` / `crypto.generateKeyPair` /
+ *     `crypto.signRsa` / `crypto.publicKeyToJwk` — pure computation, no I/O,
+ *     no privilege escalation (same model as `Math`/`JSON`).
  *
  * Conditional/extra checks that CANNOT live in a static target→permission map
  * stay in their handlers (host + VM both keep them):

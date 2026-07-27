@@ -101,20 +101,28 @@ interface ResolvedEntrypoint {
 // `/builtin/{dirName}/{version}` assetBasePath.
 const PROJECT_ROOT = join(import.meta.dir, '..', '..')
 
+// Strip the SemVer tail from a built-in assetBasePath so we can resolve
+// against the flat source tree (e.g. `/builtin/rate-limit/0.1.0` → `rate-limit`).
+function builtinRelativeDir(assetBasePath: string): string {
+  return assetBasePath
+    .replace(/^\/builtin\/?/, '')
+    .replace(/\/\d+\.\d+\.\d+(?:[-+][0-9a-zA-Z.-]+)?\/?$/, '')
+}
+
 function resolvePluginServerEntrypoint(
   manifest: PluginManifest,
   uploadsDir: string,
 ): ResolvedEntrypoint | null {
   if (!manifest.assetBasePath || !manifest.entrypoints?.server) return null
 
-  const relativeBase = manifest.assetBasePath.replace(/^\/(?:uploads|builtin)\/?/, '')
-
   let entryPath: string
   if (manifest.assetBasePath.startsWith('/builtin/')) {
-    // Built-in plugins: resolve against the project root's `plugins/` dir.
+    // Built-in plugins: source tree is flat (no version sub-dir).
+    const relativeBase = builtinRelativeDir(manifest.assetBasePath)
     entryPath = join(PROJECT_ROOT, 'plugins', relativeBase, manifest.entrypoints.server)
   } else {
     // User-installed plugins: resolve against uploadsDir.
+    const relativeBase = manifest.assetBasePath.replace(/^\/uploads\/?/, '')
     entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.server)
     assertPathWithin(uploadsDir, entryPath)
   }
@@ -209,12 +217,13 @@ export async function loadPluginModulePack(
   uploadsDir?: string,
 ): Promise<ModulePackVm | null> {
   if (!uploadsDir || !manifest.assetBasePath || !manifest.entrypoints?.modules) return null
-  const relativeBase = manifest.assetBasePath.replace(/^\/(?:uploads|builtin)\/?/, '')
 
   let entryPath: string
   if (manifest.assetBasePath.startsWith('/builtin/')) {
+    const relativeBase = builtinRelativeDir(manifest.assetBasePath)
     entryPath = join(PROJECT_ROOT, 'plugins', relativeBase, manifest.entrypoints.modules)
   } else {
+    const relativeBase = manifest.assetBasePath.replace(/^\/uploads\/?/, '')
     entryPath = join(uploadsDir, relativeBase, manifest.entrypoints.modules)
     assertPathWithin(uploadsDir, entryPath)
   }

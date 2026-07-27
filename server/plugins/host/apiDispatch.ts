@@ -34,7 +34,7 @@ import { handleSettingsReplace } from './handlers/settings'
 import { handleNetworkFetch, handleNetworkAbort } from './handlers/network'
 import { handleScheduleRegister, handleScheduleCancel } from './handlers/schedule'
 import { handleMediaRegisterStorageAdapter, handleMediaRegisterUrlTransformer, handleMediaRegisterVariantDelegate } from './handlers/media'
-import { handleCryptoDigest, handleCryptoSignHmac } from './handlers/crypto'
+import { handleCryptoDigest, handleCryptoSignHmac, handleCryptoGenerateKeyPair, handleCryptoSignRsa, handleCryptoPublicKeyToJwk } from './handlers/crypto'
 import { handleMigrationsRegister } from '../extensions/migrationsProtocol'
 import { handlePublicRoutesRegister } from '../extensions/publicRoutesProtocol'
 import { handleHttpMiddlewareRegister } from '../extensions/httpMiddlewareProtocol'
@@ -100,6 +100,9 @@ const apiHandlers = {
   'cms.media.registerVariantDelegate': handleMediaRegisterVariantDelegate,
   'crypto.digest': handleCryptoDigest,
   'crypto.signHmac': handleCryptoSignHmac,
+  'crypto.generateKeyPair': handleCryptoGenerateKeyPair,
+  'crypto.signRsa': handleCryptoSignRsa,
+  'crypto.publicKeyToJwk': handleCryptoPublicKeyToJwk,
   'cms.content.tables.list': handleContentTablesList,
   'cms.content.tables.get': handleContentTablesGet,
   'cms.content.tables.create': handleContentTablesCreate,
