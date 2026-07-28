@@ -105,6 +105,11 @@ export const PLUGIN_PERMISSION_VALUES = [
   // Plugins that need to inject request-pipeline middleware (API key
   // auth, rate limiting, request logging) require `cms.httpMiddleware`.
   'cms.httpMiddleware',
+  // Plugins that need to run parameterized SQL (SELECT/INSERT/UPDATE/DELETE)
+  // against the host database require `cms.db`. DDL (DROP/ALTER/CREATE) is
+  // rejected — schema changes go through `cms.migrations`. The host runs
+  // the statement through the same parameterized path it uses internally.
+  'cms.db',
   // Reserved
   'unstable.internals',
 ] as const

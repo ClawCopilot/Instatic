@@ -161,6 +161,13 @@ export const PLUGIN_CAPABILITIES: PluginCapability[] = [
     surfaces: ['server'],
   },
   {
+    permission: 'cms.db',
+    label: 'Run parameterized SQL queries',
+    description: 'Allows the plugin to run SELECT / INSERT / UPDATE / DELETE statements against the host database via parameterized SQL. DDL (DROP / ALTER / CREATE / TRUNCATE) is rejected — schema changes must go through `cms.migrations`. Values are always bound, never interpolated, so the statement is safe from SQL injection. This is a powerful escape hatch for plugins that need joins, aggregations, or custom indexes beyond the `cms.storage` / `cms.content` surfaces.',
+    risk: 'dangerous',
+    surfaces: ['server'],
+  },
+  {
     permission: 'cms.content.read',
     label: 'Read CMS content',
     description: 'Allows the plugin to list / read entries (pages, posts, custom tables) in the tables declared in its manifest\'s `contentAccess[]`. Includes reading tree-shaped fields and published snapshots.',

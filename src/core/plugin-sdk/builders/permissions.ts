@@ -45,6 +45,7 @@ export const permissions = {
   mediaStorageAdapter: 'media.storage.adapter',
   mediaUrlTransform: 'media.url.transform',
   mediaVariantDelegate: 'media.variant.delegate',
+  cmsDb: 'cms.db',
   unstableInternals: 'unstable.internals',
 } as const satisfies Record<string, PluginPermission>
 

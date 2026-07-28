@@ -64,7 +64,6 @@ interface CommerceSettings {
 }
 
 const PRODUCTS_TABLE_SCHEMA = {
-  id: 'products',
   name: 'Products',
   slug: 'products',
   kind: 'data',
@@ -72,7 +71,7 @@ const PRODUCTS_TABLE_SCHEMA = {
   singularLabel: 'Product',
   pluralLabel: 'Products',
   primaryFieldId: 'title',
-  fieldsJson: JSON.stringify([
+  fields: [
     { type: 'text', id: 'title', label: 'Title', required: true, builtIn: false },
     { type: 'text', id: 'slug', label: 'Slug', required: true, builtIn: false },
     { type: 'longText', id: 'description', label: 'Description', builtIn: false },
@@ -82,8 +81,7 @@ const PRODUCTS_TABLE_SCHEMA = {
     { type: 'number', id: 'availableQuantity', label: 'Available quantity', integer: true, builtIn: false },
     { type: 'boolean', id: 'trackInventory', label: 'Track inventory', builtIn: false },
     { type: 'boolean', id: 'isPublished', label: 'Published', builtIn: false },
-  ]),
-  system: false,
+  ],
 }
 
 export default definePlugin({

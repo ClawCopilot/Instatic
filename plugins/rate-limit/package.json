@@ -19,7 +19,8 @@
       "cms.routes",
       "cms.routes.public",
       "cms.publicRoutes",
-      "cms.httpMiddleware"
+      "cms.httpMiddleware",
+      "cms.db"
     ],
     "entrypoints": {
       "server": "dist/index.js"

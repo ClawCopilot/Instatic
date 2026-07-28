@@ -114,6 +114,42 @@ globalThis.__buildApi = function buildApi() {
     }
   }
 
+  // Generic route registration: api.cms.routes.register(method, path, capability, handler)
+  // Supports capability strings ('content.manage', 'users.manage'), 'authenticated',
+  // and 'public' as the third argument. Plugins use this form when the HTTP
+  // method is dynamic or when they prefer a single registration call over
+  // the method-specific shortcuts (get/post/patch/delete).
+  function registerRoute(method: unknown, path: unknown, accessOrCapability: unknown, handler: unknown) {
+    assertTargetPermission('cms.routes.register')
+    if (typeof handler !== 'function') throw new TypeError('Route handler must be a function')
+    const m = String(method).toUpperCase()
+    const validMethods = ['GET', 'POST', 'PATCH', 'DELETE']
+    if (validMethods.indexOf(m) < 0) {
+      throw new TypeError('routes.register: method must be one of GET, POST, PATCH, DELETE (got ' + String(method) + ')')
+    }
+    const normalizedPath = normalizePath(path)
+    const routeKey = m + ':' + normalizedPath
+    globalThis.__plugin_handlers.routes[routeKey] = handler as BootstrapFn
+
+    // Determine the access kind from the third argument
+    const accessArg = String(accessOrCapability)
+    let access: { kind: string; capability?: string }
+    if (accessArg === 'public') {
+      assertPermission('cms.routes.public')
+      access = { kind: 'public' }
+    } else if (accessArg === 'authenticated') {
+      access = { kind: 'authenticated' }
+    } else {
+      access = { kind: 'capability', capability: accessArg }
+    }
+    return call('cms.routes.register', [{
+      method: m,
+      path: normalizedPath,
+      access: access,
+      routeKey: routeKey,
+    }])
+  }
+
   function on(event: unknown, listener: unknown) {
     assertTargetPermission('cms.hooks.on')
     if (typeof listener !== 'function') throw new TypeError('Hook listener must be a function')
@@ -242,6 +278,60 @@ globalThis.__buildApi = function buildApi() {
     },
   }
 
+  // ---- raw SQL (cms.db.query) --------------------------------------------
+  // Plugin runs a parameterized SQL statement against the host database.
+  // The host enforces the `cms.db` permission (via TARGET_PERMISSIONS)
+  // AND rejects DDL (DROP/ALTER/CREATE/…) — schema changes must go
+  // through `api.cms.migrations.register`. Values are always bound
+  // host-side, never interpolated into the SQL text.
+  //
+  // Two call shapes are supported:
+  //   1. Tagged template — the common, injection-safe form:
+  //        const { rows } = await api.db`select * from users where id = ${userId}`
+  //      The template tag collects the interpolated values into a `params`
+  //      array and sends `{ sql, params }` to the host. Positional
+  //      placeholders ($1 / ?) are emitted by the tag so the same plugin
+  //      code works on Postgres AND SQLite without dialect knowledge.
+  //   2. Explicit method call — for SQL built dynamically:
+  //        const { rows } = await api.db.query('select * from users where id = ?', [userId])
+  //      The author writes the dialect-correct placeholder themselves.
+  function dbQueryExplicit(sql: string, params?: unknown[]) {
+    assertTargetPermission('cms.db.query')
+    if (typeof sql !== 'string' || sql.length === 0) {
+      throw new TypeError('db.query: sql must be a non-empty string')
+    }
+    return call('cms.db.query', [{ sql: sql, params: Array.isArray(params) ? params : [] }])
+  }
+
+  // Tagged-template tag. Mirrors the host DbClient's own callable shape:
+  // each `${value}` becomes a positional placeholder and the value is
+  // appended to the bind array in order. We emit `?` placeholders because
+  // the host's `db.unsafe` rewrites them to `$n` on Postgres (and leaves
+  // them as `?` on SQLite) — see server/db/client.ts. Plugin authors
+  // therefore never need to know the dialect.
+  function dbTag(strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown> {
+    assertTargetPermission('cms.db.query')
+    let sql = ''
+    const params: unknown[] = []
+    for (let i = 0; i < strings.length; i++) {
+      sql += strings[i]
+      if (i < values.length) {
+        sql += '?'
+        params.push(values[i])
+      }
+    }
+    return call('cms.db.query', [{ sql: sql, params: params }])
+  }
+
+  // Make `dbTag` also carry a `.query` method so both shapes work through
+  // the same object. `api.db` is therefore BOTH callable (tagged template)
+  // and has a `.query(sql, params)` method.
+  const dbApi = dbTag as unknown as {
+    (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown>
+    query: (sql: string, params?: unknown[]) => Promise<unknown>
+  }
+  dbApi.query = dbQueryExplicit
+
   // ---- media subsystem -----------------------------------------------------
   // Three independent surfaces under api.cms.media. The callbacks live INSIDE
   // the VM (stored under __plugin_handlers.mediaAdapters / mediaUrlTransformers);
@@ -334,6 +424,44 @@ globalThis.__buildApi = function buildApi() {
     }])
   }
 
+  // ---- viewerContext / contentGate / secrets ----------------------------
+  // These extension-point APIs let plugins participate in the render
+  // pipeline (viewer context enrichment, content gating) and store
+  // encrypted key-value pairs (signing keys, webhook secrets). The
+  // provider/gate functions live INSIDE the VM; the host stores only
+  // metadata. Secrets are encrypted at rest by the host.
+
+  function viewerContextRegister(provider: unknown) {
+    assertTargetPermission('cms.viewerContext.register')
+    if (typeof provider !== 'function') throw new TypeError('viewerContext.register: provider must be a function')
+    // Stash the provider inside the VM; the host calls back via a
+    // worker RPC at render time. The provider id is minterd here.
+    const providerId = __nextId('vcProvider')
+    globalThis.__plugin_handlers.viewContextProviders = globalThis.__plugin_handlers.viewContextProviders || {}
+    globalThis.__plugin_handlers.viewContextProviders[providerId] = provider as BootstrapFn
+    return call('cms.viewerContext.register', [{}])
+  }
+
+  function contentGateRegister(gate: unknown, priority?: unknown) {
+    assertTargetPermission('cms.contentGate.register')
+    if (typeof gate !== 'function') throw new TypeError('contentGate.register: gate must be a function')
+    const gateId = __nextId('contentGate')
+    globalThis.__plugin_handlers.contentGates = globalThis.__plugin_handlers.contentGates || {}
+    globalThis.__plugin_handlers.contentGates[gateId] = gate as BootstrapFn
+    const p = typeof priority === 'number' ? Math.floor(priority) : 100
+    return call('cms.contentGate.register', [{ priority: p }])
+  }
+
+  function secretsGet(key: unknown) {
+    assertTargetPermission('cms.secrets.get')
+    return call('cms.secrets.get', [{ key: String(key) }])
+  }
+
+  function secretsSet(key: unknown, value: unknown) {
+    assertTargetPermission('cms.secrets.set')
+    return call('cms.secrets.set', [{ key: String(key), value: String(value) }])
+  }
+
   return {
     plugin: {
       id: meta.id,
@@ -374,6 +502,8 @@ globalThis.__buildApi = function buildApi() {
         post: makeRoute('POST'),
         patch: makeRoute('PATCH'),
         delete: makeRoute('DELETE'),
+        // Generic registration: api.cms.routes.register('GET', '/path', 'cap', handler)
+        register: registerRoute,
         // Authenticated-only routes (any logged-in user).
         // Usage: api.cms.routes.authenticated.get('/path', handler)
         authenticated: {
@@ -501,8 +631,87 @@ globalThis.__buildApi = function buildApi() {
         registerUrlTransformer: registerUrlTransformer,
         registerVariantDelegate: registerVariantDelegate,
       },
+      migrations: {
+        register: function (migration: PluginInput) {
+          assertTargetPermission('cms.migrations.register')
+          if (!migration || typeof migration !== 'object') throw new TypeError('migrations.register: migration must be an object')
+          if (typeof migration.id !== 'string' || !migration.id) throw new TypeError("migrations.register: 'id' is required")
+          if (typeof migration.pgSql !== 'string' || !migration.pgSql) throw new TypeError("migrations.register: 'pgSql' is required")
+          // The host requires migration id to include the full plugin id
+          // (e.g. "instatic.rate-limit.001_initial_schema"). Plugin authors
+          // write short ids ("rate-limit.001_initial_schema"); we prefix
+          // the plugin id automatically so plugins don't need to know
+          // their own namespaced id.
+          let fullId = String(migration.id)
+          if (fullId.indexOf(meta.id + '.') !== 0 && fullId.indexOf(meta.id) < 0) {
+            fullId = meta.id + '.' + fullId
+          }
+          const payload: Record<string, unknown> = {
+            id: fullId,
+            pgSql: String(migration.pgSql),
+          }
+          if (typeof migration.sqliteSql === 'string' && migration.sqliteSql) {
+            payload.sqliteSql = String(migration.sqliteSql)
+          }
+          return call('cms.migrations.register', [payload])
+        },
+      },
+      publicRoutes: {
+        register: function (prefix: unknown, options?: PluginInput) {
+          assertTargetPermission('cms.publicRoutes.register')
+          const normalizedPrefix = normalizePath(prefix)
+          const payload: Record<string, unknown> = { prefix: normalizedPrefix }
+          if (options && typeof options.exclusive === 'boolean') {
+            payload.exclusive = options.exclusive
+          }
+          return call('cms.publicRoutes.register', [payload])
+        },
+      },
+      httpMiddleware: {
+        register: function (handler: unknown) {
+          assertTargetPermission('cms.httpMiddleware.register')
+          if (typeof handler !== 'function') throw new TypeError('httpMiddleware.register: handler must be a function')
+          const middlewareId = __nextId('httpMw')
+          globalThis.__plugin_handlers.httpMiddleware = globalThis.__plugin_handlers.httpMiddleware || {}
+          globalThis.__plugin_handlers.httpMiddleware[middlewareId] = handler as BootstrapFn
+          // The host schema accepts an empty object; the middleware thunk
+          // is stored inside the VM and dispatched via __runHookListener.
+          return call('cms.httpMiddleware.register', [{}])
+        },
+      },
     },
+    // Convenience aliases — many plugins use the shorthand `api.settings`,
+    // `api.log`, `api.db` instead of `api.cms.settings`, `api.plugin.log`.
+    // These point to the same objects so both styles work.
+    settings: settingsApi,
+    log: {
+      info: function (...args: unknown[]) { __log('info', formatLogArgs(args)) },
+      warn: function (...args: unknown[]) { __log('warn', formatLogArgs(args)) },
+      error: function (...args: unknown[]) { __log('error', formatLogArgs(args)) },
+      debug: function (...args: unknown[]) { __log('debug', formatLogArgs(args)) },
+    },
+    db: dbApi,
+    // Top-level extension-point aliases. Plugins use these shorthand forms
+    // (api.viewerContext.register, api.contentGate.register, api.secrets.get,
+    // api.hooks.emit) instead of the longer api.cms.* paths.
+    hooks: { on: on, filter: filter, emit: emit },
+    viewerContext: { register: viewerContextRegister },
+    contentGate: { register: contentGateRegister },
+    secrets: { get: secretsGet, set: secretsSet },
   }
+}
+
+function formatLogArgs(args: unknown[]): string {
+  const parts: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (typeof a === 'string') parts.push(a)
+    else {
+      try { parts.push(JSON.stringify(a)) }
+      catch (_) { parts.push(String(a)) }
+    }
+  }
+  return parts.join(' ')
 }
 
 let __idCounter = 0

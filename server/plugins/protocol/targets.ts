@@ -52,6 +52,19 @@ export const TARGET_PERMISSIONS = {
   'cms.migrations.register': 'cms.migrations',
   'cms.publicRoutes.register': 'cms.publicRoutes',
   'cms.httpMiddleware.register': 'cms.httpMiddleware',
+  // Raw parameterized SQL. DDL is rejected host-side; schema changes must
+  // go through `cms.migrations.register`.
+  'cms.db.query': 'cms.db',
+  // Viewer context + content gates — the provider/gate functions live
+  // inside the VM, so registration itself is a lightweight metadata call.
+  // No separate permission beyond cms.db (the provider/gate receives db
+  // access through the host-side dispatch, not through this RPC).
+  'cms.viewerContext.register': 'cms.db',
+  'cms.contentGate.register': 'cms.db',
+  // Plugin secrets — encrypted key-value store. Plugins with cms.db
+  // permission may read/write their own secrets.
+  'cms.secrets.get': 'cms.db',
+  'cms.secrets.set': 'cms.db',
   // Hooks
   'cms.hooks.on': 'cms.hooks',
   'cms.hooks.filter': 'cms.hooks',

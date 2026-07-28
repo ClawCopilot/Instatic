@@ -33,6 +33,7 @@ globalThis.__plugin_handlers = {
   // a host-minted transformer id (mirroring the hook-filter pattern).
   mediaAdapters: {},
   mediaUrlTransformers: {},
+  httpMiddleware: {},
 }
 
 // ------- runners — host calls these to dispatch into plugin code -------
@@ -185,7 +186,61 @@ globalThis.__runRoute = async function runRoute(routeKey, ctxJson) {
   for (const key of Object.keys(ctx.body || {})) {
     body[key] = __materializeUploadedFiles(ctx.body[key])
   }
-  const result = await handler({ req: req, body: body, user: ctx.user })
+
+  // Build the route handler context. Plugins expect:
+  //   handler(ctx, req, params)
+  // where ctx has: db, viewer, user, req, body, hooks, etc.
+  // The db is a tagged-template facade that RPCs into the host via
+  // cms.db.query. viewer is the merged viewer-context for this request
+  // (null at route time — only set during public rendering). params is
+  // the path-parameter map (e.g. { id: '...' } for /:id routes).
+  const dbFacade = function (strings: TemplateStringsArray, ...values: unknown[]) {
+    let sql = ''
+    const params: unknown[] = []
+    for (let i = 0; i < strings.length; i++) {
+      sql += strings[i]
+      if (i < values.length) {
+        sql += '?'
+        params.push(values[i])
+      }
+    }
+    return callDbQuery(sql, params)
+  }
+  dbFacade.query = function (sql: string, params?: unknown[]) {
+    return callDbQuery(sql, params || [])
+  }
+  function callDbQuery(sql: string, params: unknown[]) {
+    return __hostCall('cms.db.query', [{ sql: sql, params: params }])
+  }
+
+  // The hooks facade lets route handlers emit events and register
+  // filters from within a request context.
+  const hooksFacade = {
+    on: function (event: string, listener: unknown) {
+      return __hostCall('cms.hooks.on', [{ event: String(event), listenerId: String(listener) }])
+    },
+    filter: function (name: string, value: unknown) {
+      return __hostCall('cms.hooks.filter', [{ name: String(name), filterId: '', value: value }])
+    },
+    emit: function (event: string, payload: unknown) {
+      return __hostCall('cms.hooks.emit', [{ event: String(event), payload: payload === undefined ? null : payload }])
+    },
+  }
+
+  const routeCtx = {
+    req: req,
+    body: body,
+    user: ctx.user,
+    viewer: ctx.viewer || null,
+    db: dbFacade,
+    hooks: hooksFacade,
+    state: ctx.state || {},
+    params: ctx.params || {},
+  }
+
+  // Plugins register handlers as: async (ctx, req, params) => {...}
+  // Pass ctx, req, and params as separate arguments.
+  const result = await handler(routeCtx, req, ctx.params || {})
   if (
     result && typeof result === 'object' &&
     (result as { __response?: unknown }).__response === true

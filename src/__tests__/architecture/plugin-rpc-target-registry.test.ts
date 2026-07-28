@@ -72,6 +72,7 @@ const EXPECTED_TARGET_PERMISSIONS: Record<string, string> = {
   'cms.migrations.register': 'cms.migrations',
   'cms.publicRoutes.register': 'cms.publicRoutes',
   'cms.httpMiddleware.register': 'cms.httpMiddleware',
+  'cms.db.query': 'cms.db',
   'cms.content.tables.list': 'cms.content.read',
   'cms.content.tables.get': 'cms.content.read',
   'cms.content.tables.create': 'cms.content.tables.manage',

@@ -187,6 +187,7 @@ describe('plugin sandbox invariants', () => {
       'cms.content.tree.mutate',
       'cms.content.tree.read',
       'cms.content.tree.replace',
+      'cms.db.query',
       'cms.hooks.emit',
       'cms.hooks.filter',
       'cms.hooks.on',

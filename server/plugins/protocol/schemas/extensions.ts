@@ -42,3 +42,52 @@ export const PublicRoutesRegisterArgSchema = Type.Object({
  * at request time, identical to the existing plugin RPC pattern).
  */
 export const HttpMiddlewareRegisterArgSchema = Type.Object({})
+
+/**
+ * `cms.db.query` — plugin runs a parameterized SQL query against the host
+ * database. Only SELECT / INSERT / UPDATE / DELETE are allowed; DDL
+ * (DROP / ALTER / CREATE / TRUNCATE) is rejected and must go through a
+ * migration. `sql` is bounded in length; `params` is an optional array
+ * of primitive JSON values (string / number / boolean / null).
+ */
+export const DbQueryArgSchema = Type.Object({
+  sql: Type.String({ minLength: 1, maxBytes: 1_000_000 }),
+  params: Type.Optional(
+    Type.Array(
+      Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]),
+    ),
+  ),
+})
+
+/**
+ * `cms.viewerContext.register` — plugin registers a viewer-context provider.
+ * The provider function lives INSIDE the VM; the host stores only the
+ * pluginId so it can call back via __runViewerContextProvider.
+ */
+export const ViewerContextRegisterArgSchema = Type.Object({})
+
+/**
+ * `cms.contentGate.register` — plugin registers a content-gate function.
+ * The gate function lives INSIDE the VM; the host stores only the pluginId
+ * and priority so it can call back via __runContentGate.
+ */
+export const ContentGateRegisterArgSchema = Type.Object({
+  priority: Type.Optional(Type.Integer({ minimum: 0, maximum: 10000 })),
+})
+
+/**
+ * `cms.secrets.get` — plugin reads a secret from the encrypted
+ * `plugin_secrets` table. Returns the plaintext value (or null if absent).
+ */
+export const SecretsGetArgSchema = Type.Object({
+  key: Type.String({ minLength: 1, maxLength: 200 }),
+})
+
+/**
+ * `cms.secrets.set` — plugin writes (or clears, when value is empty) a
+ * secret to the encrypted `plugin_secrets` table.
+ */
+export const SecretsSetArgSchema = Type.Object({
+  key: Type.String({ minLength: 1, maxLength: 200 }),
+  value: Type.String({ maxLength: 1_000_000 }),
+})

@@ -191,6 +191,70 @@ export interface ServerPluginApi {
      */
     media: ServerPluginMediaApi
   }
+  /**
+   * Convenience alias for `api.cms.settings`. Many plugins use the
+   * shorthand `api.settings` instead of the fully-qualified form.
+   */
+  settings: ServerPluginSettingsApi
+  /**
+   * Convenience alias for `api.plugin.log`.
+   */
+  log: (...args: unknown[]) => void
+  /**
+   * Raw parameterized SQL surface. Requires the `cms.db` permission; the
+   * host rejects DDL (DROP / ALTER / CREATE / …) — schema changes must go
+   * through `api.cms.migrations.register`.
+   *
+   * Two call shapes:
+   *   - Tagged template (preferred, injection-safe):
+   *       const { rows } = await api.db`select * from users where id = ${userId}`
+   *   - Explicit method call (for dynamically-built SQL):
+   *       const { rows } = await api.db.query('select * from users where id = ?', [userId])
+   */
+  db: ServerPluginDbApi
+}
+
+/**
+ * Result of a `api.db` / `api.db.query` call. Mirrors the host `DbResult`
+ * shape but only exposes `rows` — `rowCount` is omitted because SQLite and
+ * Postgres disagree on its semantics for some statement types, and plugins
+ * that need a count should `select count(*)`.
+ */
+export interface DbQueryResult<Row = Record<string, unknown>> {
+  rows: Row[]
+}
+
+/**
+ * A bind value accepted by `api.db.query`. Primitives only — objects and
+ * arrays are rejected by the host schema. Matches `DbQueryArgSchema['params']`
+ * in `server/plugins/protocol/schemas/extensions.ts`.
+ */
+export type DbQueryParam = string | number | boolean | null
+
+/**
+ * The raw-SQL surface exposed to plugins. Callable as a tagged template
+ * (injection-safe — interpolated values become positional bind parameters)
+ * and as a `.query(sql, params)` method for dynamically-built SQL.
+ *
+ * Requires the `cms.db` permission; the host rejects DDL.
+ */
+export interface ServerPluginDbApi {
+  /**
+   * Tagged-template query. Each `${value}` becomes a positional `?`
+   * placeholder and the value is appended to the bind array in order.
+   * The host rewrites `?` to `$n` on Postgres, so the same plugin code
+   * works on both dialects.
+   *
+   *   const { rows } = await api.db`select * from users where id = ${userId}`
+   */
+  (strings: TemplateStringsArray, ...values: DbQueryParam[]): Promise<DbQueryResult>
+  /**
+   * Explicit parameterized query. The author writes the dialect-correct
+   * placeholder (`?` for SQLite, `$1` for Postgres) themselves.
+   *
+   *   const { rows } = await api.db.query('select * from users where id = ?', [userId])
+   */
+  query: (sql: string, params?: DbQueryParam[]) => Promise<DbQueryResult>
 }
 
 // ---------------------------------------------------------------------------

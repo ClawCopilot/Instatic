@@ -87,7 +87,7 @@ for (const migration of migrations) {
     }
 
     // ─── Hook subscriptions ────────────────────────────────────────────────
-    api.hooks.on('public-auth.userRegistered', async (payload) => {
+    api.cms.hooks.on('public-auth.userRegistered', async (payload) => {
       const p = payload as { userId: string; email: string; displayName: string; verificationToken?: string }
       await deliver(api, settings, 'public-auth.userRegistered', p.email, {
         displayName: p.displayName,
@@ -96,7 +96,7 @@ for (const migration of migrations) {
       }, { dedupKey: `register:${p.userId}` })
     })
 
-    api.hooks.on('public-auth.passwordResetRequested', async (payload) => {
+    api.cms.hooks.on('public-auth.passwordResetRequested', async (payload) => {
       const p = payload as { userId: string; email: string; resetToken: string }
       await deliver(api, settings, 'public-auth.passwordResetRequested', p.email, {
         displayName: '',
@@ -105,7 +105,7 @@ for (const migration of migrations) {
       }, { dedupKey: `pwreset:${p.userId}:${p.resetToken.slice(0, 8)}` })
     })
 
-    api.hooks.on('commerce.orderPaid', async (payload) => {
+    api.cms.hooks.on('commerce.orderPaid', async (payload) => {
       const p = payload as { orderId: string; email: string; displayName?: string; orderNumber?: string; total?: string }
       // Look up the order's email if not provided
       const recipient = p.email
@@ -118,7 +118,7 @@ for (const migration of migrations) {
       }, { dedupKey: `order:${p.orderId}` })
     })
 
-    api.hooks.on('commerce.orderRefunded', async (payload) => {
+    api.cms.hooks.on('commerce.orderRefunded', async (payload) => {
       const p = payload as { orderId: string; email: string; displayName?: string; orderNumber?: string }
       if (!p.email) return
       await deliver(api, settings, 'commerce.orderRefunded', p.email, {
@@ -128,7 +128,7 @@ for (const migration of migrations) {
       }, { dedupKey: `refund:${p.orderId}` })
     })
 
-    api.hooks.on('membership.subscriptionCanceled', async (payload) => {
+    api.cms.hooks.on('membership.subscriptionCanceled', async (payload) => {
       const p = payload as { userId: string; email?: string; displayName?: string; expiresAt: string }
       if (!p.email) return
       await deliver(api, settings, 'membership.subscriptionCanceled', p.email, {

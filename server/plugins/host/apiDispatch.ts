@@ -38,6 +38,10 @@ import { handleCryptoDigest, handleCryptoSignHmac, handleCryptoGenerateKeyPair, 
 import { handleMigrationsRegister } from '../extensions/migrationsProtocol'
 import { handlePublicRoutesRegister } from '../extensions/publicRoutesProtocol'
 import { handleHttpMiddlewareRegister } from '../extensions/httpMiddlewareProtocol'
+import { handleViewerContextRegister } from '../extensions/viewerContextProtocol'
+import { handleContentGateRegister } from '../extensions/contentGateProtocol'
+import { handleDbQuery } from './handlers/db'
+import { handleSecretsGet, handleSecretsSet } from './handlers/secrets'
 import {
   handleContentEntriesCreate,
   handleContentEntriesCreateMany,
@@ -127,6 +131,11 @@ const apiHandlers = {
   'cms.migrations.register': handleMigrationsRegister,
   'cms.publicRoutes.register': handlePublicRoutesRegister,
   'cms.httpMiddleware.register': handleHttpMiddlewareRegister,
+  'cms.viewerContext.register': handleViewerContextRegister,
+  'cms.contentGate.register': handleContentGateRegister,
+  'cms.db.query': handleDbQuery,
+  'cms.secrets.get': handleSecretsGet,
+  'cms.secrets.set': handleSecretsSet,
 } satisfies HostApiHandlerTable
 
 export async function dispatchApiCall(msg: ValidatedApiCall): Promise<void> {

@@ -20,7 +20,8 @@
       "cms.routes.public",
       "cms.publicRoutes",
       "network.outbound",
-      "cms.hooks"
+      "cms.hooks",
+      "cms.db"
     ],
     "entrypoints": {
       "server": "dist/index.js"

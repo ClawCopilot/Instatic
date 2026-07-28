@@ -37,6 +37,7 @@ declare global {
     schedules: Record<string, BootstrapFn>
     mediaAdapters: Record<string, Record<string, BootstrapFn | null>>
     mediaUrlTransformers: Record<string, BootstrapFn>
+    httpMiddleware: Record<string, BootstrapFn>
   }
 
   /**

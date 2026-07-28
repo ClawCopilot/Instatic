@@ -33,6 +33,11 @@ import {
   MigrationsRegisterArgSchema,
   PublicRoutesRegisterArgSchema,
   HttpMiddlewareRegisterArgSchema,
+  DbQueryArgSchema,
+  ViewerContextRegisterArgSchema,
+  ContentGateRegisterArgSchema,
+  SecretsGetArgSchema,
+  SecretsSetArgSchema,
 } from './schemas/extensions'
 import {
   ContentEntriesCreateArgsSchema,
@@ -166,6 +171,17 @@ export const ApiCallSchemas = {
     'cms.httpMiddleware.register',
     Type.Tuple([HttpMiddlewareRegisterArgSchema]),
   ),
+  'cms.db.query': apiCallSchema('cms.db.query', Type.Tuple([DbQueryArgSchema])),
+  'cms.viewerContext.register': apiCallSchema(
+    'cms.viewerContext.register',
+    Type.Tuple([ViewerContextRegisterArgSchema]),
+  ),
+  'cms.contentGate.register': apiCallSchema(
+    'cms.contentGate.register',
+    Type.Tuple([ContentGateRegisterArgSchema]),
+  ),
+  'cms.secrets.get': apiCallSchema('cms.secrets.get', Type.Tuple([SecretsGetArgSchema])),
+  'cms.secrets.set': apiCallSchema('cms.secrets.set', Type.Tuple([SecretsSetArgSchema])),
 } satisfies Record<string, TSchema>
 
 // ---------------------------------------------------------------------------

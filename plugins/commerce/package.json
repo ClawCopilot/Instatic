@@ -24,7 +24,8 @@
       "cms.content.publish",
       "cms.content.tables.manage",
       "network.outbound",
-      "cms.hooks"
+      "cms.hooks",
+      "cms.db"
     ],
     "entrypoints": {
       "server": "dist/index.js"
