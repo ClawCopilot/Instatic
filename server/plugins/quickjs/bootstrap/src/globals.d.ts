@@ -38,6 +38,10 @@ declare global {
     mediaAdapters: Record<string, Record<string, BootstrapFn | null>>
     mediaUrlTransformers: Record<string, BootstrapFn>
     httpMiddleware: Record<string, BootstrapFn>
+    /** Viewer context providers registered by api.viewerContext.register(). */
+    viewContextProviders?: Record<string, BootstrapFn>
+    /** Content gates registered by api.contentGate.register(). */
+    contentGates?: Record<string, BootstrapFn>
   }
 
   /**
