@@ -82,6 +82,47 @@ describe('mcp server', () => {
     await client.close()
   })
 
+  it('limits own-only content reads to rows owned by the connector user', async () => {
+    await db`
+      insert into users (id, email, email_normalized, display_name, password_hash, role_id)
+      values ('u2', 'u2@example.com', 'u2@example.com', 'User Two', 'x', 'admin')
+    `
+    const ownRow = await createDataRow(db, {
+      id: 'own-row',
+      tableId: 'posts',
+      cells: { title: 'Own row' },
+      slug: 'own-row',
+    }, 'u1')
+    const foreignRow = await createDataRow(db, {
+      id: 'foreign-read-row',
+      tableId: 'posts',
+      cells: { title: 'Foreign row' },
+      slug: 'foreign-read-row',
+    }, 'u2')
+
+    const client = await connectClient(db, [
+      'ai.chat',
+      'content.edit.own',
+      'data.system.tables.read',
+    ])
+    const listResult = await client.callTool({
+      name: 'content_list_documents',
+      arguments: { tableId: 'posts' },
+    })
+    expect(listResult.isError).toBeFalsy()
+    const listText = (listResult.content as Array<{ type: string; text: string }>)[0].text
+    expect(listText).toContain(ownRow.id)
+    expect(listText).not.toContain(foreignRow.id)
+
+    const getResult = await client.callTool({
+      name: 'content_get_document',
+      arguments: { documentId: foreignRow.id },
+    })
+    expect(getResult.isError).toBe(true)
+    expect(JSON.stringify(getResult.content)).toContain('not found')
+    await client.close()
+  })
+
   it('lists browser editing tools but errors with an open-editor hint when no editor is connected', async () => {
     const client = await connectClient(db, ['ai.chat', 'ai.tools.write', 'site.structure.edit', 'content.manage'])
     const { tools } = await client.listTools()

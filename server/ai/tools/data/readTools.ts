@@ -24,6 +24,11 @@ import {
 } from '@core/data/cells'
 import { normalizeDataTableFields } from '@core/data/fields'
 import type { DataField, DataRow, DataTableListItem } from '@core/data/schemas'
+import {
+  canReadDataRow,
+  canReadDataTable,
+  dataRowVisibility,
+} from '../../../auth/dataAccess'
 
 // ---------------------------------------------------------------------------
 // Capability requirements (ANY-OF) — mirrors HTTP-route gates in
@@ -135,7 +140,10 @@ const listTablesTool: AiTool = {
   handler: async (input, ctx) => {
     const args = input as Static<typeof ListTablesInput>
     const tables = await listDataTablesWithCounts(ctx.db)
-    const filtered = args.kind ? tables.filter((t) => t.kind === args.kind) : tables
+    const readable = tables.filter((table) => (
+      canReadDataTable({ id: ctx.userId, capabilities: ctx.capabilities }, table)
+    ))
+    const filtered = args.kind ? readable.filter((t) => t.kind === args.kind) : readable
     return { tables: filtered.map(projectTable) }
   },
 }
@@ -160,7 +168,10 @@ const getTableTool: AiTool = {
     const { tableId } = input as Static<typeof GetTableInput>
     const tables = await listDataTablesWithCounts(ctx.db)
     const table = tables.find((t) => t.id === tableId)
-    if (!table) {
+    if (
+      !table
+      || !canReadDataTable({ id: ctx.userId, capabilities: ctx.capabilities }, table)
+    ) {
       return { ok: false, error: `Table ${tableId} not found.` }
     }
     const fields = normalizeDataTableFields(table.fields)
@@ -200,7 +211,11 @@ const listRowsTool: AiTool = {
   inputSchema: ListRowsInput,
   handler: async (input, ctx) => {
     const args = input as Static<typeof ListRowsInput>
-    const all = await listDataRows(ctx.db, args.tableId)
+    const all = await listDataRows(
+      ctx.db,
+      args.tableId,
+      dataRowVisibility({ id: ctx.userId, capabilities: ctx.capabilities }),
+    )
     let filtered = all
     if (args.status) filtered = filtered.filter((r) => r.status === args.status)
     const offset = args.offset ?? 0
@@ -248,7 +263,10 @@ const getRowTool: AiTool = {
   handler: async (input, ctx) => {
     const { rowId } = input as Static<typeof GetRowInput>
     const row = await getDataRow(ctx.db, rowId)
-    if (!row) {
+    if (
+      !row
+      || !canReadDataRow({ id: ctx.userId, capabilities: ctx.capabilities }, row)
+    ) {
       return { ok: false, error: `Row ${rowId} not found.` }
     }
     return { row: projectRow(row) }

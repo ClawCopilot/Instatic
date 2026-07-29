@@ -34,8 +34,15 @@ import {
   requireAnyCapability,
   requireCapability,
   userHasAnyCapability,
-  userHasCapability,
 } from '../../../auth/authz'
+import {
+  canEditDataRow,
+  canManageDataTable,
+  canPublishDataRow,
+  canReadDataRow,
+  canReadDataTable,
+  canSeeAllDataRows,
+} from '../../../auth/dataAccess'
 import type { DbClient } from '../../../db/client'
 import { jsonResponse } from '../../../http'
 import type { AuthUser } from '../../../repositories/users'
@@ -48,17 +55,6 @@ const DATA_ACCESS_CAPABILITIES = [
   'content.publish.own',
   'content.publish.any',
   'content.manage',
-] satisfies CoreCapability[]
-
-const DATA_ANY_VISIBILITY_CAPABILITIES = [
-  'content.edit.any',
-  'content.publish.any',
-  'content.manage',
-] satisfies CoreCapability[]
-
-const DATA_OWN_READ_CAPABILITIES = [
-  'content.edit.own',
-  'content.publish.own',
 ] satisfies CoreCapability[]
 
 const DATA_EDIT_CAPABILITIES = [
@@ -75,12 +71,8 @@ const DATA_REASSIGN_CAPABILITIES = [
 const DATA_PUBLISH_CAPABILITIES = [
   'content.publish.own',
   'content.publish.any',
+  'content.manage',
 ] satisfies CoreCapability[]
-
-interface OwnedDataRow {
-  authorUserId: string | null
-  createdByUserId: string | null
-}
 
 export function forbidden(): Response {
   return jsonResponse({ error: 'Forbidden' }, { status: 403 })
@@ -122,9 +114,7 @@ export async function requireCustomTablesManager(req: Request, db: DbClient): Pr
  * gate single-table reads at the boundary.
  */
 export function canReadTable(user: AuthUser, table: Pick<DataTable, 'system'>): boolean {
-  return table.system
-    ? userHasAnyCapability(user, ['data.system.tables.read', 'data.system.tables.manage'])
-    : userHasAnyCapability(user, ['data.custom.tables.read', 'data.custom.tables.manage'])
+  return canReadDataTable(user, table)
 }
 
 /**
@@ -133,7 +123,7 @@ export function canReadTable(user: AuthUser, table: Pick<DataTable, 'system'>): 
  * fields are immutable for everyone (`assertSystemTableUpdateAllowed`).
  */
 export function canManageTable(user: AuthUser, table: Pick<DataTable, 'system'>): boolean {
-  return userHasCapability(user, table.system ? 'data.system.tables.manage' : 'data.custom.tables.manage')
+  return canManageDataTable(user, table)
 }
 
 /**
@@ -171,25 +161,9 @@ export async function requireDataPublisher(req: Request, db: DbClient): Promise<
   return requireAnyCapability(req, db, DATA_PUBLISH_CAPABILITIES)
 }
 
-export function canSeeAllDataRows(user: AuthUser): boolean {
-  return userHasAnyCapability(user, DATA_ANY_VISIBILITY_CAPABILITIES)
-}
-
-function ownsDataRow(user: AuthUser, row: OwnedDataRow): boolean {
-  return row.authorUserId === user.id || (!row.authorUserId && row.createdByUserId === user.id)
-}
-
-export function canReadDataRow(user: AuthUser, row: OwnedDataRow): boolean {
-  return canSeeAllDataRows(user) ||
-    (ownsDataRow(user, row) && userHasAnyCapability(user, DATA_OWN_READ_CAPABILITIES))
-}
-
-export function canEditDataRow(user: AuthUser, row: OwnedDataRow): boolean {
-  return userHasAnyCapability(user, ['content.edit.any', 'content.manage']) ||
-    (ownsDataRow(user, row) && userHasCapability(user, 'content.edit.own'))
-}
-
-export function canPublishDataRow(user: AuthUser, row: OwnedDataRow): boolean {
-  return userHasCapability(user, 'content.publish.any') ||
-    (ownsDataRow(user, row) && userHasCapability(user, 'content.publish.own'))
+export {
+  canEditDataRow,
+  canPublishDataRow,
+  canReadDataRow,
+  canSeeAllDataRows,
 }

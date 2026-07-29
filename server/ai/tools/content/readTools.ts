@@ -28,6 +28,11 @@ import {
 } from '@core/data/cells'
 import { normalizeDataTableFields } from '@core/data/fields'
 import type { DataField, DataRow, DataTableListItem } from '@core/data/schemas'
+import {
+  canReadDataRow,
+  canReadDataTable,
+  dataRowVisibility,
+} from '../../../auth/dataAccess'
 
 // ---------------------------------------------------------------------------
 // Capability requirements (ANY-OF) — each tool mirrors its HTTP-route gate.
@@ -135,7 +140,10 @@ const listCollectionsTool: AiTool = {
     const tables = await listDataTablesWithCounts(ctx.db)
     return {
       collections: tables
-        .filter((t) => CONTENT_KIND_VISIBLE.has(t.kind))
+        .filter((t) => (
+          CONTENT_KIND_VISIBLE.has(t.kind)
+          && canReadDataTable({ id: ctx.userId, capabilities: ctx.capabilities }, t)
+        ))
         .map(projectCollection),
     }
   },
@@ -161,7 +169,11 @@ const getCollectionSchemaTool: AiTool = {
     const { tableId } = input as Static<typeof GetCollectionSchemaInput>
     const tables = await listDataTablesWithCounts(ctx.db)
     const table = tables.find((t) => t.id === tableId)
-    if (!table) {
+    if (
+      !table
+      || !CONTENT_KIND_VISIBLE.has(table.kind)
+      || !canReadDataTable({ id: ctx.userId, capabilities: ctx.capabilities }, table)
+    ) {
       return { ok: false, error: `Collection ${tableId} not found.` }
     }
     const fields = normalizeDataTableFields(table.fields)
@@ -201,7 +213,16 @@ const listDocumentsTool: AiTool = {
   inputSchema: ListDocumentsInput,
   handler: async (input, ctx) => {
     const args = input as Static<typeof ListDocumentsInput>
-    const all = await listDataRows(ctx.db, args.tableId)
+    const tables = await listDataTablesWithCounts(ctx.db)
+    const table = tables.find((candidate) => candidate.id === args.tableId)
+    if (!table || !CONTENT_KIND_VISIBLE.has(table.kind)) {
+      return { ok: false, error: `Collection ${args.tableId} not found.` }
+    }
+    const all = await listDataRows(
+      ctx.db,
+      args.tableId,
+      dataRowVisibility({ id: ctx.userId, capabilities: ctx.capabilities }),
+    )
     let filtered = all
     if (args.status) filtered = filtered.filter((r) => r.status === args.status)
     if (args.authorUserId) filtered = filtered.filter((r) => r.authorUserId === args.authorUserId)
@@ -236,7 +257,15 @@ const getDocumentTool: AiTool = {
   handler: async (input, ctx) => {
     const { documentId } = input as Static<typeof GetDocumentInput>
     const row = await getDataRow(ctx.db, documentId)
-    if (!row) {
+    if (
+      !row
+      || !canReadDataRow({ id: ctx.userId, capabilities: ctx.capabilities }, row)
+    ) {
+      return { ok: false, error: `Document ${documentId} not found.` }
+    }
+    const tables = await listDataTablesWithCounts(ctx.db)
+    const table = tables.find((candidate) => candidate.id === row.tableId)
+    if (!table || !CONTENT_KIND_VISIBLE.has(table.kind)) {
       return { ok: false, error: `Document ${documentId} not found.` }
     }
     return {
@@ -276,11 +305,22 @@ const searchDocumentsTool: AiTool = {
   inputSchema: SearchDocumentsInput,
   handler: async (input, ctx) => {
     const { query, limit } = input as Static<typeof SearchDocumentsInput>
-    const results = await searchDataRows(ctx.db, query, limit ?? 25)
+    const principal = { id: ctx.userId, capabilities: ctx.capabilities }
+    const results = await searchDataRows(
+      ctx.db,
+      query,
+      limit ?? 25,
+      dataRowVisibility(principal),
+    )
     // Only surface postType/page rows — `data` tables aren't content.
     const tables = await listDataTablesWithCounts(ctx.db)
     const visibleTableIds = new Set(
-      tables.filter((t) => CONTENT_KIND_VISIBLE.has(t.kind)).map((t) => t.id),
+      tables
+        .filter((t) => (
+          CONTENT_KIND_VISIBLE.has(t.kind)
+          && canReadDataTable(principal, t)
+        ))
+        .map((t) => t.id),
     )
     return {
       query,

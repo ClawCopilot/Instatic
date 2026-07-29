@@ -5,7 +5,6 @@
  * the .tsx file holds (the context provider is the only export there).
  */
 import { createContext, useContext } from 'react'
-import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { AgentSlice } from '@site/agent'
 
@@ -59,7 +58,5 @@ export function useAgentStoreApi(): AgentStoreApi {
  */
 export function useAgentStore<U>(selector: (slice: AgentSlice) => U, equalityFn?: (a: U, b: U) => boolean): U {
   const api = useAgentStoreApi()
-  return equalityFn
-    ? useStoreWithEqualityFn(api, selector, equalityFn)
-    : useStore(api, selector)
+  return useStoreWithEqualityFn(api, selector, equalityFn)
 }

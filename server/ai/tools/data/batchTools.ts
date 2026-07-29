@@ -14,6 +14,7 @@ import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../types'
 import { createDataRowMany, getDataTable } from '../../../repositories/data'
 import { slugForTable } from '@core/data/cells'
+import { lockedBuiltInCellKey } from '@core/data/systemTableGuard'
 
 // ---------------------------------------------------------------------------
 // Capability requirements
@@ -50,6 +51,15 @@ const createRowsTool: AiTool = {
     const table = await getDataTable(ctx.db, args.tableId)
     if (!table) {
       return { ok: false, error: `Table ${args.tableId} not found.` }
+    }
+    for (const row of args.rows) {
+      const lockedField = lockedBuiltInCellKey(table, row.cells)
+      if (lockedField) {
+        return {
+          ok: false,
+          error: `The "${lockedField}" field is managed by the editor and cannot be edited here.`,
+        }
+      }
     }
 
     const inputs = args.rows.map((r) => ({

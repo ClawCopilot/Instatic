@@ -67,7 +67,6 @@ function leadingKeyword(sql: string): string {
   let s = sql
   // Strip leading line/block comments + whitespace, repeating so multiple
   // comments in sequence are handled.
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     s = s.trimStart()
     if (s.startsWith('/*')) {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,11 @@ import type { DbClient, DbResult } from '../../../server/db'
 import { handleCmsRequest } from '../../../server/handlers/cms'
 import { assertPathWithin } from '../../../server/util/pathWithin'
 import { hookBus } from '@core/plugins/hookBus'
+import { stopScheduler } from '../../../server/plugins/scheduler'
+
+afterEach(() => {
+  stopScheduler()
+})
 
 function makeFakeDb() {
   const admins: Record<string, unknown>[] = [

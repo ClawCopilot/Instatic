@@ -18,6 +18,7 @@
  */
 
 import { TARGET_PERMISSIONS } from '../../../protocol/targets'
+import { buildExtensionApis } from './extensionApis'
 
 // ------- the api object plugins receive -------
 globalThis.__buildApi = function buildApi() {
@@ -47,6 +48,8 @@ globalThis.__buildApi = function buildApi() {
   function call(target: string, args: unknown[]) {
     return __hostCall(target, args)
   }
+
+  const extensionApis = buildExtensionApis(assertTargetPermission, call, __nextId)
 
   function normalizePath(p: unknown): string {
     const t = String(p).trim()
@@ -424,44 +427,6 @@ globalThis.__buildApi = function buildApi() {
     }])
   }
 
-  // ---- viewerContext / contentGate / secrets ----------------------------
-  // These extension-point APIs let plugins participate in the render
-  // pipeline (viewer context enrichment, content gating) and store
-  // encrypted key-value pairs (signing keys, webhook secrets). The
-  // provider/gate functions live INSIDE the VM; the host stores only
-  // metadata. Secrets are encrypted at rest by the host.
-
-  function viewerContextRegister(provider: unknown) {
-    assertTargetPermission('cms.viewerContext.register')
-    if (typeof provider !== 'function') throw new TypeError('viewerContext.register: provider must be a function')
-    // Stash the provider inside the VM; the host calls back via a
-    // worker RPC at render time. The provider id is minterd here.
-    const providerId = __nextId('vcProvider')
-    globalThis.__plugin_handlers.viewContextProviders = globalThis.__plugin_handlers.viewContextProviders || {}
-    globalThis.__plugin_handlers.viewContextProviders[providerId] = provider as BootstrapFn
-    return call('cms.viewerContext.register', [{}])
-  }
-
-  function contentGateRegister(gate: unknown, priority?: unknown) {
-    assertTargetPermission('cms.contentGate.register')
-    if (typeof gate !== 'function') throw new TypeError('contentGate.register: gate must be a function')
-    const gateId = __nextId('contentGate')
-    globalThis.__plugin_handlers.contentGates = globalThis.__plugin_handlers.contentGates || {}
-    globalThis.__plugin_handlers.contentGates[gateId] = gate as BootstrapFn
-    const p = typeof priority === 'number' ? Math.floor(priority) : 100
-    return call('cms.contentGate.register', [{ priority: p }])
-  }
-
-  function secretsGet(key: unknown) {
-    assertTargetPermission('cms.secrets.get')
-    return call('cms.secrets.get', [{ key: String(key) }])
-  }
-
-  function secretsSet(key: unknown, value: unknown) {
-    assertTargetPermission('cms.secrets.set')
-    return call('cms.secrets.set', [{ key: String(key), value: String(value) }])
-  }
-
   return {
     plugin: {
       id: meta.id,
@@ -695,9 +660,9 @@ globalThis.__buildApi = function buildApi() {
     // (api.viewerContext.register, api.contentGate.register, api.secrets.get,
     // api.hooks.emit) instead of the longer api.cms.* paths.
     hooks: { on: on, filter: filter, emit: emit },
-    viewerContext: { register: viewerContextRegister },
-    contentGate: { register: contentGateRegister },
-    secrets: { get: secretsGet, set: secretsSet },
+    viewerContext: extensionApis.viewerContext,
+    contentGate: extensionApis.contentGate,
+    secrets: extensionApis.secrets,
   }
 }
 

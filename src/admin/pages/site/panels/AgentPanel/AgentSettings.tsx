@@ -15,6 +15,7 @@ import { ContextMenu } from '@ui/components/ContextMenu'
 import { Button } from '@ui/components/Button'
 import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import { ArrowRightIcon } from 'pixel-art-icons/icons/arrow-right'
+import { useNavigate } from '@admin/lib/routing'
 import styles from './AgentSettings.module.css'
 
 // ---------------------------------------------------------------------------
@@ -216,6 +217,7 @@ export function AgentSettingsButton({
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const navigate = useNavigate()
 
   // Close popover on Escape
   useEffect(() => {
@@ -263,9 +265,7 @@ export function AgentSettingsButton({
       type="button"
       variant="secondary"
       size={variant === 'emptyState' ? 'md' : 'sm'}
-      onClick={() => {
-        window.location.href = '/admin/ai'
-      }}
+      onClick={() => navigate('/admin/ai')}
       aria-label={label}
       data-testid={testId}
     >

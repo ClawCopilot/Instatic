@@ -149,6 +149,9 @@ function createAgentStore(overrides: Partial<AgentSlice> = {}) {
     agentActiveCredentialId: null,
     agentActiveModelId: null,
     agentConversations: [],
+    agentContextTokens: null,
+    agentSkills: [],
+    agentActiveSkillIds: [],
     agentUsage: {
       contextTokens: null,
       contextCredentialId: null,
@@ -174,6 +177,7 @@ function createAgentStore(overrides: Partial<AgentSlice> = {}) {
     })),
     loadAgentConversations: async () => {},
     loadAgentConversation: async () => {},
+    forkAgentConversation: async () => {},
     startNewAgentConversation: () => set((state) => ({
       agentMessages: [],
       agentError: null,
@@ -184,6 +188,13 @@ function createAgentStore(overrides: Partial<AgentSlice> = {}) {
       set({ agentActiveCredentialId: credentialId, agentActiveModelId: modelId, agentError: null })
     },
     loadScopeDefault: async () => {},
+    setOnToolConfirm: () => {},
+    loadAgentSkills: async () => {},
+    toggleAgentSkill: () => {},
+    agentUndo: () => {},
+    agentRedo: () => {},
+    agentCanUndo: () => false,
+    agentCanRedo: () => false,
     ...overrides,
   }))
 }
@@ -332,7 +343,7 @@ describe('AgentPanel', () => {
     renderAgentPanel({ agentActiveCredentialId: 'cred_1', agentActiveModelId: 'gpt-4o' })
 
     await waitFor(() => {
-      expect(screen.getByText("Describe what you want to build and I'll do it for you.")).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Build pages' })).toBeTruthy()
     })
 
     expect(screen.queryByText('Connect an AI provider')).toBeNull()
@@ -527,7 +538,7 @@ describe('AgentPanel', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText("Describe what you want to build and I'll do it for you.")).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Build pages' })).toBeTruthy()
     })
 
     // The setup empty state must not appear, and the composer textarea must be

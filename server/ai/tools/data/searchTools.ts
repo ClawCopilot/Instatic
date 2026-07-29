@@ -12,6 +12,7 @@ import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../types'
 import { listDataTablesWithCounts, listDataRows } from '../../../repositories/data'
 import { readTitleCell } from '@core/data/cells'
+import { dataRowVisibility } from '../../../auth/dataAccess'
 
 // ---------------------------------------------------------------------------
 // Capability requirements
@@ -110,7 +111,11 @@ const searchTool: AiTool = {
       // Skip tables with no rows
       if (table.rowCount === 0) continue
 
-      const rows = await listDataRows(ctx.db, table.id)
+      const rows = await listDataRows(
+        ctx.db,
+        table.id,
+        dataRowVisibility({ id: ctx.userId, capabilities: ctx.capabilities }),
+      )
       for (const row of rows) {
         const title = readTitleCell(row.cells) || row.slug || row.id
         const searchText = `${row.slug} ${title} ${extractSearchableText(row.cells)}`

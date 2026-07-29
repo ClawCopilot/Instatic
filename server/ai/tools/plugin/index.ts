@@ -23,6 +23,10 @@ import { listInstalledPlugins } from '../../../repositories/plugins'
 import type { PluginManifest } from '@core/plugin-sdk'
 import type { SkillAiTool } from '@core/plugin-sdk/types/skillTypes'
 import type { AiTool, ToolContext } from '../types'
+import {
+  getPluginSettings,
+  replacePluginSettingsCache,
+} from './pluginSettingsCache'
 import { lookupLocalHandler } from './toolHandlers'
 
 // ---------------------------------------------------------------------------
@@ -37,9 +41,6 @@ let cachedPluginSystemPrompts: string[] = []
 
 /** skillId → systemPrompt 映射，用于精细化注入 */
 let cachedSkillPromptMap: Map<string, string> = new Map()
-
-/** skillId → settings 映射，让 tool handler 可以读取用户配置 */
-let cachedSkillSettingsMap: Map<string, Record<string, unknown>> = new Map()
 
 /** Skill 元数据 — 用于自动推荐 */
 interface SkillMeta {
@@ -125,7 +126,7 @@ export async function initPluginToolCache(db: DbClient): Promise<void> {
   cachedPluginTools = tools
   cachedPluginSystemPrompts = prompts
   cachedSkillPromptMap = promptMap
-  cachedSkillSettingsMap = settingsMap
+  replacePluginSettingsCache(settingsMap)
   cachedSkillMetas = metas
 }
 
@@ -227,9 +228,7 @@ export function getPluginTools(): AiTool[] {
  * Tool handler 通过此函数读取用户在管理面板配置的插件参数（如 API token）。
  * 返回空对象如果该 skill 没有配置或未找到。
  */
-export function getPluginSettings(pluginId: string): Record<string, unknown> {
-  return cachedSkillSettingsMap.get(pluginId) ?? {}
-}
+export { getPluginSettings }
 
 /**
  * 返回指定 skillIds 对应的工具子集。

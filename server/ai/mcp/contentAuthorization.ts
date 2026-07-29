@@ -10,6 +10,11 @@
 import type { CoreCapability } from '@core/capabilities'
 import type { DbClient } from '../../db/client'
 import { getDataRow } from '../../repositories/data'
+import {
+  canEditDataRow,
+  canPublishDataRow,
+  type DataAccessPrincipal,
+} from '../../auth/dataAccess'
 
 const DOCUMENT_EDIT_TOOLS = new Set([
   'content_delete_document',
@@ -33,13 +38,6 @@ function inputDocumentId(input: unknown): string {
   return input.documentId
 }
 
-function ownsDocument(
-  row: { authorUserId: string | null; createdByUserId: string | null },
-  userId: string,
-): boolean {
-  return row.authorUserId === userId || (!row.authorUserId && row.createdByUserId === userId)
-}
-
 export async function authorizeMcpContentTool(
   db: DbClient,
   userId: string,
@@ -54,16 +52,10 @@ export async function authorizeMcpContentTool(
   const documentId = inputDocumentId(input)
   const row = await getDataRow(db, documentId)
   if (!row) throw new Error(`Document ${documentId} not found.`)
+  const principal: DataAccessPrincipal = { id: userId, capabilities }
 
-  if (checksEditOwnership) {
-    if (capabilities.includes('content.edit.any') || capabilities.includes('content.manage')) return
-    if (capabilities.includes('content.edit.own') && ownsDocument(row, userId)) return
-  }
-
-  if (checksPublishOwnership) {
-    if (capabilities.includes('content.publish.any')) return
-    if (capabilities.includes('content.publish.own') && ownsDocument(row, userId)) return
-  }
+  if (checksEditOwnership && canEditDataRow(principal, row)) return
+  if (checksPublishOwnership && canPublishDataRow(principal, row)) return
 
   throw new Error(`Tool ${toolName} is not permitted for document ${documentId}.`)
 }

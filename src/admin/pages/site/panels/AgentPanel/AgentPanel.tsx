@@ -225,15 +225,15 @@ export function AgentPanel({ variant = 'floating', scope = 'site' }: { variant?:
     return () => setOnToolConfirm(null)
   }, [setOnToolConfirm, settings.confirmDangerousOps])
 
-  const handleConfirm = useCallback(() => {
+  function handleConfirm() {
     confirmDialog.resolve?.(true)
     setConfirmDialog((prev) => ({ ...prev, open: false, resolve: null }))
-  }, [confirmDialog.resolve])
+  }
 
-  const handleReject = useCallback(() => {
+  function handleReject() {
     confirmDialog.resolve?.(false)
     setConfirmDialog((prev) => ({ ...prev, open: false, resolve: null }))
-  }, [confirmDialog.resolve])
+  }
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

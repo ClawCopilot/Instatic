@@ -1,4 +1,5 @@
-import { relative, sep } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, join, posix, relative, sep } from 'node:path'
 import * as esbuild from 'esbuild'
 import type { Page, SiteDocument } from '@core/page-tree'
 import {
@@ -18,7 +19,6 @@ import {
   DEFAULT_SITE_PACKAGE_JSON,
 } from '@core/site-dependencies/manifest'
 import type { RuntimeDependencyCache } from './dependencyCache'
-import { materializeSiteScriptWorkspace } from './virtualSiteWorkspace'
 
 export interface BuiltRuntimeAssetFile {
   path: string
@@ -52,6 +52,8 @@ export interface BuildSiteRuntimeScriptsInput {
  */
 const DEFAULT_BUNDLE_TIMEOUT_MS = 30_000
 const textEncoder = new TextEncoder()
+const SITE_MODULE_PREFIX = 'instatic-site:'
+const SITE_MODULE_NAMESPACE = 'instatic-site'
 
 function toPosixPath(path: string): string {
   return path.split(sep).join('/')
@@ -163,16 +165,144 @@ function esbuildDiagnostics(error: unknown): SiteRuntimeDiagnostic[] {
 
 function selectedScriptByEntryPoint(
   selectedScripts: RuntimeScriptEntry[],
-  entryPointByFileId: Map<string, string>,
-  rootDir: string,
 ): Map<string, RuntimeScriptEntry> {
   const entries = new Map<string, RuntimeScriptEntry>()
   for (const script of selectedScripts) {
-    const absolutePath = entryPointByFileId.get(script.file.id)
-    if (!absolutePath) continue
-    entries.set(toPosixPath(relative(rootDir, absolutePath)), script)
+    const path = normalizeSiteModulePath(script.file.path)
+    entries.set(`${SITE_MODULE_PREFIX}${path}`, script)
+    entries.set(path, script)
   }
   return entries
+}
+
+function normalizeSiteModulePath(path: string): string {
+  return posix.normalize(path.replaceAll('\\', '/')).replace(/^\.\/+/, '')
+}
+
+function siteModuleLoader(path: string): esbuild.Loader {
+  if (path.endsWith('.tsx')) return 'tsx'
+  if (path.endsWith('.jsx')) return 'jsx'
+  if (path.endsWith('.json')) return 'json'
+  if (path.endsWith('.css')) return 'css'
+  if (path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.cjs')) return 'js'
+  return 'ts'
+}
+
+function localModuleCandidates(importer: string, specifier: string): string[] {
+  const requested = normalizeSiteModulePath(
+    specifier.startsWith('/')
+      ? specifier.slice(1)
+      : posix.join(posix.dirname(importer), specifier),
+  )
+  const candidates = [requested]
+  if (!posix.extname(requested)) {
+    candidates.push(
+      `${requested}.ts`,
+      `${requested}.tsx`,
+      `${requested}.js`,
+      `${requested}.jsx`,
+      `${requested}.json`,
+      posix.join(requested, 'index.ts'),
+      posix.join(requested, 'index.tsx'),
+      posix.join(requested, 'index.js'),
+      posix.join(requested, 'index.jsx'),
+    )
+  } else if (requested.endsWith('.js')) {
+    candidates.push(requested.slice(0, -3) + '.ts', requested.slice(0, -3) + '.tsx')
+  } else if (requested.endsWith('.jsx')) {
+    candidates.push(requested.slice(0, -4) + '.ts', requested.slice(0, -4) + '.tsx')
+  }
+  return candidates
+}
+
+function isWithinDirectory(rootDir: string, path: string): boolean {
+  const relativePath = relative(rootDir, path)
+  return relativePath === '' || (!relativePath.startsWith('..') && !relativePath.startsWith(sep))
+}
+
+function resolveRuntimeDependency(
+  specifier: string,
+  importer: string,
+  dependencyNodeModulesDirs: string[],
+): string | null {
+  const anchors = [
+    ...(importer ? [importer] : []),
+    ...dependencyNodeModulesDirs.map((nodeModulesDir) => join(dirname(nodeModulesDir), 'package.json')),
+  ]
+
+  for (const anchor of anchors) {
+    try {
+      const resolved = createRequire(anchor).resolve(specifier)
+      if (
+        dependencyNodeModulesDirs.some((nodeModulesDir) => (
+          isWithinDirectory(nodeModulesDir, resolved)
+        ))
+      ) {
+        return resolved
+      }
+    } catch {
+      // Try the next explicitly configured dependency cache.
+    }
+  }
+  return null
+}
+
+function createSiteModulePlugin(
+  site: SiteDocument,
+  dependencyNodeModulesDirs: string[],
+): esbuild.Plugin {
+  const sourceByPath = new Map(
+    site.files
+      .filter((file) => file.type === 'script' && typeof file.content === 'string')
+      .map((file) => [normalizeSiteModulePath(file.path), file.content ?? '']),
+  )
+
+  return {
+    name: 'instatic-site-modules',
+    setup(build) {
+      build.onResolve({ filter: /^instatic-site:/ }, (args) => {
+        const path = normalizeSiteModulePath(args.path.slice(SITE_MODULE_PREFIX.length))
+        return sourceByPath.has(path)
+          ? { path, namespace: SITE_MODULE_NAMESPACE }
+          : { errors: [{ text: `Could not resolve site module "${path}"` }] }
+      })
+
+      build.onResolve({ filter: /.*/, namespace: SITE_MODULE_NAMESPACE }, async (args) => {
+        if (args.path.startsWith('.') || args.path.startsWith('/')) {
+          const path = localModuleCandidates(args.importer, args.path)
+            .find((candidate) => sourceByPath.has(candidate))
+          return path
+            ? { path, namespace: SITE_MODULE_NAMESPACE }
+            : { errors: [{ text: `Could not resolve "${args.path}" from "${args.importer}"` }] }
+        }
+
+        const path = resolveRuntimeDependency(args.path, '', dependencyNodeModulesDirs)
+        return path
+          ? { path }
+          : {
+              errors: [{
+                text: `Could not resolve runtime dependency "${args.path}" from the dependency cache`,
+              }],
+            }
+      })
+
+      build.onResolve({ filter: /^[^./]/, namespace: 'file' }, (args) => {
+        const path = resolveRuntimeDependency(args.path, args.importer, dependencyNodeModulesDirs)
+        return path
+          ? { path }
+          : {
+              errors: [{
+                text: `Could not resolve runtime dependency "${args.path}" from the dependency cache`,
+              }],
+            }
+      })
+
+      build.onLoad({ filter: /.*/, namespace: SITE_MODULE_NAMESPACE }, (args) => ({
+        contents: sourceByPath.get(args.path) ?? '',
+        loader: siteModuleLoader(args.path),
+      }))
+    },
+  }
 }
 
 export async function buildSiteRuntimeScripts(
@@ -208,11 +338,13 @@ export async function buildSiteRuntimeScripts(
     }
   }
 
-  const workspace = await materializeSiteScriptWorkspace(input.site)
+  const dependencyNodeModulesDirs = [
+    ...(input.dependencyCache?.nodeModulesDir ? [input.dependencyCache.nodeModulesDir] : []),
+    ...(input.dependencyNodeModulesDir ? [input.dependencyNodeModulesDir] : []),
+  ]
   try {
     const entryPoints = moduleScripts
-      .map((entry) => workspace.entryPointByFileId.get(entry.file.id))
-      .filter((entryPoint): entryPoint is string => Boolean(entryPoint))
+      .map((entry) => `${SITE_MODULE_PREFIX}${normalizeSiteModulePath(entry.file.path)}`)
 
     if (entryPoints.length === 0) {
       return {
@@ -234,7 +366,7 @@ export async function buildSiteRuntimeScripts(
     }
 
     const buildPromise = esbuild.build({
-      absWorkingDir: workspace.rootDir,
+      absWorkingDir: process.cwd(),
       assetNames: 'assets/[name]-[hash]',
       bundle: true,
       chunkNames: 'chunks/[name]-[hash]',
@@ -243,16 +375,10 @@ export async function buildSiteRuntimeScripts(
       format: 'esm',
       logLevel: 'silent',
       metafile: true,
-      nodePaths: [
-        ...(
-          input.dependencyCache?.nodeModulesDir
-            ? [input.dependencyCache.nodeModulesDir]
-            : []
-        ),
-        ...(input.dependencyNodeModulesDir ? [input.dependencyNodeModulesDir] : []),
-      ],
+      nodePaths: dependencyNodeModulesDirs,
       outdir: outputRoot,
       platform: 'browser',
+      plugins: [createSiteModulePlugin(input.site, dependencyNodeModulesDirs)],
       // Inline source maps for canvas preview keep runtime errors mappable
       // back to user code without serving separate .map assets. Publish
       // output stays minimal — the published surface is read-only and we
@@ -260,6 +386,11 @@ export async function buildSiteRuntimeScripts(
       sourcemap: input.target === 'canvas' ? 'inline' : false,
       splitting: splitRuntimeChunks,
       target: ['es2020'],
+      // Site scripts live in an isolated virtual workspace and must not
+      // inherit a host project's tsconfig. Supplying an explicit empty config
+      // also prevents esbuild from walking parent directories outside the
+      // runtime sandbox while searching for one.
+      tsconfigRaw: { compilerOptions: {} },
       write: false,
     })
     buildPromise.catch(() => {
@@ -271,8 +402,7 @@ export async function buildSiteRuntimeScripts(
     // Race esbuild against a timeout so a pathological build cannot stall the
     // request indefinitely. esbuild has no public abort API for one-shot
     // builds; if the timeout fires first the build promise still settles
-    // later but we have already abandoned its result and torn down the
-    // workspace via the outer finally.
+    // later but we have already abandoned its result.
     let build: Awaited<typeof buildPromise>
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -288,7 +418,7 @@ export async function buildSiteRuntimeScripts(
     }
 
     const files = build.outputFiles.map((file) => {
-      const path = toPosixPath(relative(`${workspace.rootDir}/${outputRoot}`, file.path))
+      const path = toPosixPath(relative(join(process.cwd(), outputRoot), file.path))
       return {
         path,
         publicPath: joinPublicPath(input.assetBasePath, path),
@@ -298,11 +428,7 @@ export async function buildSiteRuntimeScripts(
       }
     })
     const publicPathByOutput = new Map(files.map((file) => [`${outputRoot}/${file.path}`, file.publicPath]))
-    const selectedByEntryPoint = selectedScriptByEntryPoint(
-      moduleScripts,
-      workspace.entryPointByFileId,
-      workspace.rootDir,
-    )
+    const selectedByEntryPoint = selectedScriptByEntryPoint(moduleScripts)
 
     const moduleAssetScripts = Object.entries(build.metafile.outputs)
       .map(([
@@ -333,7 +459,5 @@ export async function buildSiteRuntimeScripts(
     }
   } catch (error) {
     return emptyRuntimeBuild([...importAnalysis.diagnostics, ...esbuildDiagnostics(error)])
-  } finally {
-    await workspace.cleanup()
   }
 }

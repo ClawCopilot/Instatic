@@ -28,7 +28,7 @@
  * convention used by `buildAiToolFromSkillTool` for the qualified tool name.
  */
 
-import { getPluginSettings } from './index'
+import { getPluginSettings } from './pluginSettingsCache'
 
 // ===========================================================================
 // Proxy-aware fetch helper

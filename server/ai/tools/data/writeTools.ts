@@ -24,6 +24,8 @@ import {
   softDeleteDataRow,
 } from '../../../repositories/data'
 import { slugForTable } from '@core/data/cells'
+import { lockedBuiltInCellKey } from '@core/data/systemTableGuard'
+import { canEditDataRow } from '../../../auth/dataAccess'
 
 // ---------------------------------------------------------------------------
 // Capability requirements (ANY-OF) — mirrors HTTP-route gates in
@@ -172,6 +174,13 @@ const createRowTool: AiTool = {
     if (!table) {
       return { ok: false, error: `Table ${args.tableId} not found.` }
     }
+    const lockedField = lockedBuiltInCellKey(table, args.cells)
+    if (lockedField) {
+      return {
+        ok: false,
+        error: `The "${lockedField}" field is managed by the editor and cannot be edited here.`,
+      }
+    }
     const slug = args.slug ?? slugForTable(table, args.cells)
     const row = await createDataRow(
       ctx.db,
@@ -200,12 +209,25 @@ const updateRowTool: AiTool = {
   handler: async (input, ctx) => {
     const args = input as Static<typeof UpdateRowInput>
     const currentRow = await getDataRow(ctx.db, args.rowId)
-    if (!currentRow) {
+    if (
+      !currentRow
+      || !canEditDataRow(
+        { id: ctx.userId, capabilities: ctx.capabilities },
+        currentRow,
+      )
+    ) {
       return { ok: false, error: `Row ${args.rowId} not found.` }
     }
     const table = await getDataTable(ctx.db, currentRow.tableId)
     if (!table) {
       return { ok: false, error: `Table ${currentRow.tableId} not found.` }
+    }
+    const lockedField = lockedBuiltInCellKey(table, args.cells)
+    if (lockedField) {
+      return {
+        ok: false,
+        error: `The "${lockedField}" field is managed by the editor and cannot be edited here.`,
+      }
     }
     const slug = slugForTable(table, args.cells)
     const updated = await saveDataRowDraft(
@@ -244,6 +266,16 @@ const deleteRowTool: AiTool = {
   inputSchema: DeleteRowInput,
   handler: async (input, ctx) => {
     const args = input as Static<typeof DeleteRowInput>
+    const currentRow = await getDataRow(ctx.db, args.rowId)
+    if (
+      !currentRow
+      || !canEditDataRow(
+        { id: ctx.userId, capabilities: ctx.capabilities },
+        currentRow,
+      )
+    ) {
+      return { ok: false, error: `Row ${args.rowId} not found.` }
+    }
     const summary = await softDeleteDataRow(ctx.db, args.rowId, ctx.userId)
     if (!summary) {
       return { ok: false, error: `Row ${args.rowId} not found or already deleted.` }

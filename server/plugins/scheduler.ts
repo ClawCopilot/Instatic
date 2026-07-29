@@ -122,6 +122,17 @@ export function startScheduler(db: DbClient): void {
 }
 
 /**
+ * Stop the scheduler loop and reset its process-local bookkeeping.
+ * Production shutdown and tests use this to ensure a stale interval cannot
+ * retain a closed database client.
+ */
+export function stopScheduler(): void {
+  if (tickTimer !== null) clearInterval(tickTimer)
+  tickTimer = null
+  lastHistoryTrimAt = 0
+}
+
+/**
  * One iteration of the tick. Exported for tests — production code uses
  * `startScheduler` and lets `setInterval` drive.
  *
